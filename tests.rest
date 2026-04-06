@@ -1,0 +1,15 @@
+### Generic Webhook Receiver Plugin
+POST http://localhost:8000/webhooks/generic_webhook
+Content-Type: application/json
+
+{
+  "source_type": "manual-submission",
+  "source_id": "libs/core/src/waygate_core/plugin_base.py",
+  "timestamp": {{$timestamp}},
+  "tags": [
+    "waygate",
+    "git",
+    "waygate_core"
+  ],
+  "content": "from abc import ABC\n\nfrom typing import Awaitable, Callable, List, Optional\nfrom datetime import datetime\nfrom waygate_core.schemas import RawDocument\n\n\nclass IngestionPlugin(ABC):\n    \"\"\"Abstract base class for ingestion plugins.\n\n    Implementations should provide one or more of the following integration\n    points depending on how the source delivers data:\n\n    - `poll()`: periodically called to fetch new documents.\n    - `handle_webhook()`: invoked when an incoming HTTP webhook is received.\n    - `listen()`: an async long-running listener (e.g., WebSocket) that\n      pushes incoming documents to the provided callback.\n\n    The receiver expects these methods to return a list of `RawDocument`\n    instances representing newly ingested items.\n    \"\"\"\n\n    @property\n    def plugin_name(self) -> str:\n        \"\"\"Human-readable plugin name used for logging and registry keys.\n\n        Override this property in subclasses when a different name is desired.\n        \"\"\"\n\n        return \"base_plugin\"\n\n    @property\n    def cron_schedule(self) -> Optional[dict]:\n        \"\"\"Optional cron schedule for polling.\n\n        If defined, the receiver will set up a scheduled job to call `poll()`\n        according to this schedule. The dictionary should contain valid cron\n        trigger arguments (e.g., `{\"hour\": \"*/1\"}` for hourly).\n        \"\"\"\n\n        return {}\n\n    def poll(self, since_timestamp: Optional[datetime] = None) -> List[RawDocument]:\n        \"\"\"Poll the source for new documents.\n\n        Args:\n            since_timestamp: optional datetime to fetch only newer items.\n\n        Returns:\n            A list of `RawDocument` instances discovered since `since_timestamp`.\n        \"\"\"\n\n        raise NotImplementedError()\n\n    def handle_webhook(self, payload: dict) -> List[RawDocument]:\n        \"\"\"Handle an incoming webhook payload and return discovered documents.\n\n        Args:\n            payload: the JSON-decoded webhook body.\n\n        Returns:\n            A list of `RawDocument` instances parsed from the payload.\n        \"\"\"\n\n        raise NotImplementedError()\n\n    async def listen(\n        self, on_data_callback: Callable[[List[RawDocument]], Awaitable[None]]\n    ):\n        \"\"\"Start a persistent listener and push data to `on_data_callback`.\n\n        Implementations should `await on_data_callback(docs)` whenever new\n        `RawDocument` objects are available from the live stream.\n        \"\"\"\n\n        raise NotImplementedError()\n"
+}

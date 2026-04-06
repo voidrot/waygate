@@ -1,0 +1,11 @@
+[tools]
+    python = "latest"
+    ruff   = "latest"
+    uv     = "latest"
+
+[env]
+    _.file        = '.env'
+    _.python.venv = { path = '.venv', create = false }
+
+[tasks."uv:sync"]
+    run = "uv sync --all-groups --all-extras --all-packages"

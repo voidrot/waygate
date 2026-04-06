@@ -1,0 +1,16 @@
+[project]
+    name            = "waygate"
+    version         = "0.1.0"
+    description     = "Add your description here"
+    readme          = "README.md"
+    requires-python = ">=3.14"
+    dependencies    = []
+
+[dependency-groups]
+    dev = ["pytest", "ruff", "pyright"]
+
+[tool.uv]
+    package = false
+
+    [tool.uv.workspace]
+        members = ["apps/*", "libs/*", "plugins/*"]
