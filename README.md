@@ -1,6 +1,6 @@
 # WayGate — Modern LLM Knowledge Base
 
-A combanation of Human usage and Generation-Augmented Retrieval (GAR) Platforms.
+A combanation of Human usable and agentic Generation-Augmented Retrieval (GAR) Platforms.
 
 ---
 
