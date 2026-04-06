@@ -32,12 +32,6 @@ Quickstart (development)
 docker compose -f compose.yml up -d
 ```
 
-1. Run a quick smoke check:
-
-```bash
-python main.py
-```
-
 1. Exercise the receiver with example payloads from `tests.rest` or run individual packages via your workspace tooling.
 
 Contributing
@@ -52,5 +46,3 @@ Where to look first
 - Storage interface: [libs/storage/src/waygate_storage/storage_base.py](libs/storage/src/waygate_storage/storage_base.py)
 - Compiler entrypoints: [apps/compiler/src/compiler/worker.py](apps/compiler/src/compiler/worker.py)
 - Example plugins: [plugins/ollama_provider](plugins/ollama_provider/README.md), [plugins/storage_local](plugins/storage_local/README.md)
-
-If you'd like, I can open a draft PR with these docs changes, run a markdown linter across the repo, or generate a `CONTRIBUTING.md` next.

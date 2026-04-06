@@ -1,4 +1,3 @@
-(The file `/home/buck/src/voidrot/waygate/plugins/webhook_generic/README.md` exists, but is empty)
 # Generic Webhook Ingestion Plugin
 
 Example ingestion plugin that accepts generic webhook payloads and converts

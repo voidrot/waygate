@@ -10,7 +10,6 @@ WayGate is a modular knowledge ingestion and processing platform oriented around
 
 Entry points and configuration
 
-- Top-level `main.py`: small project entry used for quick checks. See [main.py](main.py).
 - `compose.yml`: simple compose file used for local services. See [compose.yml](compose.yml).
 - `pyproject.toml`: workspace definition and member packages. See [pyproject.toml](pyproject.toml).
 
