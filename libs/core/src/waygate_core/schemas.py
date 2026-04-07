@@ -37,6 +37,7 @@ class DocumentType(StrEnum):
 
 class AuditEventType(StrEnum):
     RECEIVER_ENQUEUED = "receiver_enqueued"
+    MAINTENANCE_RECOMPILATION_ENQUEUED = "maintenance_recompilation_enqueued"
     COMPILER_WORKER_STARTED = "compiler_worker_started"
     COMPILER_WORKER_COMPLETED = "compiler_worker_completed"
     COMPILER_NODE_STARTED = "compiler_node_started"

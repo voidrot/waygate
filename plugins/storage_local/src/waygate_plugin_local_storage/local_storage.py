@@ -101,6 +101,13 @@ class LocalStorageProvider(StorageProvider):
         finding_type = slugify(str(finding.finding_type)) or "maintenance"
         return f"{timestamp}-{finding_type}-{finding.finding_id.split('-')[0]}"
 
+    def _find_raw_document_path(self, doc_id: str) -> Path | None:
+        for filepath in self._iter_markdown_files(self.raw_dir):
+            post = frontmatter.load(str(filepath))
+            if post.metadata.get("doc_id") == doc_id:
+                return filepath
+        return None
+
     def write_raw_documents(self, documents: List[RawDocument]) -> List[str]:
         saved_uris = []
         for doc in documents:
@@ -129,51 +136,54 @@ class LocalStorageProvider(StorageProvider):
         return uris
 
     def get_raw_document_metadata(self, doc_id: str) -> RawDocument | None:
-        for filepath in self._iter_markdown_files(self.raw_dir):
-            post = frontmatter.load(str(filepath))
-            if post.metadata.get("doc_id") != doc_id:
-                continue
+        filepath = self._find_raw_document_path(doc_id)
+        if filepath is None:
+            return None
 
-            m = post.metadata
-            raw_ts = m.get("timestamp")
-            if isinstance(raw_ts, datetime):
-                timestamp = raw_ts
-            else:
-                timestamp = datetime.fromtimestamp(filepath.stat().st_mtime, tz=UTC)
-                if raw_ts:
-                    try:
-                        parsed = datetime.fromisoformat(str(raw_ts))
-                        timestamp = (
-                            parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
-                        )
-                    except TypeError, ValueError:
-                        pass
+        post = frontmatter.load(str(filepath))
 
-            raw_sm = m.get("source_metadata")
-            source_metadata: SourceMetadataBase | None = None
-            if isinstance(raw_sm, dict):
+        m = post.metadata
+        raw_ts = m.get("timestamp")
+        if isinstance(raw_ts, datetime):
+            timestamp = raw_ts
+        else:
+            timestamp = datetime.fromtimestamp(filepath.stat().st_mtime, tz=UTC)
+            if raw_ts:
                 try:
-                    source_metadata = SourceMetadataBase.model_validate(raw_sm)
-                except ValidationError:
-                    # Old documents may not have a `kind` field; treat as opaque.
-                    source_metadata = None
+                    parsed = datetime.fromisoformat(str(raw_ts))
+                    timestamp = parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+                except TypeError, ValueError:
+                    pass
 
-            return RawDocument.model_validate(
-                {
-                    "doc_id": m["doc_id"],
-                    "source_type": m["source_type"],
-                    "source_id": m["source_id"],
-                    "timestamp": timestamp,
-                    "content": post.content,
-                    "tags": m.get("tags", []),
-                    "source_url": m.get("source_url"),
-                    "source_hash": m.get("source_hash"),
-                    "visibility": m.get("visibility", Visibility.INTERNAL),
-                    "source_metadata": source_metadata,
-                }
-            )
+        raw_sm = m.get("source_metadata")
+        source_metadata: SourceMetadataBase | None = None
+        if isinstance(raw_sm, dict):
+            try:
+                source_metadata = SourceMetadataBase.model_validate(raw_sm)
+            except ValidationError:
+                # Old documents may not have a `kind` field; treat as opaque.
+                source_metadata = None
 
-        return None
+        return RawDocument.model_validate(
+            {
+                "doc_id": m["doc_id"],
+                "source_type": m["source_type"],
+                "source_id": m["source_id"],
+                "timestamp": timestamp,
+                "content": post.content,
+                "tags": m.get("tags", []),
+                "source_url": m.get("source_url"),
+                "source_hash": m.get("source_hash"),
+                "visibility": m.get("visibility", Visibility.INTERNAL),
+                "source_metadata": source_metadata,
+            }
+        )
+
+    def get_raw_document_uri(self, doc_id: str) -> str | None:
+        filepath = self._find_raw_document_path(doc_id)
+        if filepath is None:
+            return None
+        return f"file://{filepath.absolute()}"
 
     def write_live_document(self, document_id: str, content: str) -> str:
         return self.write_live_document_to_category(document_id, content, "concepts")

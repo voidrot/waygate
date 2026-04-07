@@ -7,7 +7,7 @@ This guide helps contributors understand where to look and how to add features.
 - `RawDocument` and `FrontMatterDocument` carry canonical provenance fields (`doc_id`, `source_url`, `source_hash`, `visibility`, `tags`, `lineage`, `sources`, `source_metadata`).
 - `FrontMatterDocument` also carries `document_type`, which now drives live-document placement under the local GAR filesystem topology.
 - `SourceMetadataBase` requires `kind` and allows provider-specific extra fields.
-- Storage implementations must preserve canonical frontmatter, support metadata lookup via `get_raw_document_metadata(doc_id)`, and manage the GAR filesystem locations (`raw/`, `live/`, `staging/`, `meta/`).
+- Storage implementations must preserve canonical frontmatter, support metadata lookup via `get_raw_document_metadata(doc_id)` and raw URI lookup via `get_raw_document_uri(doc_id)`, and manage the GAR filesystem locations (`raw/`, `live/`, `staging/`, `meta/`).
 - Compiler publish promotes raw metadata into live frontmatter, including lineage, promoted sources, aggregated tags, and deterministic live-document naming.
 - The compiler draft path now consumes reusable markdown scaffolds from `libs/core/src/waygate_core/file_templates.py` instead of relying solely on inline prompt structure.
 - GitHub/Slack receiver plugins currently parse webhook payloads into canonical `RawDocument` records.
@@ -44,6 +44,7 @@ Quick pointers to source locations:
 - Fast local run: `mise run test:quick`
 - Dependency bootstrap: `mise run uv:sync`
 - Maintenance sweep: `mise run maintenance:sweep`
+- Maintenance sweep with queued recompilation handoff: `mise run maintenance:sweep -- --enqueue-recompilation`
 
 Observability env surface:
 

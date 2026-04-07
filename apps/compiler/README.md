@@ -23,3 +23,8 @@ For an explicit maintenance sweep over the current storage backend, run:
 
 - `uv run waygate-maintenance-sweep`
 - `mise run maintenance:sweep`
+
+To enqueue recompilation jobs for hash-mismatch findings during the sweep:
+
+- `uv run waygate-maintenance-sweep --enqueue-recompilation`
+- `mise run maintenance:sweep -- --enqueue-recompilation`

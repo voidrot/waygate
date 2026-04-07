@@ -184,6 +184,14 @@ class TestGetRawDocumentMetadata:
         assert result is not None
         assert isinstance(result.timestamp, datetime)
 
+    def test_get_raw_document_uri_returns_saved_uri(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        doc = _make_doc()
+        [saved_uri] = storage.write_raw_documents([doc])
+
+        assert storage.get_raw_document_uri(doc.doc_id) == saved_uri
+
 
 class TestManagedTopology:
     def test_write_live_document_to_category(

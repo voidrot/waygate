@@ -227,14 +227,14 @@ def test_visibility_enum_values_are_valid() -> None:
 
 def test_audit_event_defaults_and_payload() -> None:
     event = AuditEvent(
-        event_type=AuditEventType.RECEIVER_ENQUEUED,
+        event_type=AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED,
         occurred_at="2026-04-06T12:00:00+00:00",
         trace_id="trace-123",
         payload={"queue_name": "draft_tasks"},
     )
 
     assert event.event_id
-    assert event.event_type == AuditEventType.RECEIVER_ENQUEUED
+    assert event.event_type == AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED
     assert event.trace_id == "trace-123"
     assert event.document_ids == []
     assert event.uris == []

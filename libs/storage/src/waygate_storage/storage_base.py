@@ -208,3 +208,12 @@ class StorageProvider(ABC):
         """
 
         pass
+
+    @abstractmethod
+    def get_raw_document_uri(self, doc_id: str) -> str | None:
+        """Retrieve a raw document URI by its canonical doc_id.
+
+        Returns ``None`` if no raw document exists for the given ``doc_id``.
+        """
+
+        pass
