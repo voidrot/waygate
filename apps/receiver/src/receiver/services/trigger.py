@@ -28,6 +28,7 @@ async def save_and_trigger_langgraph_async(documents: List[RawDocument]) -> None
 
     initial_state = {
         "new_document_uris": saved_uris,
+        "raw_documents_metadata": [doc.model_dump(mode="json") for doc in documents],
         "target_topic": "Auto-Detect",  # We can have the LLM figure this out later
         "revision_count": 0,
         "status": "pending_draft",

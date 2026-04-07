@@ -1,22 +1,20 @@
 [project]
-name = "waygate-plugin-generic-webhook"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-authors = [
-    { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" }
-]
-requires-python = ">=3.14"
-dependencies = [
-    "waygate_core",
-]
+    name = "waygate-plugin-generic-webhook"
+    version = "0.1.0"
+    description = "Add your description here"
+    readme = "README.md"
+    authors = [
+        { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+    ]
+    requires-python = ">=3.14"
+    dependencies = ["waygate_core"]
 
 [tool.uv.sources]
-waygate_core = { workspace = true }
+    waygate_core = { workspace = true }
 
 [build-system]
-requires = ["uv_build>=0.11.3,<0.12.0"]
-build-backend = "uv_build"
+    requires      = ["uv_build>=0.11.3,<0.12.0"]
+    build-backend = "uv_build"
 
-[project.entry-points."waygate.plugins.receiver"]
-generic_webhook = "waygate_plugin_generic_webhook.webhook_receiver:WebhookReceiver"
+    [project.entry-points."waygate.plugins.receiver"]
+        generic_webhook = "waygate_plugin_generic_webhook.webhook_receiver:WebhookReceiver"

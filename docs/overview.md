@@ -8,6 +8,18 @@ WayGate is a modular knowledge ingestion and processing platform oriented around
 - `libs/storage`: pluggable storage provider interfaces and registry.
 - `plugins/*`: provider and storage plugin implementations (examples: Ollama LLM provider, local storage, generic webhook receiver plugin).
 
+Current implementation focus (April 2026):
+
+- Canonical metadata contract implemented from ingestion through publish.
+- Local storage preserves and can query raw document metadata by `doc_id`.
+- Compiler promotion includes provenance lineage/source propagation into live frontmatter.
+- GitHub and Slack receiver plugins currently parse webhook payloads to canonical documents.
+
+Explicitly out of scope for this milestone:
+
+- Retrieval-filtering/RBAC enforcement engine across query transports.
+- Broader cryptographic provenance systems beyond current hash + lineage fields.
+
 Entry points and configuration
 
 - `compose.yml`: simple compose file used for local services. See [compose.yml](compose.yml).

@@ -2,6 +2,7 @@ import logging
 from compiler.config import storage
 from langchain_core.messages import HumanMessage, SystemMessage
 from waygate_core.llm import get_llm
+from waygate_core.schemas import RawDocument
 from compiler.state import GraphState
 import os
 
@@ -9,6 +10,24 @@ logger = logging.getLogger(__name__)
 
 draft_model = os.getenv("DRAFT_LLM_MODEL", "gemma4:e4b")
 draft_provider = os.getenv("DRAFT_LLM_PROVIDER", "ollama")
+
+
+def _build_source_context(raw_docs_metadata: list[dict]) -> str:
+    """Render a compact source-context block for the LLM prompt."""
+    if not raw_docs_metadata:
+        return ""
+
+    lines = []
+    for i, raw in enumerate(raw_docs_metadata, start=1):
+        doc = RawDocument.model_validate(raw)
+        parts = [f"[{doc.source_type}]"]
+        if doc.source_url:
+            parts.append(doc.source_url)
+        if doc.tags:
+            parts.append(f"tags: {', '.join(doc.tags)}")
+        lines.append(f"  {i}. {' — '.join(parts)}")
+
+    return "<source_context>\n" + "\n".join(lines) + "\n</source_context>"
 
 
 def draft_node(state: GraphState):
@@ -26,6 +45,8 @@ def draft_node(state: GraphState):
 
     compiled_raw_data = "\n\n".join(raw_texts)
 
+    source_context = _build_source_context(state.get("raw_documents_metadata", []))
+
     llm = get_llm(draft_provider, draft_model)
 
     feedback_section = ""
@@ -42,6 +63,8 @@ def draft_node(state: GraphState):
     You are an expert technical writer and knowledge base compiler.
     Your task is to synthesize the provided raw documents into a highly organized,
     comprehensive Markdown article about '{state["target_topic"]}'.
+
+    {source_context}
 
     Guidelines:
     - Use clear headers, bullet points, and code blocks where applicable.

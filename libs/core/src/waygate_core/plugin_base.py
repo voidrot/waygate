@@ -18,6 +18,10 @@ class IngestionPlugin(ABC):
 
     The receiver expects these methods to return a list of `RawDocument`
     instances representing newly ingested items.
+
+    Implementations should populate canonical metadata whenever possible,
+    including `source_url`, `source_hash`, `visibility`, and typed
+    `source_metadata` for known source types.
     """
 
     @property
