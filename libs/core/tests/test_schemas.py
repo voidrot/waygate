@@ -3,9 +3,15 @@ from datetime import datetime, timezone
 import pytest
 
 from waygate_core.schemas import (
+    AuditEvent,
+    AuditEventType,
+    ContextErrorReport,
     DocumentType,
     FrontMatterDocument,
+    MaintenanceFinding,
+    MaintenanceFindingType,
     RawDocument,
+    RecompilationSignal,
     SourceMetadataBase,
     SourceType,
     Visibility,
@@ -217,3 +223,47 @@ def test_visibility_enum_values_are_valid() -> None:
             visibility=vis,
         )
         assert doc.visibility == vis
+
+
+def test_audit_event_defaults_and_payload() -> None:
+    event = AuditEvent(
+        event_type=AuditEventType.RECEIVER_ENQUEUED,
+        occurred_at="2026-04-06T12:00:00+00:00",
+        trace_id="trace-123",
+        payload={"queue_name": "draft_tasks"},
+    )
+
+    assert event.event_id
+    assert event.event_type == AuditEventType.RECEIVER_ENQUEUED
+    assert event.trace_id == "trace-123"
+    assert event.document_ids == []
+    assert event.uris == []
+    assert event.payload["queue_name"] == "draft_tasks"
+
+
+def test_maintenance_models_round_trip_payload() -> None:
+    signal = RecompilationSignal(
+        created_at="2026-04-06T12:00:00+00:00",
+        live_document_uri="file:///tmp/live/doc-1.md",
+        live_document_id="doc-1",
+        reason="hash_mismatch",
+        lineage=["raw-1"],
+        payload={"expected_source_hash": "abc"},
+    )
+    report = ContextErrorReport(
+        occurred_at="2026-04-06T12:00:00+00:00",
+        message="Missing context",
+        query="incident runbook",
+        requested_visibilities=[Visibility.PUBLIC],
+    )
+    finding = MaintenanceFinding(
+        finding_type=MaintenanceFindingType.HASH_MISMATCH,
+        occurred_at="2026-04-06T12:00:00+00:00",
+        live_document_id="doc-1",
+        payload={"signal": signal.model_dump(mode="json")},
+    )
+
+    assert signal.reason == "hash_mismatch"
+    assert report.requested_visibilities == [Visibility.PUBLIC]
+    assert finding.finding_type == MaintenanceFindingType.HASH_MISMATCH
+    assert finding.payload["signal"]["live_document_id"] == "doc-1"

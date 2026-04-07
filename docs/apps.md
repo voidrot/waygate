@@ -10,6 +10,7 @@ This page summarizes the top-level applications in `apps/` and links to key sour
   - [compiler config](apps/compiler/src/compiler/config.py)
   - [graph builder](apps/compiler/src/compiler/graph.py)
   - [worker/runner](apps/compiler/src/compiler/worker.py)
+  - [maintenance sweep](apps/compiler/src/compiler/maintenance.py)
   - [state model](apps/compiler/src/compiler/state.py)
   - nodes: [draft](apps/compiler/src/compiler/nodes/draft.py), [review](apps/compiler/src/compiler/nodes/review.py), [publish](apps/compiler/src/compiler/nodes/publish.py)
 
@@ -30,5 +31,6 @@ This page summarizes the top-level applications in `apps/` and links to key sour
   - [apps/mcp_server README](apps/mcp_server/README.md)
   - [service boundary](apps/mcp_server/src/mcp_server/service.py)
   - [runtime config](apps/mcp_server/src/mcp_server/config.py)
+  - [trace middleware](apps/mcp_server/src/mcp_server/trace.py)
   - [FastMCP server wrapper](apps/mcp_server/src/mcp_server/server.py)
   - [CLI entrypoint](apps/mcp_server/src/mcp_server/main.py)

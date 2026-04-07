@@ -8,7 +8,11 @@ import pytest
 
 from waygate_core.doc_helpers import generate_frontmatter
 from waygate_core.schemas import (
+    AuditEvent,
+    AuditEventType,
     FrontMatterDocument,
+    MaintenanceFinding,
+    MaintenanceFindingType,
     RawDocument,
     SourceMetadataBase,
     Visibility,
@@ -219,3 +223,51 @@ class TestManagedTopology:
         assert uri == "meta/templates/default"
         assert storage.read_meta_document(uri) == "# Template"
         assert storage.list_meta_documents("templates") == [uri]
+
+    def test_write_read_and_list_audit_events(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        event = AuditEvent(
+            event_type=AuditEventType.RECEIVER_ENQUEUED,
+            occurred_at="2026-04-06T12:00:00+00:00",
+            trace_id="trace-1",
+            document_ids=["doc-1"],
+            uris=["file:///tmp/raw/doc-1.md"],
+            payload={"job_id": "job-123"},
+        )
+
+        uri = storage.write_audit_event(event)
+
+        assert uri.startswith("meta/audit/")
+        assert storage.list_audit_events() == [uri]
+
+        saved = storage.read_audit_event(uri)
+
+        assert saved.event_id == event.event_id
+        assert saved.event_type == AuditEventType.RECEIVER_ENQUEUED
+        assert saved.trace_id == "trace-1"
+        assert saved.document_ids == ["doc-1"]
+        assert saved.payload == {"job_id": "job-123"}
+
+    def test_write_read_and_list_maintenance_findings(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        finding = MaintenanceFinding(
+            finding_type=MaintenanceFindingType.HASH_MISMATCH,
+            occurred_at="2026-04-06T12:00:00+00:00",
+            live_document_uri="file:///tmp/live/doc-1.md",
+            live_document_id="doc-1",
+            payload={"expected_source_hash": "abc"},
+        )
+
+        uri = storage.write_maintenance_finding(finding)
+
+        assert uri.startswith("meta/maintenance/")
+        assert storage.list_maintenance_findings() == [uri]
+
+        saved = storage.read_maintenance_finding(uri)
+
+        assert saved.finding_id == finding.finding_id
+        assert saved.finding_type == MaintenanceFindingType.HASH_MISMATCH
+        assert saved.live_document_id == "doc-1"
+        assert saved.payload == {"expected_source_hash": "abc"}

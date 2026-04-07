@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List
 
 from waygate_core.plugin_base import RawDocument
+from waygate_core.schemas import AuditEvent, FrontMatterDocument, MaintenanceFinding
 
 
 class StorageProvider(ABC):
@@ -97,6 +98,12 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
+    def get_live_document_metadata(self, uri: str) -> FrontMatterDocument:
+        """Retrieve a live document's frontmatter metadata."""
+
+        pass
+
+    @abstractmethod
     def list_live_documents(self, prefix: str = "") -> List[str]:
         """List all live document URIs in the storage backend, optionally filtered by a prefix.
 
@@ -136,6 +143,42 @@ class StorageProvider(ABC):
 
         Returned URIs should use the logical format `meta/<namespace>/<document_id>`.
         """
+
+        pass
+
+    @abstractmethod
+    def write_audit_event(self, event: AuditEvent) -> str:
+        """Persist a structured audit event as a managed meta artifact."""
+
+        pass
+
+    @abstractmethod
+    def read_audit_event(self, uri: str) -> AuditEvent:
+        """Read a structured audit event from a managed meta artifact."""
+
+        pass
+
+    @abstractmethod
+    def list_audit_events(self, prefix: str = "") -> List[str]:
+        """List structured audit event artifact URIs."""
+
+        pass
+
+    @abstractmethod
+    def write_maintenance_finding(self, finding: MaintenanceFinding) -> str:
+        """Persist a structured maintenance finding as a managed meta artifact."""
+
+        pass
+
+    @abstractmethod
+    def read_maintenance_finding(self, uri: str) -> MaintenanceFinding:
+        """Read a structured maintenance finding from a managed meta artifact."""
+
+        pass
+
+    @abstractmethod
+    def list_maintenance_findings(self, prefix: str = "") -> List[str]:
+        """List structured maintenance finding artifact URIs."""
 
         pass
 

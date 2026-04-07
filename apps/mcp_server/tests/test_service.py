@@ -3,10 +3,17 @@ from pathlib import Path
 import pytest
 
 from mcp_server.service import BriefingService, GenerateBriefingRequest
+from mcp_server.trace import reset_current_trace_id, set_current_trace_id
 from waygate_agent_sdk import BriefingResult
+from waygate_agent_sdk.models import RetrievalScope
 from waygate_agent_sdk.models import RetrievedLiveDocument
 from waygate_core.doc_helpers import generate_frontmatter
-from waygate_core.schemas import FrontMatterDocument, SourceType, Visibility
+from waygate_core.schemas import (
+    AuditEventType,
+    FrontMatterDocument,
+    SourceType,
+    Visibility,
+)
 from waygate_plugin_local_storage.local_storage import LocalStorageProvider
 
 
@@ -22,6 +29,15 @@ class FakeRepository:
     def retrieve(self, request, scope=None) -> list[RetrievedLiveDocument]:
         self.retrieve_calls.append((request, scope))
         return []
+
+
+class FakeAuditStorage:
+    def __init__(self) -> None:
+        self.audit_events = []
+
+    def write_audit_event(self, event) -> str:
+        self.audit_events.append(event)
+        return f"meta/audit/{event.event_id}"
 
 
 @pytest.fixture()
@@ -44,7 +60,13 @@ def storage(tmp_path: Path) -> LocalStorageProvider:
 
 def test_generate_briefing_maps_request_to_sdk_boundary() -> None:
     repository = FakeRepository()
-    service = BriefingService(repository)
+    service = BriefingService(
+        repository,
+        default_scope=RetrievalScope(
+            role="server_role",
+            allowed_visibilities=[Visibility.PUBLIC],
+        ),
+    )
 
     result = service.generate_briefing(
         GenerateBriefingRequest(
@@ -65,13 +87,19 @@ def test_generate_briefing_maps_request_to_sdk_boundary() -> None:
     assert request.token_budget == 500
     assert request.tags == ["incident"]
     assert request.lineage_ids == ["raw-1"]
-    assert scope.role == "ops_agent"
+    assert scope.role == "server_role"
     assert scope.allowed_visibilities == [Visibility.PUBLIC]
 
 
 def test_preview_retrieval_maps_request_to_sdk_boundary() -> None:
     repository = FakeRepository()
-    service = BriefingService(repository)
+    service = BriefingService(
+        repository,
+        default_scope=RetrievalScope(
+            role="preview_role",
+            allowed_visibilities=[Visibility.PUBLIC],
+        ),
+    )
 
     service.preview_retrieval(
         GenerateBriefingRequest(
@@ -82,7 +110,51 @@ def test_preview_retrieval_maps_request_to_sdk_boundary() -> None:
 
     request, scope = repository.retrieve_calls[0]
     assert request.query == "architecture"
-    assert scope.role == "architecture_agent"
+    assert scope.role == "preview_role"
+
+
+def test_generate_briefing_writes_retrieval_audit_event() -> None:
+    repository = FakeRepository()
+    audit_storage = FakeAuditStorage()
+    service = BriefingService(
+        repository,
+        default_scope=RetrievalScope(
+            role="ops_agent",
+            allowed_visibilities=[Visibility.PUBLIC],
+        ),
+        audit_storage=audit_storage,
+    )
+
+    service.generate_briefing(
+        GenerateBriefingRequest(
+            query="incident runbook",
+            role="ignored_role",
+            allowed_visibilities=[Visibility.PUBLIC, Visibility.INTERNAL],
+        )
+    )
+
+    assert len(audit_storage.audit_events) == 1
+    event = audit_storage.audit_events[0]
+    assert event.event_type == AuditEventType.MCP_RETRIEVAL_REQUESTED
+    assert event.payload["action"] == "generate_briefing"
+    assert event.payload["role"] == "ops_agent"
+    assert event.payload["allowed_visibilities"] == ["public"]
+    assert event.payload["requested_allowed_visibilities"] == ["public", "internal"]
+
+
+def test_generate_briefing_includes_current_trace_id_in_audit_event() -> None:
+    repository = FakeRepository()
+    audit_storage = FakeAuditStorage()
+    service = BriefingService(repository, audit_storage=audit_storage)
+    token = set_current_trace_id("trace-mcp-1")
+
+    try:
+        service.generate_briefing(GenerateBriefingRequest(query="incident runbook"))
+    finally:
+        reset_current_trace_id(token)
+
+    assert len(audit_storage.audit_events) == 1
+    assert audit_storage.audit_events[0].trace_id == "trace-mcp-1"
 
 
 def test_generate_briefing_from_storage_uses_sdk_repository(

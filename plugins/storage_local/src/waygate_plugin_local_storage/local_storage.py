@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Iterable, List
+from typing import Iterable, List, cast
 
 import frontmatter
 from pydantic import ValidationError
@@ -9,7 +9,13 @@ from pathlib import Path
 from waygate_core.plugin_base import RawDocument
 from waygate_core.doc_helpers import generate_raw_document, slugify
 from waygate_core.settings import get_runtime_settings
-from waygate_core.schemas import FrontMatterDocument, SourceMetadataBase, Visibility
+from waygate_core.schemas import (
+    AuditEvent,
+    FrontMatterDocument,
+    MaintenanceFinding,
+    SourceMetadataBase,
+    Visibility,
+)
 
 
 class LocalStorageProvider(StorageProvider):
@@ -84,6 +90,16 @@ class LocalStorageProvider(StorageProvider):
         directory = self.meta_dir / slugify(namespace)
         directory.mkdir(parents=True, exist_ok=True)
         return directory
+
+    def _audit_event_document_id(self, event: AuditEvent) -> str:
+        timestamp = slugify(event.occurred_at) or "event"
+        event_type = slugify(str(event.event_type)) or "audit"
+        return f"{timestamp}-{event_type}-{event.event_id.split('-')[0]}"
+
+    def _maintenance_finding_document_id(self, finding: MaintenanceFinding) -> str:
+        timestamp = slugify(finding.occurred_at) or "finding"
+        finding_type = slugify(str(finding.finding_type)) or "maintenance"
+        return f"{timestamp}-{finding_type}-{finding.finding_id.split('-')[0]}"
 
     def write_raw_documents(self, documents: List[RawDocument]) -> List[str]:
         saved_uris = []
@@ -212,10 +228,42 @@ class LocalStorageProvider(StorageProvider):
                 uris.append(f"meta/{normalized_namespace}/{filepath.stem}")
         return uris
 
+    def write_audit_event(self, event: AuditEvent) -> str:
+        post = frontmatter.Post("", **event.model_dump(mode="json"))
+        document_id = self._audit_event_document_id(event)
+        return self.write_meta_document("audit", document_id, frontmatter.dumps(post))
+
+    def read_audit_event(self, uri: str) -> AuditEvent:
+        post = frontmatter.loads(self.read_meta_document(uri))
+        metadata = cast(dict[str, object], dict(post.metadata))
+        return AuditEvent.model_validate(metadata)
+
+    def list_audit_events(self, prefix: str = "") -> List[str]:
+        return self.list_meta_documents("audit", prefix)
+
+    def write_maintenance_finding(self, finding: MaintenanceFinding) -> str:
+        post = frontmatter.Post("", **finding.model_dump(mode="json"))
+        document_id = self._maintenance_finding_document_id(finding)
+        return self.write_meta_document(
+            "maintenance", document_id, frontmatter.dumps(post)
+        )
+
+    def read_maintenance_finding(self, uri: str) -> MaintenanceFinding:
+        post = frontmatter.loads(self.read_meta_document(uri))
+        metadata = cast(dict[str, object], dict(post.metadata))
+        return MaintenanceFinding.model_validate(metadata)
+
+    def list_maintenance_findings(self, prefix: str = "") -> List[str]:
+        return self.list_meta_documents("maintenance", prefix)
+
     def get_live_document_metadata(self, uri: str) -> FrontMatterDocument:
         filepath = self._get_real_path(uri)
         post = frontmatter.load(str(filepath))
-        metadata = dict(post.metadata)
+        metadata = cast(dict[str, object], dict(post.metadata))
+        for field_name in ("last_compiled", "last_updated"):
+            value = metadata.get(field_name)
+            if isinstance(value, datetime):
+                metadata[field_name] = value.isoformat()
         if metadata.get("source_metadata") == {}:
             metadata["source_metadata"] = None
         return FrontMatterDocument.model_validate(metadata)

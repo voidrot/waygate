@@ -5,17 +5,23 @@ import frontmatter
 
 from compiler.nodes import publish
 from compiler.state import GraphState
-from waygate_core.schemas import RawDocument
+from waygate_core.schemas import AuditEventType, RawDocument
 
 
 class _FakeStorage:
     def __init__(self) -> None:
         self.writes: list[tuple[str, str, str]] = []
+        self.audit_events = []
 
     def write_live_document_to_category(
         self, filename: str, content: str, category: str
-    ) -> None:
+    ) -> str:
         self.writes.append((filename, content, category))
+        return f"file:///tmp/live/{category}/{filename}.md"
+
+    def write_audit_event(self, event) -> str:
+        self.audit_events.append(event)
+        return f"meta/audit/{event.event_id}"
 
 
 def _raw_doc(*, source_id: str, source_url: str | None, tags: list[str]) -> dict:
@@ -86,6 +92,11 @@ def test_publish_node_writes_canonical_frontmatter_with_promoted_fields(
     ]
     assert metadata["tags"] == ["github", "issue", "review"]
     assert post.content == "This is the compiled draft."
+    assert len(fake_storage.audit_events) == 1
+    event = fake_storage.audit_events[0]
+    assert event.event_type == AuditEventType.COMPILER_PUBLISH_COMPLETED
+    assert event.trace_id == "trace-1"
+    assert event.payload["document_type"] == "concepts"
 
 
 def test_publish_node_falls_back_to_raw_uris_when_source_urls_missing(

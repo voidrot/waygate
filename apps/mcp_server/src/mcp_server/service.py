@@ -1,4 +1,5 @@
 from typing import Protocol
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -8,8 +9,15 @@ from waygate_agent_sdk.models import (
     RetrievalScope,
     RetrievedLiveDocument,
 )
-from waygate_core.schemas import DocumentStatus, DocumentType, Visibility
+from waygate_core.schemas import (
+    AuditEvent,
+    AuditEventType,
+    DocumentStatus,
+    DocumentType,
+    Visibility,
+)
 from waygate_storage.storage_base import StorageProvider
+from mcp_server.trace import get_current_trace_id
 
 
 class GenerateBriefingRequest(BaseModel):
@@ -56,23 +64,76 @@ class BriefingRepository(Protocol):
 
 
 class BriefingService:
-    def __init__(self, repository: BriefingRepository):
+    def __init__(
+        self,
+        repository: BriefingRepository,
+        default_scope: RetrievalScope | None = None,
+        audit_storage: StorageProvider | None = None,
+    ):
         self.repository = repository
+        self.default_scope = default_scope
+        self.audit_storage = audit_storage
 
     @classmethod
-    def from_storage(cls, storage_provider: StorageProvider) -> "BriefingService":
-        return cls(LiveDocumentRepository(storage_provider))
+    def from_storage(
+        cls,
+        storage_provider: StorageProvider,
+        default_scope: RetrievalScope | None = None,
+    ) -> "BriefingService":
+        return cls(
+            LiveDocumentRepository(storage_provider),
+            default_scope=default_scope,
+            audit_storage=storage_provider,
+        )
+
+    def _resolve_scope(self, request: GenerateBriefingRequest) -> RetrievalScope:
+        if self.default_scope is not None:
+            return RetrievalScope.model_validate(self.default_scope.model_dump())
+        return request.to_retrieval_scope()
+
+    def _write_retrieval_audit_event(
+        self,
+        request: GenerateBriefingRequest,
+        scope: RetrievalScope,
+        action: str,
+    ) -> None:
+        if self.audit_storage is None:
+            return
+
+        self.audit_storage.write_audit_event(
+            AuditEvent(
+                event_type=AuditEventType.MCP_RETRIEVAL_REQUESTED,
+                occurred_at=datetime.now(timezone.utc).isoformat(),
+                trace_id=get_current_trace_id(),
+                payload={
+                    "action": action,
+                    "query": request.query,
+                    "role": scope.role,
+                    "allowed_visibilities": [
+                        str(item) for item in scope.allowed_visibilities
+                    ],
+                    "requested_role": request.role,
+                    "requested_allowed_visibilities": [
+                        str(item) for item in request.allowed_visibilities
+                    ],
+                },
+            )
+        )
 
     def generate_briefing(self, request: GenerateBriefingRequest) -> BriefingResult:
+        scope = self._resolve_scope(request)
+        self._write_retrieval_audit_event(request, scope, "generate_briefing")
         return self.repository.build_briefing(
             request.to_retrieval_query(),
-            request.to_retrieval_scope(),
+            scope,
         )
 
     def preview_retrieval(
         self, request: GenerateBriefingRequest
     ) -> list[RetrievedLiveDocument]:
+        scope = self._resolve_scope(request)
+        self._write_retrieval_audit_event(request, scope, "preview_retrieval")
         return self.repository.retrieve(
             request.to_retrieval_query(),
-            request.to_retrieval_scope(),
+            scope,
         )

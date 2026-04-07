@@ -27,6 +27,7 @@ Current implementation snapshot (April 2026)
 - Draft generation now consumes reusable markdown template scaffolds from the core library, and receiver state seeds a derived topic instead of the old `Auto-Detect` placeholder.
 - First-party GitHub and Slack receivers now parse webhook payloads into canonical `RawDocument` records.
 - Retrieval now has an initial internal SDK for loading, filtering, scoring, and token-budgeting live documents from the compiled wiki.
+- Maintenance now has an explicit sweep command that can detect and persist hash-mismatch and orphan-lineage findings as durable maintenance artifacts.
 
 Out of scope (current milestone)
 
@@ -68,6 +69,12 @@ mise run test
 
 ```bash
 mise run test:quick
+```
+
+1. Run an explicit maintenance sweep against the current storage backend:
+
+```bash
+mise run maintenance:sweep
 ```
 
 Contributing

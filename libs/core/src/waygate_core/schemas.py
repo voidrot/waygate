@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import List
+from typing import Any, List
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,6 +33,28 @@ class DocumentType(StrEnum):
     CONCEPTS = "concepts"
     ENTITIES = "entities"
     THEMATIC = "thematic"
+
+
+class AuditEventType(StrEnum):
+    RECEIVER_ENQUEUED = "receiver_enqueued"
+    COMPILER_WORKER_STARTED = "compiler_worker_started"
+    COMPILER_WORKER_COMPLETED = "compiler_worker_completed"
+    COMPILER_NODE_STARTED = "compiler_node_started"
+    COMPILER_NODE_COMPLETED = "compiler_node_completed"
+    COMPILER_PUBLISH_COMPLETED = "compiler_publish_completed"
+    COMPILER_HUMAN_REVIEW_ESCALATED = "compiler_human_review_escalated"
+    MCP_RETRIEVAL_REQUESTED = "mcp_retrieval_requested"
+
+
+class MaintenanceFindingType(StrEnum):
+    HASH_MISMATCH = "hash_mismatch"
+    ORPHAN_LINEAGE = "orphan_lineage"
+    CONTEXT_ERROR = "context_error"
+
+
+class MaintenanceFindingStatus(StrEnum):
+    OPEN = "open"
+    RESOLVED = "resolved"
 
 
 class SourceMetadataBase(BaseModel):
@@ -99,3 +121,48 @@ class FrontMatterDocument(BaseModel):
     source_metadata: SourceMetadataBase | None = None
     # Backward-compatible field that older flows still populate.
     last_updated: str | None = None
+
+
+class AuditEvent(BaseModel):
+    event_id: str = Field(default_factory=lambda: str(uuid4()))
+    event_type: AuditEventType | str
+    occurred_at: str
+    trace_id: str | None = None
+    document_ids: List[str] = Field(default_factory=list)
+    uris: List[str] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class RecompilationSignal(BaseModel):
+    signal_id: str = Field(default_factory=lambda: str(uuid4()))
+    created_at: str
+    live_document_uri: str
+    live_document_id: str
+    reason: str
+    lineage: List[str] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ContextErrorReport(BaseModel):
+    report_id: str = Field(default_factory=lambda: str(uuid4()))
+    occurred_at: str
+    message: str
+    trace_id: str | None = None
+    query: str = ""
+    role: str | None = None
+    requested_visibilities: List[Visibility] = Field(default_factory=list)
+    lineage_ids: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+
+
+class MaintenanceFinding(BaseModel):
+    finding_id: str = Field(default_factory=lambda: str(uuid4()))
+    finding_type: MaintenanceFindingType | str
+    occurred_at: str
+    status: MaintenanceFindingStatus | str = MaintenanceFindingStatus.OPEN
+    trace_id: str | None = None
+    live_document_uri: str | None = None
+    live_document_id: str | None = None
+    related_doc_ids: List[str] = Field(default_factory=list)
+    uris: List[str] = Field(default_factory=list)
+    payload: dict[str, Any] = Field(default_factory=dict)

@@ -8,6 +8,7 @@ from rq import Queue
 
 from waygate_core.doc_helpers import infer_initial_topic
 from waygate_core.plugin_base import RawDocument
+from waygate_core.schemas import AuditEvent, AuditEventType
 from waygate_core.settings import get_runtime_settings
 from receiver.core.config import storage
 
@@ -52,6 +53,22 @@ async def save_and_trigger_langgraph_async(documents: List[RawDocument]) -> None
         "compiler.worker.execute_graph",
         initial_state,
         job_timeout="10m",  # LLM calls can take a while, give it a long timeout
+    )
+
+    storage.write_audit_event(
+        AuditEvent(
+            event_type=AuditEventType.RECEIVER_ENQUEUED,
+            occurred_at=datetime.now(timezone.utc).isoformat(),
+            trace_id=initial_state["trace_id"],
+            document_ids=[document.doc_id for document in documents],
+            uris=saved_uris,
+            payload={
+                "job_id": job.id,
+                "queue_name": settings.draft_queue_name,
+                "target_topic": initial_state["target_topic"],
+                "document_count": len(documents),
+            },
+        )
     )
 
     logger.info(

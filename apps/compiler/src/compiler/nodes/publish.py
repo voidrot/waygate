@@ -13,6 +13,8 @@ from waygate_core.doc_helpers import (
     generate_frontmatter,
 )
 from waygate_core.schemas import (
+    AuditEvent,
+    AuditEventType,
     DocumentType,
     FrontMatterDocument,
     RawDocument,
@@ -123,8 +125,23 @@ def publish_node(state: GraphState) -> dict:
 
     file_name = build_live_document_name(resolved_title, compiled_doc_id)
 
-    storage.write_live_document_to_category(
+    live_uri = storage.write_live_document_to_category(
         file_name[:-3], final_article, document_type
+    )
+
+    storage.write_audit_event(
+        AuditEvent(
+            event_type=AuditEventType.COMPILER_PUBLISH_COMPLETED,
+            occurred_at=timestamp,
+            trace_id=state.get("trace_id"),
+            document_ids=[compiled_doc_id, *promoted.lineage],
+            uris=[live_uri, *sources_uris],
+            payload={
+                "document_type": document_type,
+                "title": resolved_title,
+                "live_document_uri": live_uri,
+            },
+        )
     )
 
     return {"status": "completed"}

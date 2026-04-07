@@ -1,3 +1,4 @@
+from waygate_core.schemas import Visibility
 from waygate_core.settings import reload_runtime_settings
 
 
@@ -15,6 +16,8 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
     monkeypatch.delenv("MCP_SERVER_PATH", raising=False)
     monkeypatch.delenv("MCP_AUTH_ENABLED", raising=False)
     monkeypatch.delenv("MCP_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("MCP_DEFAULT_ROLE", raising=False)
+    monkeypatch.delenv("MCP_ALLOWED_VISIBILITIES", raising=False)
 
     settings = reload_runtime_settings()
 
@@ -31,6 +34,11 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
     assert settings.mcp_server_path == "/mcp"
     assert settings.mcp_auth_enabled is False
     assert settings.mcp_auth_token is None
+    assert settings.mcp_default_role is None
+    assert settings.mcp_allowed_visibilities == [
+        Visibility.PUBLIC,
+        Visibility.INTERNAL,
+    ]
 
 
 def test_runtime_settings_overrides(monkeypatch) -> None:
@@ -47,6 +55,8 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
     monkeypatch.setenv("MCP_SERVER_PATH", "/briefing")
     monkeypatch.setenv("MCP_AUTH_ENABLED", "true")
     monkeypatch.setenv("MCP_AUTH_TOKEN", "secret-token")
+    monkeypatch.setenv("MCP_DEFAULT_ROLE", "ops_agent")
+    monkeypatch.setenv("MCP_ALLOWED_VISIBILITIES", "public")
 
     settings = reload_runtime_settings()
 
@@ -63,6 +73,8 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
     assert settings.mcp_server_path == "/briefing"
     assert settings.mcp_auth_enabled is True
     assert settings.mcp_auth_token == "secret-token"
+    assert settings.mcp_default_role == "ops_agent"
+    assert settings.mcp_allowed_visibilities == [Visibility.PUBLIC]
 
 
 def test_runtime_settings_reload_is_stable(monkeypatch) -> None:

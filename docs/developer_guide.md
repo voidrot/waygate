@@ -13,6 +13,7 @@ This guide helps contributors understand where to look and how to add features.
 - GitHub/Slack receiver plugins currently parse webhook payloads into canonical `RawDocument` records.
 - `libs/agent_sdk` provides the live-document retrieval boundary: frontmatter parsing, retrieval-scope visibility filtering, lexical scoring, lineage filtering, and token-budgeted briefing assembly.
 - `apps/mcp_server` is a thin transport adapter over the SDK, exposing `generate_briefing` and `preview_retrieval` through FastMCP.
+- The compiler package now also exposes an explicit maintenance sweep command that detects and persists maintenance findings through the storage boundary.
 
 Out of scope for the current milestone:
 
@@ -27,6 +28,7 @@ Out of scope for the current milestone:
 Quick pointers to source locations:
 
 - `apps/compiler` — graph building and execution: [graph.py](apps/compiler/src/compiler/graph.py), [worker.py](apps/compiler/src/compiler/worker.py)
+- `apps/compiler` maintenance sweep entrypoint: [maintenance.py](apps/compiler/src/compiler/maintenance.py)
 - `apps/mcp_server` — FastMCP transport surface: [service.py](apps/mcp_server/src/mcp_server/service.py), [server.py](apps/mcp_server/src/mcp_server/server.py), [main.py](apps/mcp_server/src/mcp_server/main.py)
 - `libs/agent_sdk` — retrieval repository and policy/scoring seams: [repository.py](libs/agent_sdk/src/waygate_agent_sdk/repository.py), [policy.py](libs/agent_sdk/src/waygate_agent_sdk/policy.py), [scoring.py](libs/agent_sdk/src/waygate_agent_sdk/scoring.py)
 - `libs/core` — LLM abstractions and plugin base: [llm_base.py](libs/core/src/waygate_core/llm_base.py), [plugin_base.py](libs/core/src/waygate_core/plugin_base.py)
@@ -37,6 +39,7 @@ Quick pointers to source locations:
 - Root test command: `mise run test`
 - Fast local run: `mise run test:quick`
 - Dependency bootstrap: `mise run uv:sync`
+- Maintenance sweep: `mise run maintenance:sweep`
 
 Test placement conventions:
 

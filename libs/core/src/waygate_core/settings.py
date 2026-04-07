@@ -23,9 +23,20 @@ class RuntimeSettings(BaseModel):
     mcp_server_path: str = Field(default="/mcp")
     mcp_auth_enabled: bool = Field(default=False)
     mcp_auth_token: str | None = Field(default=None)
+    mcp_default_role: str | None = Field(default=None)
+    mcp_allowed_visibilities: list[str] = Field(
+        default_factory=lambda: ["public", "internal"]
+    )
 
 
-def _load_runtime_env() -> dict[str, str | None]:
+def _parse_csv_env(raw_value: str | None, default: list[str]) -> list[str]:
+    if raw_value is None:
+        return default
+    values = [item.strip() for item in raw_value.split(",") if item.strip()]
+    return values or default
+
+
+def _load_runtime_env() -> dict[str, object]:
     return {
         "storage_provider": os.getenv("STORAGE_PROVIDER", "local"),
         "local_storage_path": os.getenv("LOCAL_STORAGE_PATH", "wiki"),
@@ -40,6 +51,11 @@ def _load_runtime_env() -> dict[str, str | None]:
         "mcp_server_path": os.getenv("MCP_SERVER_PATH", "/mcp"),
         "mcp_auth_enabled": os.getenv("MCP_AUTH_ENABLED", "false"),
         "mcp_auth_token": os.getenv("MCP_AUTH_TOKEN"),
+        "mcp_default_role": os.getenv("MCP_DEFAULT_ROLE"),
+        "mcp_allowed_visibilities": _parse_csv_env(
+            os.getenv("MCP_ALLOWED_VISIBILITIES"),
+            ["public", "internal"],
+        ),
     }
 
 

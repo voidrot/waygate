@@ -1,14 +1,20 @@
 from compiler.nodes import human_review
 from compiler.state import GraphState
+from waygate_core.schemas import AuditEventType
 
 
 class _FakeStorage:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
+        self.audit_events = []
 
     def write_staging_document(self, document_id: str, content: str) -> str:
         self.calls.append((document_id, content))
         return f"file:///tmp/staging/{document_id}.md"
+
+    def write_audit_event(self, event) -> str:
+        self.audit_events.append(event)
+        return f"meta/audit/{event.event_id}"
 
 
 def test_human_review_node_writes_staging_artifact(monkeypatch) -> None:
@@ -41,3 +47,8 @@ def test_human_review_node_writes_staging_artifact(monkeypatch) -> None:
     assert "trace-123" in content
     assert "Missing citations" in content
     assert "Draft body" in content
+    assert len(fake_storage.audit_events) == 1
+    event = fake_storage.audit_events[0]
+    assert event.event_type == AuditEventType.COMPILER_HUMAN_REVIEW_ESCALATED
+    assert event.trace_id == "trace-123"
+    assert event.payload["revision_count"] == 3
