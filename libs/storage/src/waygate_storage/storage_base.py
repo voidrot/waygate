@@ -100,6 +100,15 @@ class StorageProvider(ABC):
 
         pass
 
+    def write_staging_document(self, document_id: str, content: str) -> str:
+        """Save a dead-letter staging document to the storage backend.
+
+        Storage providers that support dead-letter escalation should override
+        this method. The base implementation fails explicitly.
+        """
+
+        raise NotImplementedError("This storage provider does not support staging")
+
     @abstractmethod
     def get_raw_document_metadata(self, doc_id: str) -> RawDocument | None:
         """Retrieve a raw document's metadata by its canonical doc_id.

@@ -36,9 +36,13 @@ def test_publish_node_writes_canonical_frontmatter_with_promoted_fields(
     monkeypatch.setattr(publish, "storage", fake_storage)
 
     state: GraphState = {
+        "state_version": "1",
+        "trace_id": "trace-1",
+        "enqueued_at": "2026-04-06T11:59:59+00:00",
         "target_topic": "Webhook Metadata Promotion",
         "current_draft": "This is the compiled draft.",
         "qa_feedback": None,
+        "staging_uri": None,
         "revision_count": 0,
         "status": "drafting",
         "new_document_uris": ["file:///tmp/raw/fallback-a.md"],
@@ -86,9 +90,13 @@ def test_publish_node_falls_back_to_raw_uris_when_source_urls_missing(
     monkeypatch.setattr(publish, "storage", fake_storage)
 
     state: GraphState = {
+        "state_version": "1",
+        "trace_id": "trace-2",
+        "enqueued_at": "2026-04-06T11:59:59+00:00",
         "target_topic": "Fallback Sources",
         "current_draft": "Body",
         "qa_feedback": None,
+        "staging_uri": None,
         "revision_count": 0,
         "status": "drafting",
         "new_document_uris": [
