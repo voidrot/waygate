@@ -1,6 +1,7 @@
 import logging
 from compiler.config import storage
 from langchain_core.messages import HumanMessage, SystemMessage
+from waygate_core.file_templates import render_markdown_template
 from waygate_core.llm import get_llm
 from waygate_core.schemas import RawDocument
 from waygate_core.settings import get_runtime_settings
@@ -49,6 +50,9 @@ def draft_node(state: GraphState):
     source_context = _build_source_context(state.get("raw_documents_metadata", []))
 
     llm = get_llm(draft_provider, draft_model)
+    suggested_structure = render_markdown_template(
+        state["target_topic"], state.get("document_type")
+    )
 
     feedback_section = ""
     if state.get("qa_feedback"):
@@ -71,6 +75,12 @@ def draft_node(state: GraphState):
     - Use clear headers, bullet points, and code blocks where applicable.
     - Do not invent information; rely ONLY on the provided raw documents.
     - Include internal markdown backlinks if you reference other concepts.
+    - Use the provided markdown scaffold as the structural baseline when it fits the source material.
+
+    TEMPLATE SCAFFOLD:
+    <template>
+    {suggested_structure}
+    </template>
 
     {feedback_section}
     """

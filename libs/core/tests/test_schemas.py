@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from waygate_core.schemas import (
+    DocumentType,
     FrontMatterDocument,
     RawDocument,
     SourceMetadataBase,
@@ -54,6 +55,7 @@ def test_frontmatter_document_defaults() -> None:
     )
 
     assert metadata.doc_id
+    assert metadata.document_type == DocumentType.CONCEPTS
     assert metadata.source_type == SourceType.SYNTHESIS
     assert metadata.visibility == Visibility.INTERNAL
     assert metadata.tags == []

@@ -1,11 +1,18 @@
-from typing import Literal
+from datetime import datetime, timezone
 
-from waygate_core.doc_helpers import generate_frontmatter, slugify
-from waygate_core.schemas import FrontMatterDocument, SourceMetadataBase
+from waygate_core.doc_helpers import (
+    build_live_document_name,
+    extract_markdown_title,
+    generate_frontmatter,
+    generate_raw_document,
+    infer_initial_topic,
+    slugify,
+)
+from waygate_core.schemas import FrontMatterDocument, RawDocument, SourceMetadataBase
 
 
 class FixtureWebSourceMetadata(SourceMetadataBase):
-    kind: Literal["web"] = "web"
+    kind: str = "web"
     author: str | None = None
     domain: str | None = None
     keywords: list[str] = []
@@ -29,6 +36,7 @@ def test_generate_frontmatter_with_empty_tags_and_sources() -> None:
         "---\n"
         "doc_id: doc-123\n"
         "title: Knowledge Base\n"
+        "document_type: concepts\n"
         "source_type: synthesis\n"
         "status: live\n"
         "visibility: internal\n"
@@ -66,6 +74,7 @@ def test_generate_frontmatter_with_tags_and_sources() -> None:
     frontmatter = generate_frontmatter(metadata)
 
     assert "doc_id: doc-456\n" in frontmatter
+    assert "document_type: concepts\n" in frontmatter
     assert "source_type: synthesis\n" in frontmatter
     assert "source_url: https://example.com/raw\n" in frontmatter
     assert "source_hash: abc123\n" in frontmatter
@@ -79,3 +88,47 @@ def test_generate_frontmatter_with_tags_and_sources() -> None:
         in frontmatter
     )
     assert "  keywords:\n    - gar\n    - metadata\n" in frontmatter
+
+
+def test_extract_markdown_title_prefers_first_heading() -> None:
+    draft = "# Final Title\n\nBody"
+
+    assert extract_markdown_title(draft, "Fallback") == "Final Title"
+
+
+def test_infer_initial_topic_uses_source_context() -> None:
+    documents = [
+        RawDocument(
+            source_type="github",
+            source_id="issue/1",
+            timestamp=datetime(2026, 4, 6, tzinfo=timezone.utc),
+            content="hello",
+        )
+    ]
+
+    assert infer_initial_topic(documents) == "Github issue 1"
+
+
+def test_generate_raw_document_emits_canonical_frontmatter() -> None:
+    document = RawDocument(
+        source_type="web",
+        source_id="page-1",
+        timestamp=datetime(2026, 4, 6, 12, 0, tzinfo=timezone.utc),
+        content="Hello world",
+        tags=["gar"],
+    )
+
+    raw_output = generate_raw_document(document)
+
+    assert "doc_id:" in raw_output
+    assert "source_type: web\n" in raw_output
+    assert "source_id: page-1\n" in raw_output
+    assert "tags:\n  - gar\n" in raw_output
+    assert raw_output.endswith("\nHello world")
+
+
+def test_build_live_document_name_adds_stable_suffix() -> None:
+    assert (
+        build_live_document_name("WayGate Contract", "12345678-abcd")
+        == "waygate-contract-12345678.md"
+    )

@@ -10,10 +10,12 @@ from waygate_core.schemas import RawDocument
 
 class _FakeStorage:
     def __init__(self) -> None:
-        self.writes: list[tuple[str, str]] = []
+        self.writes: list[tuple[str, str, str]] = []
 
-    def write_live_document(self, filename: str, content: str) -> None:
-        self.writes.append((filename, content))
+    def write_live_document_to_category(
+        self, filename: str, content: str, category: str
+    ) -> None:
+        self.writes.append((filename, content, category))
 
 
 def _raw_doc(*, source_id: str, source_url: str | None, tags: list[str]) -> dict:
@@ -65,12 +67,15 @@ def test_publish_node_writes_canonical_frontmatter_with_promoted_fields(
     assert result == {"status": "completed"}
     assert len(fake_storage.writes) == 1
 
-    filename, body = fake_storage.writes[0]
-    assert filename == "webhook-metadata-promotion.md"
+    filename, body, category = fake_storage.writes[0]
+    assert filename.startswith("webhook-metadata-promotion-")
+    assert category == "concepts"
 
     post = frontmatter.loads(body)
     metadata = cast(dict[str, Any], post.metadata)
+    assert metadata["document_type"] == "concepts"
     assert metadata["source_type"] == "synthesis"
+    assert metadata["source_hash"]
     assert metadata["status"] == "live"
     assert metadata["visibility"] == "internal"
     assert metadata["lineage"]
@@ -111,9 +116,10 @@ def test_publish_node_falls_back_to_raw_uris_when_source_urls_missing(
 
     publish.publish_node(state)
 
-    _, body = fake_storage.writes[0]
+    _, body, category = fake_storage.writes[0]
     post = frontmatter.loads(body)
     metadata = cast(dict[str, Any], post.metadata)
+    assert category == "concepts"
     assert metadata["sources"] == [
         "file:///tmp/raw/doc-a.md",
         "file:///tmp/raw/doc-b.md",

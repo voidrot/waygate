@@ -29,6 +29,12 @@ class Visibility(StrEnum):
     STRICTLY_CONFIDENTIAL = "strictly_confidential"
 
 
+class DocumentType(StrEnum):
+    CONCEPTS = "concepts"
+    ENTITIES = "entities"
+    THEMATIC = "thematic"
+
+
 class SourceMetadataBase(BaseModel):
     """Base class for plugin-specific source metadata.
 
@@ -80,6 +86,7 @@ class RawDocument(BaseModel):
 class FrontMatterDocument(BaseModel):
     doc_id: str = Field(default_factory=lambda: str(uuid4()))
     title: str
+    document_type: DocumentType | str = DocumentType.CONCEPTS
     source_type: SourceType | str = SourceType.SYNTHESIS
     source_url: str | None = None
     source_hash: str | None = None
