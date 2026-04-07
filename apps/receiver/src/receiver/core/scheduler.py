@@ -1,6 +1,7 @@
 import logging
 
 from receiver.core.registry import registry
+from receiver.core.checkpoints import get_poll_checkpoint, set_poll_checkpoint
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from receiver.services.trigger import save_and_trigger_langgraph_async
@@ -17,11 +18,13 @@ async def poll_plugin_job(plugin_name: str):
         return
 
     try:
-        last_polled = None  # TODO: track last polled timestamp per plugin
+        last_polled = get_poll_checkpoint(plugin_name)
         raw_documents = plugin.poll(since_timestamp=last_polled)
 
         if raw_documents:
             await save_and_trigger_langgraph_async(raw_documents)
+            latest_checkpoint = max(doc.timestamp for doc in raw_documents)
+            set_poll_checkpoint(plugin_name, latest_checkpoint)
             logger.info(
                 "Polled %d new documents from plugin '%s'",
                 len(raw_documents),

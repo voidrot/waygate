@@ -1,9 +1,10 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 import pytest
 
-from waygate_core.plugin_base import IngestionPlugin
+from waygate_core.plugin_base import IngestionPlugin, RawDocument
 
 
 class _PollingNotImplementedPlugin(IngestionPlugin):
@@ -48,6 +49,20 @@ class _ActiveListenerPlugin(IngestionPlugin):
         await on_data_callback([])
 
 
+class _PollingPlugin(IngestionPlugin):
+    def __init__(self, docs: list[RawDocument]) -> None:
+        self.docs = docs
+        self.last_since_timestamp = None
+
+    @property
+    def plugin_name(self) -> str:
+        return "polling_plugin"
+
+    def poll(self, since_timestamp=None):
+        self.last_since_timestamp = since_timestamp
+        return self.docs
+
+
 @pytest.mark.anyio
 async def test_poll_plugin_job_handles_not_implemented(monkeypatch, caplog) -> None:
     from receiver.core import scheduler as scheduler_module
@@ -72,6 +87,93 @@ async def test_poll_plugin_job_handles_not_implemented(monkeypatch, caplog) -> N
 
     assert not callback_called
     assert "does not implement polling" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_poll_plugin_job_uses_and_updates_checkpoint(monkeypatch) -> None:
+    from receiver.core import scheduler as scheduler_module
+
+    current_checkpoint = datetime(2026, 4, 6, 12, 0, tzinfo=timezone.utc)
+    newer_doc_time = datetime(2026, 4, 6, 12, 30, tzinfo=timezone.utc)
+
+    plugin = _PollingPlugin(
+        docs=[
+            RawDocument(
+                source_type="github",
+                source_id="issue/1",
+                timestamp=newer_doc_time,
+                content="payload",
+            )
+        ]
+    )
+
+    monkeypatch.setattr(scheduler_module.registry, "get", lambda _name: plugin)
+    monkeypatch.setattr(
+        scheduler_module,
+        "get_poll_checkpoint",
+        lambda _plugin_name: current_checkpoint,
+    )
+
+    observed_updates: list[datetime] = []
+    monkeypatch.setattr(
+        scheduler_module,
+        "set_poll_checkpoint",
+        lambda _plugin_name, checkpoint: observed_updates.append(checkpoint),
+    )
+
+    async def _fake_save(_documents):
+        return None
+
+    monkeypatch.setattr(
+        scheduler_module, "save_and_trigger_langgraph_async", _fake_save
+    )
+
+    await scheduler_module.poll_plugin_job("polling_plugin")
+
+    assert plugin.last_since_timestamp == current_checkpoint
+    assert observed_updates == [newer_doc_time]
+
+
+@pytest.mark.anyio
+async def test_poll_plugin_job_does_not_advance_checkpoint_on_handoff_error(
+    monkeypatch,
+) -> None:
+    from receiver.core import scheduler as scheduler_module
+
+    plugin = _PollingPlugin(
+        docs=[
+            RawDocument(
+                source_type="github",
+                source_id="issue/1",
+                timestamp=datetime(2026, 4, 6, 13, 0, tzinfo=timezone.utc),
+                content="payload",
+            )
+        ]
+    )
+
+    monkeypatch.setattr(scheduler_module.registry, "get", lambda _name: plugin)
+    monkeypatch.setattr(
+        scheduler_module, "get_poll_checkpoint", lambda _plugin_name: None
+    )
+
+    checkpoint_advanced = False
+
+    def _fake_set_checkpoint(_plugin_name, _checkpoint):
+        nonlocal checkpoint_advanced
+        checkpoint_advanced = True
+
+    monkeypatch.setattr(scheduler_module, "set_poll_checkpoint", _fake_set_checkpoint)
+
+    async def _failing_save(_documents):
+        raise RuntimeError("handoff failed")
+
+    monkeypatch.setattr(
+        scheduler_module, "save_and_trigger_langgraph_async", _failing_save
+    )
+
+    await scheduler_module.poll_plugin_job("polling_plugin")
+
+    assert checkpoint_advanced is False
 
 
 def test_setup_scheduler_only_registers_plugins_with_cron(monkeypatch) -> None:

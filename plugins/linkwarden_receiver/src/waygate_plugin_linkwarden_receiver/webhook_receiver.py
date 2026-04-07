@@ -113,7 +113,7 @@ class LinkwardenReceiver(IngestionPlugin):
             return None
         try:
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def _extract_documents(self, payload: Any) -> tuple[list[Any], dict[str, Any]]:
@@ -274,7 +274,9 @@ class LinkwardenReceiver(IngestionPlugin):
             timestamp = datetime.fromtimestamp(timestamp_value, tz=UTC)
         elif isinstance(timestamp_value, str):
             try:
-                timestamp = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
+                timestamp = datetime.fromisoformat(
+                    timestamp_value.replace("Z", "+00:00")
+                )
             except ValueError:
                 timestamp = datetime.now(UTC)
         else:

@@ -3,13 +3,14 @@ from compiler.config import storage
 from langchain_core.messages import HumanMessage, SystemMessage
 from waygate_core.llm import get_llm
 from waygate_core.schemas import RawDocument
+from waygate_core.settings import get_runtime_settings
 from compiler.state import GraphState
-import os
 
 logger = logging.getLogger(__name__)
 
-draft_model = os.getenv("DRAFT_LLM_MODEL", "gemma4:e4b")
-draft_provider = os.getenv("DRAFT_LLM_PROVIDER", "ollama")
+settings = get_runtime_settings()
+draft_model = settings.draft_llm_model
+draft_provider = settings.draft_llm_provider
 
 
 def _build_source_context(raw_docs_metadata: list[dict]) -> str:

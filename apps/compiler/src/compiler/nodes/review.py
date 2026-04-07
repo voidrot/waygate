@@ -4,16 +4,17 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from compiler.state import GraphState
+from waygate_core.settings import get_runtime_settings
 
 import logging
-import os
 from compiler.config import storage
 from waygate_core.llm import get_structured_llm
 
 logger = logging.getLogger(__name__)
 
-review_provider = os.getenv("REVIEW_LLM_PROVIDER", "ollama")
-review_model = os.getenv("REVIEW_LLM_MODEL", "hermes3:8b")
+settings = get_runtime_settings()
+review_provider = settings.review_llm_provider
+review_model = settings.review_llm_model
 
 
 class ReviewOutcome(BaseModel):
@@ -83,5 +84,5 @@ def review_node(state: GraphState) -> dict:
 
     return {
         "status": "approved" if response.approved else "rejected",
-        "feedback": response.feedback,
+        "qa_feedback": response.feedback,
     }

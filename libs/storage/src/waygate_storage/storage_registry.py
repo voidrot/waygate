@@ -27,8 +27,8 @@ class StorageRegistry:
             except Exception as e:
                 logger.exception("Failed to load storage provider %s: %s", ep.name, e)
 
-    def get_provider(self) -> StorageProvider:
-        active_name = os.getenv("STORAGE_PROVIDER", "local").lower()
+    def get_provider(self, provider_name: str | None = None) -> StorageProvider:
+        active_name = (provider_name or os.getenv("STORAGE_PROVIDER", "local")).lower()
         provider_class = self._providers.get(active_name)
         if not provider_class:
             raise ValueError(f"No storage provider found for name: {active_name}")

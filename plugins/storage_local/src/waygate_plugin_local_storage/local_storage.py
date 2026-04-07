@@ -6,20 +6,23 @@ from pydantic import ValidationError
 
 from waygate_storage.storage_base import StorageProvider
 from pathlib import Path
-import os
 from waygate_core.plugin_base import RawDocument
+from waygate_core.settings import get_runtime_settings
 from waygate_core.schemas import SourceMetadataBase, Visibility
 
 
 class LocalStorageProvider(StorageProvider):
     def __init__(self):
-        base_dir = Path(os.getenv("LOCAL_STORAGE_PATH", "wiki"))
+        settings = get_runtime_settings()
+        base_dir = Path(settings.local_storage_path)
         self.base_dir = Path(base_dir)
         self.raw_dir = self.base_dir / "raw"
         self.live_dir = self.base_dir / "live"
+        self.staging_dir = self.base_dir / "staging"
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.live_dir.mkdir(parents=True, exist_ok=True)
+        self.staging_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def provider_name(self) -> str:
@@ -92,7 +95,7 @@ class LocalStorageProvider(StorageProvider):
                         timestamp = (
                             parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
                         )
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
 
             raw_sm = m.get("source_metadata")
@@ -130,6 +133,12 @@ class LocalStorageProvider(StorageProvider):
     def read_live_document(self, uri: str) -> str:
         filepath = self._get_real_path(uri)
         return filepath.read_text(encoding="utf-8")
+
+    def write_staging_document(self, document_id: str, content: str) -> str:
+        filename = f"{document_id}.md"
+        filepath = self.staging_dir / filename
+        filepath.write_text(content, encoding="utf-8")
+        return f"file://{filepath.absolute()}"
 
     def list_live_documents(self, prefix: str = "") -> List[str]:
         uris = []
