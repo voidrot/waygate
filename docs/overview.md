@@ -4,7 +4,9 @@ WayGate is a modular knowledge ingestion and processing platform oriented around
 
 - `apps/compiler`: a workflow compiler/executor that builds and runs content transformation graphs.
 - `apps/receiver`: HTTP/webhook receiver and scheduler for ingestion plugins.
+- `apps/mcp_server`: FastMCP-backed briefing service exposing the retrieval boundary over HTTP.
 - `libs/core`: shared core utilities, LLM provider abstractions, schemas, and plugin base classes.
+- `libs/agent_sdk`: internal retrieval and briefing SDK for live markdown documents.
 - `libs/storage`: pluggable storage provider interfaces and registry.
 - `plugins/*`: provider and storage plugin implementations (examples: Ollama LLM provider, local storage, generic webhook receiver plugin).
 
@@ -14,10 +16,13 @@ Current implementation focus (April 2026):
 - Local storage preserves and can query raw document metadata by `doc_id`.
 - Compiler promotion includes provenance lineage/source propagation into live frontmatter.
 - GitHub and Slack receiver plugins currently parse webhook payloads to canonical documents.
+- Retrieval now loads compiled live markdown through an internal SDK with deterministic filtering, lexical scoring, lineage narrowing, and token-budgeted briefing assembly.
+- The MCP server exposes the retrieval SDK through FastMCP with a health endpoint and optional static bearer auth controlled by environment variables.
 
 Explicitly out of scope for this milestone:
 
-- Retrieval-filtering/RBAC enforcement engine across query transports.
+- External IAM, scoped tokens, and end-user RBAC across retrieval transports.
+- Non-lexical search backends such as vector indexes or LLM re-ranking adapters.
 - Broader cryptographic provenance systems beyond current hash + lineage fields.
 
 Entry points and configuration

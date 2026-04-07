@@ -11,10 +11,13 @@ Implemented now:
 - Local storage writes canonical raw frontmatter and supports metadata fetch by doc id via `get_raw_document_metadata`.
 - Compiler publish promotes provenance from raw metadata into live frontmatter: lineage from raw `doc_id`, sources from raw `source_url` (with URI fallback), and aggregated tags.
 - Receiver trigger now passes structured raw metadata into compiler graph state for draft/review/publish usage.
+- The retrieval SDK now loads live markdown, applies caller-supplied visibility policy, performs deterministic lexical ranking, and assembles token-budgeted briefing payloads.
+- The MCP app exposes that SDK through FastMCP with briefing and retrieval-preview tools.
 
 Out of scope for this milestone:
 
-- Retrieval-time RBAC filtering engine and policy enforcement across query surfaces.
+- External IAM, scoped tokens, and end-user RBAC across query surfaces.
+- Vector search backends, BM25 indexes, and LLM re-ranking beyond the current scorer seams.
 - Advanced provenance engines (for example cryptographic receipt/signature chains); current provenance is frontmatter lineage plus `source_hash`.
 
 The paradigm of artificial intelligence is currently undergoing a fundamental transition from stateless, ephemeral interaction models toward persistent, compounding knowledge architectures. Standard Retrieval-Augmented Generation (RAG) frameworks have historically treated data as a collection of fragmented vector chunks, a method that frequently leads to the degradation of hierarchical context and the erosion of semantic relationships between disparate pieces of information.1 In response to these limitations, the Generation-Augmented Retrieval (GAR) pattern has emerged as a superior alternative, drawing inspiration from structured knowledge bases and multi-agent swarm concepts.3 Within a GAR system, a large language model (LLM) acts not merely as a passive search engine but as an autonomous background worker that continuously ingests raw data and synthesizes it into a human-readable, machine-accessible "Live Wiki".2 By utilizing Markdown as the primary medium, these systems establish a transparent, auditable, and version-controlled environment that bridges the gap between human oversight and automated processing.5
@@ -59,20 +62,18 @@ Metadata is the mechanism through which a GAR system transforms a passive collec
 
 A core set of metadata fields is required for all documents to ensure interoperability across the system and to provide agents with the context necessary for high-precision retrieval.27
 
-| Metadata Key  | Data Type | Origin Worker      | Purpose                                                        |
-| ------------- | --------- | ------------------ | -------------------------------------------------------------- |
-| doc_id        | UUID/ULID | Ingestion/Compiler | Unique persistent identifier.                                  |
-| title         | String    | Both               | Human-readable title for UI/SSG rendering.                     |
-| source_type   | Enum      | Ingestion          | Categorizes origin (github, slack, web, synthesis).            |
-| source_url    | URL       | Ingestion          | Direct link to the raw data or API origin.                     |
-| source_hash   | SHA-256   | Ingestion          | Cryptographic tie to raw/; triggers auto-recompile if changed. |
-| status        | Enum      | Compiler           | Lifecycle execution (draft, active, stale_warning, archived).  |
-| visibility    | Enum      | Both               | RBAC enforcement (public, internal, strictly_confidential).    |
-| tags          | Array     | Ingestion          | Essential for the Synthesis Worker to execute tag aggregation. |
-| last_compiled | ISO 8601  | Compiler           | Used by chrono-decay sweeps to flag stale documents.           |
-| lineage       | Array     | Compiler           | Recursive doc_id links for mapping the graph database overlay. |
+- `doc_id` (`UUID/ULID`, ingestion/compiler): unique persistent identifier.
+- `title` (`String`, both): human-readable title for UI and rendering.
+- `source_type` (`Enum`, ingestion): categorizes origin (`github`, `slack`, `web`, `synthesis`).
+- `source_url` (`URL`, ingestion): direct link to the raw data or API origin.
+- `source_hash` (`SHA-256`, ingestion): cryptographic tie to `raw/`; triggers auto-recompile if changed.
+- `status` (`Enum`, compiler): lifecycle execution state (`draft`, `active`, `stale_warning`, `archived`).
+- `visibility` (`Enum`, both): retrieval-layer visibility filtering input.
+- `tags` (`Array`, ingestion): supports aggregation and retrieval narrowing.
+- `last_compiled` (`ISO 8601`, compiler): used by chrono-decay sweeps to flag stale documents.
+- `lineage` (`Array`, compiler): recursive `doc_id` links for mapping document ancestry.
 
-The visibility field is particularly vital in enterprise settings, as it allows the retrieval engine to filter responses based on the requesting user's role, preventing "accidental oversharing" of sensitive information.32 The source\_hash field ensures that the system is self-healing; when a query is performed, the system can compare the current raw file hash against the hash recorded at the time of synthesis to identify stale or invalid claims.1
+The visibility field is currently enforced inside the retrieval layer through a caller-supplied scope of allowed visibilities, preventing sensitive documents from entering the ranking or final briefing output. The source\_hash field ensures that the system is self-healing; when a query is performed, the system can compare the current raw file hash against the hash recorded at the time of synthesis to identify stale or invalid claims.1
 
 ## **Source-Specific Metadata Enrichment Strategies**
 
@@ -143,28 +144,27 @@ In this model, ![][image2] represents the drafted article and ![][image3] repres
 
 ## **Retrieval Engineering and the MCP Briefing Engine**
 
-The primary access layer for human developers and downstream swarm agents is the Model Context Protocol (MCP) server.3 This server exposes the "Live Wiki" through a suite of tools that permit sophisticated retrieval and context compilation.1
+The primary access layers for human developers and downstream swarm agents are the internal retrieval SDK and the Model Context Protocol (MCP) server built on top of it. The MCP service exposes the "Live Wiki" through a small suite of tools without bypassing the SDK boundary.
 
 ### **The Briefing Generation Workflow**
 
-Instead of providing an agent with raw search results, the "Briefing Engine" utilizes metadata to compile a strict, token-limited contextual package tailored to a specific agent role.3 This process involves filtering articles by YAML tags, scoring them based on relevance to the current task, and prioritizing the most recent information.3
+Instead of providing an agent with raw search results, the briefing engine compiles a strict, token-limited contextual package from live markdown. The current implementation filters by visibility and metadata, scores with deterministic lexical signals plus lineage boosts, then applies recency-based tie-breaks before assembling the final briefing.
 
-| Retrieval Signal        | Weighted Importance | Operational Logic                                    |
-| :---------------------- | :------------------ | :--------------------------------------------------- |
-| **Semantic Similarity** | High                | Matches conceptual meaning via vector distance.      |
-| **Recency Score**       | Medium              | Prioritizes files with the latest updated\_at date.  |
-| **Agent Role Filter**   | Mandatory           | Excludes content irrelevant to the agent's function. |
-| **Lineage Trace**       | Critical            | Ensures the agent can cite its sources back to raw/. |
+- Visibility filter: mandatory. Removes documents outside the caller's allowed visibility set.
+- Metadata filters: mandatory. Applies `document_type`, `status`, `tags`, and `lineage_ids` narrowing.
+- Lexical score: high importance. Weights title matches highest, then tag matches, then body matches.
+- Lineage boost: medium importance. Adds deterministic relevance when requested lineage intersects.
+- Recency tie-break: secondary. Uses `last_compiled`, then `last_updated` to order equal scores.
 
-This "Briefing" serves as the agent's memory for a specific turn, ensuring that the model has deep, accurate context before executing any tools or making decisions.3 By using a Knowledge Graph overlay to track backlinks, the Briefing Engine can follow connections across notes to pull together relevant information that might be missed by simple vector search alone.3
+This briefing serves as the agent's memory for a specific turn, ensuring that the model has deep, accurate context before executing any tools or making decisions. The current implementation uses direct metadata and lineage matching rather than a recursive knowledge-graph traversal, but preserves extension points for richer search backends later.
 
 ### **Hybrid Search Strategies for Scalability**
 
-While a purely content-oriented index works effectively at moderate scales, a hybrid search strategy is necessary for enterprise-level knowledge bases.4 This strategy combines three distinct layers of search to ensure both recall and precision.5
+While a purely content-oriented index works effectively at moderate scales, the current SDK is intentionally hybrid-search-ready rather than hybrid-search-complete. The first release keeps the filesystem as the source of truth and ships only the deterministic lexical path, while leaving room for richer secondary indexes later.
 
-1. **BM25 Keyword Matching:** Provides fast and precise retrieval for specific technical terms, error codes, or function names.5
-2. **Vector Semantic Search:** Identifies conceptually related articles based on the "semantic coordinate system" defined by the embedding model.5
-3. **LLM Re-ranking:** Uses a high-capacity model to score the relevance of the top candidates, ensuring that the most contextually appropriate information is presented first.5
+1. **Current path:** Deterministic lexical scoring over live markdown plus recency tie-breaks.
+2. **Planned path:** Optional BM25 or vector indexes as reconstructable secondary layers.
+3. **Planned path:** Optional re-ranking adapters without changing the SDK request/response contract.
 
 By maintaining the Markdown files as the "source of truth" on the local filesystem, the vector index becomes a secondary, reconstructable layer.17 If the index is deleted, it can be entirely rebuilt by re-embedding the structured Markdown files, ensuring that the knowledge base remains durable and future-proof.17
 

@@ -11,12 +11,14 @@ Implemented now:
 - Compiler graph runs Draft -> Review -> Publish and writes live articles under `wiki/live`.
 - Publish promotes provenance fields from raw metadata into live frontmatter (`lineage`, `sources`, aggregated `tags`).
 - First-party GitHub and Slack receiver plugins parse webhook payloads into canonical document records.
+- `libs/agent_sdk` loads live markdown documents, applies retrieval-scope visibility filtering, performs deterministic lexical scoring, and assembles token-budgeted briefings.
+- `apps/mcp_server` exposes the SDK through FastMCP with `generate_briefing` and `preview_retrieval`, a health endpoint, and optional static bearer auth.
 
 Not implemented in this milestone (explicitly out of scope):
 
-- Transport-level retrieval/RBAC enforcement engine for downstream query consumers.
+- External IAM, scoped tokens, and end-user RBAC for downstream query consumers.
 - Full provenance engine beyond current source hash + lineage frontmatter fields.
-- FastMCP/SDK/static-site deployment surfaces described as target architecture.
+- Static-site deployment surfaces and non-lexical search backends described as target architecture.
 
 ## Executive Summary
 
@@ -24,7 +26,7 @@ Not implemented in this milestone (explicitly out of scope):
 
 Operating on an elastic, Python-centric monorepo managed by `uv`, the system features a decoupled ingestion receiver and a LangGraph-powered compilation worker. WayGate prioritizes extreme modularity: its execution graphs support pre/post middleware hooks, dynamic prompt injection, and highly observable traces. Its deployment footprint scales seamlessly from sequential local generation to massive, queue-driven batch processing.
 
-Instead of relying on fragmented vector retrievals, downstream agents and human users interact with WayGate's structured knowledge base through securely scoped consumption layers, including a publishable Python SDK, a FastMCP server, and an auto-generated static frontend.
+Instead of relying on fragmented vector retrievals, downstream agents and human users interact with WayGate's structured knowledge base through an internal retrieval SDK and a FastMCP server, while preserving room for future static-site and hybrid-search layers.
 
 ---
 
@@ -34,12 +36,12 @@ The system treats the filesystem itself as the primary database. The topology is
 
 ### The WayGate Directory Topology
 
-* **`raw/` (Immutable Source):** Managed exclusively by ingestion plugins (Tri-Mode Receiver). Contains webhooks, Git diffs, and Slack thread JSONs. Read-only for the compiler.
-* **`live/` (The Compiled Wiki):** Managed exclusively by the LangGraph compiler. Contains the synthesized Markdown files categorized into `concepts/`, `entities/`, and `thematic/`.
-* **`staging/` (Dead-Letter Queue):** When the LangGraph Draft Node fails the "Hermes Quality Gate" three consecutive times, the draft is dropped here, and a slack alert is fired for manual human review.
-* **`meta/` (Architect Tier):** Consolidates system configuration.
-  * `templates/` holds the Markdown validation templates used by the Draft Node.
-  * `agents/` holds role overlays and context-anchoring for downstream agent swarms.
+- **`raw/` (Immutable Source):** Managed exclusively by ingestion plugins (Tri-Mode Receiver). Contains webhooks, Git diffs, and Slack thread JSONs. Read-only for the compiler.
+- **`live/` (The Compiled Wiki):** Managed exclusively by the LangGraph compiler. Contains the synthesized Markdown files categorized into `concepts/`, `entities/`, and `thematic/`.
+- **`staging/` (Dead-Letter Queue):** When the LangGraph Draft Node fails the "Hermes Quality Gate" three consecutive times, the draft is dropped here, and a slack alert is fired for manual human review.
+- **`meta/` (Architect Tier):** Consolidates system configuration.
+  - `templates/` holds the Markdown validation templates used by the Draft Node.
+  - `agents/` holds role overlays and context-anchoring for downstream agent swarms.
 
 ### The Unified YAML Frontmatter
 
@@ -62,7 +64,7 @@ Provenance Pipeline: source_type, source_url, source_hash, and tags are extracte
 
 Execution Pipeline: status, last_compiled, and lineage are dynamically managed by the LangGraph Compiler worker during the synthesis loop.
 
-Security Pipeline: visibility is rigidly enforced at the transport layer by FastMCP (see Section 14) to prevent agents from accessing unauthorized data.
+Security Pipeline: visibility is currently enforced inside the retrieval SDK using a caller-supplied retrieval scope, while transport auth is limited to optional static bearer middleware on the MCP server.
 
 ---
 
@@ -70,17 +72,17 @@ Security Pipeline: visibility is rigidly enforced at the transport layer by Fast
 
 WayGate operates on a highly asynchronous, Python-centric stack.
 
-* **Core Stack:** Python (`uv` workspaces), FastAPI (Receiver), LangGraph (Compiler Worker), Valkey/Redis (Task Queue), LangChain.
-* **Observability:** OpenTelemetry (OTel) and LangSmith for state tracing *(See Section 11).*
-* **Pluggable Middleware Architecture:** The LangGraph nodes (`draft`, `review`, `publish`) utilize a Hook/Middleware pattern for dependency injection, Pre-Hooks (chunking/PII scrubbing), and Post-Hooks (human-in-the-loop alerts).
+- **Core Stack:** Python (`uv` workspaces), FastAPI (Receiver), LangGraph (Compiler Worker), Valkey/Redis (Task Queue), LangChain.
+- **Observability:** OpenTelemetry (OTel) and LangSmith for state tracing *(See Section 11).*
+- **Pluggable Middleware Architecture:** The LangGraph nodes (`draft`, `review`, `publish`) utilize a Hook/Middleware pattern for dependency injection, Pre-Hooks (chunking/PII scrubbing), and Post-Hooks (human-in-the-loop alerts).
 
 ---
 
 ## 3\. Foundational Plugin Base
 
-* **Ingestion Plugins:** GitHub/Git (codebase context), Slack (communication consensus), Web Clipper.
-* **Storage Plugins:** Local File System (Base) and AWS S3 (Enterprise).
-* **LLM Providers:** Abstracted interfaces supporting local models and cloud APIs. *(Model swaps are guarded by Eval Pipelines \- See Section 13).*
+- **Ingestion Plugins:** GitHub/Git (codebase context), Slack (communication consensus), Web Clipper.
+- **Storage Plugins:** Local File System (Base) and AWS S3 (Enterprise).
+- **LLM Providers:** Abstracted interfaces supporting local models and cloud APIs. *(Model swaps are guarded by Eval Pipelines \- See Section 13).*
 
 ---
 
@@ -100,22 +102,22 @@ The FastAPI receiver standardizes inputs via Pull (Batch polling), Push (Webhook
 
 ## 5\. Agent Integration & SDK
 
-### The `waygate-agent-sdk`
+### The `waygate_agent_sdk`
 
-All Briefing Engine logic—filtering the wiki via YAML `visibility` tags, traversing `lineage` graphs, and compiling token-limited contexts—is abstracted into `libs/waygate-agent-sdk`.
+The current retrieval boundary lives in `libs/agent_sdk`. It loads live markdown from storage, parses canonical frontmatter, applies visibility and metadata filters, ranks documents with a deterministic lexical scorer, and assembles token-limited briefings.
 
 ### Dual Consumption Model
 
-1. **Standard MCP Access:** The internal `apps/mcp_server` utilizes the SDK to expose the `generate_briefing` tool to IDEs and generalized swarm agents. *(Secured via Scoped Tokens \- See Section 14).*
-2. **Native Custom Agents:** Developers can `pip install waygate-agent-sdk` directly into proprietary codebases to dynamically manipulate the knowledge graph natively.
+1. **Standard MCP Access:** The internal `apps/mcp_server` utilizes the SDK to expose `generate_briefing` and `preview_retrieval` over FastMCP. The current transport supports optional static bearer auth, but not scoped IAM.
+2. **Native Internal Consumers:** Other workspace apps can depend on `waygate_agent_sdk` directly when they need retrieval or briefing assembly without going through MCP.
 
 ---
 
 ## 6\. Enhancements & Roadmap
 
-* **Missing Context Loop:** Downstream agents detect context gaps and dispatch a "Research Agent" to scrape the web, updating the `raw/` directory and triggering a compile.
-* **Structured Consensus:** Passing raw data through multiple, distinct models that cross-critique each other to resolve hallucinations.
-* **Cryptographic Receipt Binding:** Hashing synthesized facts to original `raw/` sources using Ed25519 signatures.
+- **Missing Context Loop:** Downstream agents detect context gaps and dispatch a "Research Agent" to scrape the web, updating the `raw/` directory and triggering a compile.
+- **Structured Consensus:** Passing raw data through multiple, distinct models that cross-critique each other to resolve hallucinations.
+- **Cryptographic Receipt Binding:** Hashing synthesized facts to original `raw/` sources using Ed25519 signatures.
 
 ---
 
@@ -123,9 +125,9 @@ All Briefing Engine logic—filtering the wiki via YAML `visibility` tags, trave
 
 The Markdown filesystem is the immutable source of truth; secondary indexes are reconstructable:
 
-* **Vector Database (Milvus / Qdrant):** For "Hybrid Search" (Vector Semantic \+ BM25).
-* **Graph Database (Neo4j):** To actualize a "Knowledge Graph Overlay" mapped from the YAML `lineage` tags.
-* **Temporal.io:** To provide highly durable execution for long-running batch ingestion, replacing Valkey/Redis.
+- **Vector Database (Milvus / Qdrant):** For "Hybrid Search" (Vector Semantic \+ BM25).
+- **Graph Database (Neo4j):** To actualize a "Knowledge Graph Overlay" mapped from the YAML `lineage` tags.
+- **Temporal.io:** To provide highly durable execution for long-running batch ingestion, replacing Valkey/Redis.
 
 ---
 
@@ -152,8 +154,8 @@ To maintain continuous parity between the `raw/` data ingestion tier and the `li
 
 To prevent downstream agents from exhausting token limits reading granular micro-documents, a "Synthesis Worker" provides macro-level roll-ups.
 
-* **Execution:** A LangGraph node scans the `live/` directory for specific `tags` or `lineage` clusters. It drafts a high-level architectural overview, flagging any detected contradictions among the granular docs.
-* **Output:** The new document is classified as `document_type: thematic_overview`. The Briefing SDK preferentially serves this overview to agents querying broad topics.
+- **Execution:** A LangGraph node scans the `live/` directory for specific `tags` or `lineage` clusters. It drafts a high-level architectural overview, flagging any detected contradictions among the granular docs.
+- **Output:** The new document is classified as `document_type: thematic_overview`. The Briefing SDK preferentially serves this overview to agents querying broad topics.
 
 ---
 
@@ -161,8 +163,8 @@ To prevent downstream agents from exhausting token limits reading granular micro
 
 Asynchronous, multi-agent workflows are highly susceptible to silent failures. WayGate requires a robust observability layer to trace the lifecycle of a document from raw webhook to compiled wiki.
 
-* **OpenTelemetry (OTel) Backbone:** The system implements standard OTel tracing. A unique `trace_id` is generated at the FastAPI Receiver. This ID is passed through the Valkey/Redis queue payload and injected into the LangGraph worker state, creating a unified trace of the entire ingestion-to-publish lifecycle.
-* **LangGraph Auditing (LangSmith / Langfuse):** The LangGraph compiler natively integrates with an LLM observability platform (like LangSmith or the open-source Langfuse). This provides granular UI dashboards to inspect exact prompt inputs, Hermes Review logic loops, token consumption, and generation latency per node.
+- **OpenTelemetry (OTel) Backbone:** The system implements standard OTel tracing. A unique `trace_id` is generated at the FastAPI Receiver. This ID is passed through the Valkey/Redis queue payload and injected into the LangGraph worker state, creating a unified trace of the entire ingestion-to-publish lifecycle.
+- **LangGraph Auditing (LangSmith / Langfuse):** The LangGraph compiler natively integrates with an LLM observability platform (like LangSmith or the open-source Langfuse). This provides granular UI dashboards to inspect exact prompt inputs, Hermes Review logic loops, token consumption, and generation latency per node.
 
 ---
 
@@ -170,9 +172,9 @@ Asynchronous, multi-agent workflows are highly susceptible to silent failures. W
 
 While agents consume knowledge via the SDK, human stakeholders require a highly readable, navigable interface.
 
-* **Static Site Generator (SSG):** The system integrates a build-step utilizing an SSG like MkDocs (Material Theme) or Docusaurus.
-* **Automated CI/CD:** A background worker watches the `live/` directory. Upon a `publish` event from the LangGraph worker, the SSG rebuilds the static site and deploys it to a standard internal web server.
-* **Metadata Rendering:** The SSG is configured to parse the YAML frontmatter and render it visually. `visibility` becomes a security badge, `status` becomes a color-coded banner, and `lineage` can be rendered as an interactive D3.js graph at the bottom of the page, allowing humans to visually explore the knowledge base.
+- **Static Site Generator (SSG):** The system integrates a build-step utilizing an SSG like MkDocs (Material Theme) or Docusaurus.
+- **Automated CI/CD:** A background worker watches the `live/` directory. Upon a `publish` event from the LangGraph worker, the SSG rebuilds the static site and deploys it to a standard internal web server.
+- **Metadata Rendering:** The SSG is configured to parse the YAML frontmatter and render it visually. `visibility` becomes a security badge, `status` becomes a color-coded banner, and `lineage` can be rendered as an interactive D3.js graph at the bottom of the page, allowing humans to visually explore the knowledge base.
 
 ---
 
@@ -180,16 +182,21 @@ While agents consume knowledge via the SDK, human stakeholders require a highly 
 
 The internal "Hermes Quality Gate" (Section 4\) handles real-time draft reviews, but the system architecture itself requires evaluation to prevent regressions when modifying prompts or swapping underlying LLM providers (Section 3).
 
-* **The Golden Dataset:** WayGate maintains a static repository of complex `raw/` inputs and their human-approved `live/` outputs.
-* **Eval Pipeline (DeepEval / Ragas):** Before any code merged into the compiler (`prompts/`, `templates/`, or `llm_registry.py`) is deployed, it must pass an automated CI/CD evaluation pipeline.
-* **Metrics:** The new configuration generates drafts against the Golden Dataset, and the Eval framework scores the output on Factual Consistency, Contextual Relevancy, and Markdown Formatting adherence. A score drop blocks the deployment.
+- **The Golden Dataset:** WayGate maintains a static repository of complex `raw/` inputs and their human-approved `live/` outputs.
+- **Eval Pipeline (DeepEval / Ragas):** Before any code merged into the compiler (`prompts/`, `templates/`, or `llm_registry.py`) is deployed, it must pass an automated CI/CD evaluation pipeline.
+- **Metrics:** The new configuration generates drafts against the Golden Dataset, and the Eval framework scores the output on Factual Consistency, Contextual Relevancy, and Markdown Formatting adherence. A score drop blocks the deployment.
 
 ---
 
-## 14\. Advanced Security & Access Control (IAM)
+## 14\. Access Control Boundary
 
-To prevent agents from hallucinating or exfiltrating sensitive organizational data, the `visibility` YAML tags (Section 1\) must be enforced at the transport layer.
+Current behavior:
 
-* **Scoped API Tokens:** Downstream swarm agents cannot anonymously query the FastMCP Briefing Server. They must authenticate using scoped JWTs or API keys that define their authorized role (e.g., `role: infrastructure_agent`, `role: hr_assistant`).
-* **Enforcement Engine:** When an agent issues a `generate_briefing` request, the FastMCP server intercepts the request. It cross-references the agent's token scope against the `visibility` tags of the retrieved documents.
-* **Hard Block:** If an agent without `clearance: confidential` attempts to pull a document tagged `visibility: strictly_confidential`, the SDK strips that document from the context window entirely before returning the briefing payload.
+- **Retrieval-layer visibility enforcement:** The SDK accepts a caller-supplied `RetrievalScope` and removes documents whose `visibility` is not allowed before ranking or briefing assembly.
+- **Optional transport auth:** The FastMCP service can require a static bearer token via `MCP_AUTH_ENABLED` and `MCP_AUTH_TOKEN`.
+- **Hard block:** Documents outside the allowed visibility set never enter the ranked result set or final briefing payload.
+
+Future work:
+
+- Scoped JWT/API-key claims mapped into retrieval scopes.
+- External IAM integration and end-user transport authorization.
