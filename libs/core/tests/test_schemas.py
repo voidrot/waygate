@@ -257,7 +257,7 @@ def test_maintenance_models_round_trip_payload() -> None:
         requested_visibilities=[Visibility.PUBLIC],
     )
     finding = MaintenanceFinding(
-        finding_type=MaintenanceFindingType.HASH_MISMATCH,
+        finding_type=MaintenanceFindingType.STALE_COMPILATION,
         occurred_at="2026-04-06T12:00:00+00:00",
         live_document_id="doc-1",
         payload={"signal": signal.model_dump(mode="json")},
@@ -265,5 +265,5 @@ def test_maintenance_models_round_trip_payload() -> None:
 
     assert signal.reason == "hash_mismatch"
     assert report.requested_visibilities == [Visibility.PUBLIC]
-    assert finding.finding_type == MaintenanceFindingType.HASH_MISMATCH
+    assert finding.finding_type == MaintenanceFindingType.STALE_COMPILATION
     assert finding.payload["signal"]["live_document_id"] == "doc-1"

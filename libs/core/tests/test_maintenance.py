@@ -100,6 +100,50 @@ def test_detect_orphan_lineage_returns_finding(tmp_path: Path) -> None:
     assert finding.payload["missing_lineage_ids"] == ["missing-raw"]
 
 
+def test_detect_stale_compilation_returns_recompilation_finding(
+    tmp_path: Path,
+) -> None:
+    storage = _storage(tmp_path)
+    raw = RawDocument.model_validate(
+        {
+            "doc_id": "raw-2",
+            "source_type": "web",
+            "source_id": "page-2",
+            "timestamp": "2026-04-05T12:00:00+00:00",
+            "content": "Body",
+            "source_hash": "current-hash",
+            "visibility": Visibility.INTERNAL,
+        }
+    )
+    storage.write_raw_documents([raw])
+    live = (
+        generate_frontmatter(
+            FrontMatterDocument(
+                doc_id="live-stale-1",
+                title="Aging Doc",
+                status="live",
+                lineage=["raw-2"],
+                last_compiled="2026-04-05T12:05:00+00:00",
+            )
+        )
+        + "\nCompiled content"
+    )
+    storage.write_live_document_to_category("live-stale-1", live, "concepts")
+
+    findings = detect_maintenance_findings(
+        storage,
+        occurred_at="2026-04-07T13:00:00+00:00",
+        stale_after_hours=24,
+    )
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.finding_type == MaintenanceFindingType.STALE_COMPILATION
+    assert finding.live_document_id == "live-stale-1"
+    assert finding.payload["stale_after_hours"] == 24
+    assert finding.payload["recompilation_signal"]["reason"] == "stale_compilation"
+
+
 def test_persist_maintenance_findings_and_record_context_error(tmp_path: Path) -> None:
     storage = _storage(tmp_path)
     report = ContextErrorReport(

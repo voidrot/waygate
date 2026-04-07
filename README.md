@@ -27,8 +27,8 @@ Current implementation snapshot (April 2026)
 - Draft generation now consumes reusable markdown template scaffolds from the core library, and receiver state seeds a derived topic instead of the old `Auto-Detect` placeholder.
 - First-party GitHub and Slack receivers now parse webhook payloads into canonical `RawDocument` records.
 - Retrieval now has an initial internal SDK for loading, filtering, scoring, and token-budgeting live documents from the compiled wiki.
-- Maintenance now has an explicit sweep command that can detect and persist hash-mismatch and orphan-lineage findings as durable maintenance artifacts.
-- The maintenance sweep can now optionally enqueue recompilation jobs directly from persisted hash-mismatch findings, reusing the same compiler queue contract as ingestion.
+- Maintenance now has an explicit sweep command that can detect and persist hash-mismatch, orphan-lineage, and stale-compilation findings as durable maintenance artifacts.
+- The maintenance sweep can now optionally enqueue recompilation jobs directly from persisted hash-mismatch or stale-compilation findings, reusing the same compiler queue contract as ingestion.
 - The MCP boundary can now persist explicit context-gap reports as durable maintenance artifacts when downstream callers detect missing or insufficient wiki context.
 - Optional OpenTelemetry tracing can now wrap receiver polling/enqueue and compiler worker/node execution, while remaining disabled by default for local development.
 
@@ -80,10 +80,10 @@ mise run test:quick
 mise run maintenance:sweep
 ```
 
-1. Run the maintenance sweep and enqueue recompilation jobs for hash-mismatch findings:
+1. Run the maintenance sweep and enqueue recompilation jobs for stale or hash-mismatch findings older than 24 hours:
 
 ```bash
-mise run maintenance:sweep -- --enqueue-recompilation
+mise run maintenance:sweep -- --stale-after-hours 24 --enqueue-recompilation
 ```
 
 1. Enable optional OpenTelemetry tracing when you want spans emitted from receiver/compiler:

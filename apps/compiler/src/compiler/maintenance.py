@@ -36,6 +36,12 @@ def _build_parser() -> ArgumentParser:
         help="Override the maintenance finding timestamp",
     )
     parser.add_argument(
+        "--stale-after-hours",
+        type=int,
+        default=None,
+        help="Detect stale live documents whose last_compiled exceeds this age in hours",
+    )
+    parser.add_argument(
         "--enqueue-recompilation",
         action="store_true",
         help="Enqueue recompilation jobs for findings with embedded recompilation signals",
@@ -123,15 +129,23 @@ def enqueue_recompilation_jobs(
 
 def run_maintenance_sweep(
     occurred_at: str | None = None,
+    stale_after_hours: int | None = None,
 ) -> tuple[list[MaintenanceFinding], list[str]]:
-    findings = detect_maintenance_findings(storage, occurred_at=occurred_at)
+    findings = detect_maintenance_findings(
+        storage,
+        occurred_at=occurred_at,
+        stale_after_hours=stale_after_hours,
+    )
     finding_uris = persist_maintenance_findings(storage, findings)
     return findings, finding_uris
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = _build_parser().parse_args(list(argv) if argv is not None else None)
-    findings, finding_uris = run_maintenance_sweep(occurred_at=args.occurred_at)
+    findings, finding_uris = run_maintenance_sweep(
+        occurred_at=args.occurred_at,
+        stale_after_hours=args.stale_after_hours,
+    )
     enqueued_jobs = (
         enqueue_recompilation_jobs(findings) if args.enqueue_recompilation else []
     )

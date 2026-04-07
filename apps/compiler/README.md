@@ -24,7 +24,7 @@ For an explicit maintenance sweep over the current storage backend, run:
 - `uv run waygate-maintenance-sweep`
 - `mise run maintenance:sweep`
 
-To enqueue recompilation jobs for hash-mismatch findings during the sweep:
+To detect stale live documents and enqueue recompilation jobs for stale or hash-mismatch findings during the sweep:
 
-- `uv run waygate-maintenance-sweep --enqueue-recompilation`
-- `mise run maintenance:sweep -- --enqueue-recompilation`
+- `uv run waygate-maintenance-sweep --stale-after-hours 24 --enqueue-recompilation`
+- `mise run maintenance:sweep -- --stale-after-hours 24 --enqueue-recompilation`

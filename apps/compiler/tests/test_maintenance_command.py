@@ -17,11 +17,20 @@ def test_run_maintenance_sweep_detects_and_persists(monkeypatch) -> None:
         occurred_at="2026-04-07T00:00:00+00:00",
         live_document_id="live-1",
     )
+    captured = {}
 
     monkeypatch.setattr(
         maintenance_module,
         "detect_maintenance_findings",
-        lambda storage, occurred_at=None: [finding],
+        lambda storage, occurred_at=None, stale_after_hours=None: (
+            captured.update(
+                {
+                    "occurred_at": occurred_at,
+                    "stale_after_hours": stale_after_hours,
+                }
+            )
+            or [finding]
+        ),
     )
     monkeypatch.setattr(
         maintenance_module,
@@ -30,11 +39,16 @@ def test_run_maintenance_sweep_detects_and_persists(monkeypatch) -> None:
     )
 
     findings, uris = maintenance_module.run_maintenance_sweep(
-        occurred_at="2026-04-07T00:00:00+00:00"
+        occurred_at="2026-04-07T00:00:00+00:00",
+        stale_after_hours=24,
     )
 
     assert findings == [finding]
     assert uris == ["meta/maintenance/finding-1"]
+    assert captured == {
+        "occurred_at": "2026-04-07T00:00:00+00:00",
+        "stale_after_hours": 24,
+    }
 
 
 def test_main_outputs_json_summary(monkeypatch, capsys) -> None:
@@ -46,10 +60,20 @@ def test_main_outputs_json_summary(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         maintenance_module,
         "run_maintenance_sweep",
-        lambda occurred_at=None: ([finding], ["meta/maintenance/finding-2"]),
+        lambda occurred_at=None, stale_after_hours=None: (
+            [finding],
+            ["meta/maintenance/finding-2"],
+        ),
     )
 
-    maintenance_module.main(["--occurred-at", "2026-04-07T00:00:00+00:00"])
+    maintenance_module.main(
+        [
+            "--occurred-at",
+            "2026-04-07T00:00:00+00:00",
+            "--stale-after-hours",
+            "24",
+        ]
+    )
 
     payload = json.loads(capsys.readouterr().out)
     assert payload == {
@@ -148,3 +172,33 @@ def test_enqueue_recompilation_jobs_uses_embedded_signal(monkeypatch) -> None:
         == AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED
     )
     assert kwargs["job_timeout"] == "10m"
+
+
+def test_enqueue_recompilation_jobs_supports_stale_compilation(monkeypatch) -> None:
+    fake_storage = _FakeStorage()
+    fake_queue = _FakeQueue()
+    finding = MaintenanceFinding(
+        finding_type=MaintenanceFindingType.STALE_COMPILATION,
+        occurred_at="2026-04-08T00:00:00+00:00",
+        live_document_id="live-1",
+        live_document_uri="file:///tmp/live/concepts/live-1.md",
+        payload={
+            "recompilation_signal": {
+                "signal_id": "signal-stale-1",
+                "created_at": "2026-04-08T00:00:00+00:00",
+                "live_document_uri": "file:///tmp/live/concepts/live-1.md",
+                "live_document_id": "live-1",
+                "reason": "stale_compilation",
+                "lineage": ["raw-1"],
+                "payload": {"stale_after_hours": 24},
+            }
+        },
+    )
+
+    monkeypatch.setattr(maintenance_module, "storage", fake_storage)
+    monkeypatch.setattr(maintenance_module, "draft_queue", fake_queue)
+
+    jobs = maintenance_module.enqueue_recompilation_jobs([finding])
+
+    assert jobs[0]["job_id"] == "job-recompile-1"
+    assert fake_storage.audit_events[0].payload["reason"] == "stale_compilation"

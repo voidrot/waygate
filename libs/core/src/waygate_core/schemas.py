@@ -50,6 +50,7 @@ class AuditEventType(StrEnum):
 class MaintenanceFindingType(StrEnum):
     HASH_MISMATCH = "hash_mismatch"
     ORPHAN_LINEAGE = "orphan_lineage"
+    STALE_COMPILATION = "stale_compilation"
     CONTEXT_ERROR = "context_error"
 
 
