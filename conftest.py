@@ -3,7 +3,7 @@ import sys
 
 
 def _add_workspace_src_paths() -> None:
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parent
     src_paths = sorted(
         [
             *root.glob("apps/*/src"),

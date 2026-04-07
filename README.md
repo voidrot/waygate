@@ -26,15 +26,16 @@ Current implementation snapshot (April 2026)
 - Compiler publish promotes provenance from raw metadata into live frontmatter (`lineage`, `sources`, aggregated `tags`).
 - Draft generation now consumes reusable markdown template scaffolds from the core library, and receiver state seeds a derived topic instead of the old `Auto-Detect` placeholder.
 - First-party GitHub and Slack receivers now parse webhook payloads into canonical `RawDocument` records.
+- Retrieval now has an initial internal SDK for loading, filtering, scoring, and token-budgeting live documents from the compiled wiki.
 
 Out of scope (current milestone)
 
-- Retrieval filtering engine and end-user RBAC enforcement across retrieval transports.
+- Transport-level auth, token validation, and end-user RBAC enforcement across retrieval transports.
 - Broader provenance engines (for example cryptographic receipts/signatures beyond current hash fields).
 
 Project layout
 
-- Apps: see [apps/](apps/) — `apps/receiver` handles ingestion; `apps/compiler` builds and runs workflow graphs.
+- Apps: see [apps/](apps/) — `apps/receiver` handles ingestion; `apps/compiler` builds workflow graphs; `apps/mcp_server` exposes the briefing service boundary.
 - Libraries: see [libs/](libs/) — `libs/core` contains plugin base classes, `libs/storage` defines storage interfaces.
 - Plugins: see [plugins/](plugins/) — example providers for Ollama LLMs and local filesystem storage.
 - Docs: [docs/overview.md](docs/overview.md) provides a high-level tour; developer guidance is in [docs/developer_guide.md](docs/developer_guide.md).

@@ -22,3 +22,13 @@ This page summarizes the top-level applications in `apps/` and links to key sour
   - [health endpoint](apps/receiver/src/receiver/api/health.py)
   - [app entry](apps/receiver/src/receiver/app.py)
   - [clients and services](apps/receiver/src/receiver/clients, apps/receiver/src/receiver/services)
+
+1. MCP Server
+
+- Purpose: Provide the transport-facing briefing service layer on top of the retrieval SDK.
+- Key files:
+  - [apps/mcp_server README](apps/mcp_server/README.md)
+  - [service boundary](apps/mcp_server/src/mcp_server/service.py)
+  - [runtime config](apps/mcp_server/src/mcp_server/config.py)
+  - [FastMCP server wrapper](apps/mcp_server/src/mcp_server/server.py)
+  - [CLI entrypoint](apps/mcp_server/src/mcp_server/main.py)

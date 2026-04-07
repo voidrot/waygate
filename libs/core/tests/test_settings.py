@@ -10,6 +10,11 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
     monkeypatch.delenv("DRAFT_LLM_MODEL", raising=False)
     monkeypatch.delenv("REVIEW_LLM_PROVIDER", raising=False)
     monkeypatch.delenv("REVIEW_LLM_MODEL", raising=False)
+    monkeypatch.delenv("MCP_SERVER_HOST", raising=False)
+    monkeypatch.delenv("MCP_SERVER_PORT", raising=False)
+    monkeypatch.delenv("MCP_SERVER_PATH", raising=False)
+    monkeypatch.delenv("MCP_AUTH_ENABLED", raising=False)
+    monkeypatch.delenv("MCP_AUTH_TOKEN", raising=False)
 
     settings = reload_runtime_settings()
 
@@ -21,6 +26,11 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
     assert settings.draft_llm_model == "gemma4:e4b"
     assert settings.review_llm_provider == "ollama"
     assert settings.review_llm_model == "hermes3:8b"
+    assert settings.mcp_server_host == "127.0.0.1"
+    assert settings.mcp_server_port == 8000
+    assert settings.mcp_server_path == "/mcp"
+    assert settings.mcp_auth_enabled is False
+    assert settings.mcp_auth_token is None
 
 
 def test_runtime_settings_overrides(monkeypatch) -> None:
@@ -32,6 +42,11 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
     monkeypatch.setenv("DRAFT_LLM_MODEL", "draft-model")
     monkeypatch.setenv("REVIEW_LLM_PROVIDER", "review-provider")
     monkeypatch.setenv("REVIEW_LLM_MODEL", "review-model")
+    monkeypatch.setenv("MCP_SERVER_HOST", "0.0.0.0")
+    monkeypatch.setenv("MCP_SERVER_PORT", "9001")
+    monkeypatch.setenv("MCP_SERVER_PATH", "/briefing")
+    monkeypatch.setenv("MCP_AUTH_ENABLED", "true")
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "secret-token")
 
     settings = reload_runtime_settings()
 
@@ -43,6 +58,11 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
     assert settings.draft_llm_model == "draft-model"
     assert settings.review_llm_provider == "review-provider"
     assert settings.review_llm_model == "review-model"
+    assert settings.mcp_server_host == "0.0.0.0"
+    assert settings.mcp_server_port == 9001
+    assert settings.mcp_server_path == "/briefing"
+    assert settings.mcp_auth_enabled is True
+    assert settings.mcp_auth_token == "secret-token"
 
 
 def test_runtime_settings_reload_is_stable(monkeypatch) -> None:
