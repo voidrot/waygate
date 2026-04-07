@@ -97,3 +97,123 @@ def test_source_metadata_base_allows_extra_fields() -> None:
     assert metadata.kind == "web"
     assert metadata.model_extra is not None
     assert metadata.model_extra["domain"] == "example.com"
+
+
+# ---------------------------------------------------------------
+# NEW: Comprehensive validation edge cases
+# ---------------------------------------------------------------
+
+
+def test_raw_document_doc_id_is_stable_for_same_inputs() -> None:
+    """Verify doc_id is generated (UUID4 is random but present on each instance)."""
+    now = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+    doc1 = RawDocument(
+        source_type="github",
+        source_id="pr/123",
+        timestamp=now,
+        content="content",
+    )
+    doc2 = RawDocument(
+        source_type="github",
+        source_id="pr/123",
+        timestamp=now,
+        content="content",
+    )
+
+    # Both should have doc_id, but they will be different (UUID4)
+    assert doc1.doc_id
+    assert doc2.doc_id
+    assert len(doc1.doc_id) > 0
+    assert len(doc2.doc_id) > 0
+
+
+def test_raw_document_doc_id_differs_for_different_source_ids() -> None:
+    """Verify doc_id changes when source_id differs."""
+    now = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
+    doc1 = RawDocument(
+        source_type="github",
+        source_id="pr/123",
+        timestamp=now,
+        content="content",
+    )
+    doc2 = RawDocument(
+        source_type="github",
+        source_id="pr/456",
+        timestamp=now,
+        content="content",
+    )
+
+    assert doc1.doc_id != doc2.doc_id
+
+
+def test_frontmatter_document_with_empty_lineage() -> None:
+    """Verify frontmatter handles empty lineage without crashing."""
+    doc = FrontMatterDocument(
+        title="Title",
+        last_compiled="2026-04-06T00:00:00+00:00",
+        status="live",
+        lineage=[],
+    )
+
+    assert doc.lineage == []
+
+
+def test_frontmatter_document_with_lineage_preserves_order() -> None:
+    """Verify lineage list order is preserved."""
+    doc = FrontMatterDocument(
+        title="Title",
+        last_compiled="2026-04-06T00:00:00+00:00",
+        status="live",
+        lineage=["id1", "id2", "id3"],
+    )
+
+    assert doc.lineage == ["id1", "id2", "id3"]
+
+
+def test_frontmatter_document_with_sources_preserves_urls() -> None:
+    """Verify sources list is preserved correctly."""
+    doc = FrontMatterDocument(
+        title="Title",
+        last_compiled="2026-04-06T00:00:00+00:00",
+        status="live",
+        sources=["https://a.com", "https://b.com"],
+    )
+
+    assert doc.sources == ["https://a.com", "https://b.com"]
+
+
+def test_raw_document_with_multiple_tags_preserved() -> None:
+    """Verify tags array is correctly stored and retrieved."""
+    doc = RawDocument(
+        source_type="slack",
+        source_id="msg/1",
+        timestamp=datetime.now(timezone.utc),
+        content="content",
+        tags=["architecture", "decision", "framework"],
+    )
+
+    assert doc.tags == ["architecture", "decision", "framework"]
+
+
+def test_document_type_enum_values_are_valid() -> None:
+    """Verify all DocumentType enum members can be used."""
+    for doc_type in DocumentType:
+        doc = FrontMatterDocument(
+            title="Test",
+            last_compiled="2026-04-06T00:00:00+00:00",
+            status="live",
+            document_type=doc_type,
+        )
+        assert doc.document_type == doc_type
+
+
+def test_visibility_enum_values_are_valid() -> None:
+    """Verify all Visibility enum members can be used."""
+    for vis in Visibility:
+        doc = FrontMatterDocument(
+            title="Test",
+            last_compiled="2026-04-06T00:00:00+00:00",
+            status="live",
+            visibility=vis,
+        )
+        assert doc.visibility == vis

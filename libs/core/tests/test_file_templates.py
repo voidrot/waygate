@@ -87,3 +87,67 @@ def test_load_template_from_storage_returns_none_on_error() -> None:
     result = _load_template_from_storage(mock_storage, "concepts")
 
     assert result is None
+
+
+# ---------------------------------------------------------------
+# NEW: Template edge cases and fallback behavior
+# ---------------------------------------------------------------
+
+
+def test_render_markdown_template_with_special_characters_in_title() -> None:
+    """Verify render_markdown_template handles special characters safely."""
+    title = "Title: With (Special) & Characters!"
+    rendered = render_markdown_template(title, "concepts")
+
+    assert "Title: With (Special) & Characters!" in rendered
+    assert rendered.startswith("# Title: With (Special) & Characters!")
+
+
+def test_render_markdown_template_respects_document_type_selection() -> None:
+    """Verify different document types use different templates."""
+    concepts_render = render_markdown_template("Test", document_type="concepts")
+    entities_render = render_markdown_template("Test", document_type="entities")
+    thematic_render = render_markdown_template("Test", document_type="thematic")
+
+    # Each should have the type-specific section
+    assert "## Summary" in concepts_render
+    assert "## Responsibilities" not in concepts_render
+
+    assert "## Overview" in entities_render
+    assert "## Responsibilities" in entities_render
+
+    assert "## Major Themes" in thematic_render
+    assert "## Open Questions" in thematic_render
+
+
+def test_render_markdown_template_fallback_chain_on_multiple_storage_failures() -> None:
+    """Verify fallback to packaged template when storage fails multiple times."""
+    mock_storage = MagicMock()
+    mock_storage.read_meta_document.side_effect = [
+        FileNotFoundError(),  # First call fails
+        Exception("Connection error"),  # Any exception should trigger fallback
+    ]
+
+    # First call: storage fails, uses packaged
+    result1 = render_markdown_template("Title 1", "concepts", mock_storage)
+    assert "## Summary" in result1
+
+    # Second call: storage fails again, uses packaged
+    result2 = render_markdown_template("Title 2", "concepts", mock_storage)
+    assert "## Summary" in result2
+
+
+def test_render_markdown_template_empty_title_substitution() -> None:
+    """Verify render_markdown_template handles empty title gracefully."""
+    rendered = render_markdown_template("", "concepts")
+
+    assert rendered.startswith("# ")
+    assert "## Summary" in rendered
+
+
+def test_get_markdown_template_unknown_document_type_falls_back_to_concepts() -> None:
+    """Verify unknown document types fall back to CONCEPTS template."""
+    result = get_markdown_template("unknown_type_xyz")
+
+    # Should fall back to concepts template
+    assert "## Summary" in result

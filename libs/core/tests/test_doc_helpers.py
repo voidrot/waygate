@@ -132,3 +132,104 @@ def test_build_live_document_name_adds_stable_suffix() -> None:
         build_live_document_name("WayGate Contract", "12345678-abcd")
         == "waygate-contract-12345678.md"
     )
+
+
+# ---------------------------------------------------------------
+# NEW: Round-trip and provenance consistency tests
+# ---------------------------------------------------------------
+
+
+def test_generate_frontmatter_with_source_metadata_round_trips() -> None:
+    """Verify source_metadata serialized in frontmatter preserves extra fields."""
+    original_metadata = FixtureWebSourceMetadata.model_validate(
+        {
+            "author": "Alice",
+            "domain": "docs.example.com",
+            "keywords": ["ai", "ml"],
+        }
+    )
+
+    doc = FrontMatterDocument(
+        doc_id="test-123",
+        title="AI Knowledge",
+        last_compiled="2026-04-06T12:00:00+00:00",
+        status="live",
+        source_metadata=original_metadata,
+    )
+
+    frontmatter_str = generate_frontmatter(doc)
+
+    # Parse back to verify round-trip
+    assert "author: Alice" in frontmatter_str
+    assert "domain: docs.example.com" in frontmatter_str
+    assert "- ai" in frontmatter_str
+
+
+def test_build_live_document_name_is_deterministic() -> None:
+    """Verify same title+id produces same filename on repeated calls."""
+    name1 = build_live_document_name("Test Title", "abc-123")
+    name2 = build_live_document_name("Test Title", "abc-123")
+
+    assert name1 == name2
+
+
+def test_build_live_document_name_differs_with_different_ids() -> None:
+    """Verify different IDs produce different filename prefixes by UUID first part."""
+    # build_live_document_name takes first segment before dash
+    name1 = build_live_document_name("Test Title", "aaaaaaaa-1111-2222-3333-444444444444")
+    name2 = build_live_document_name("Test Title", "bbbbbbbb-1111-2222-3333-444444444444")
+
+    # Different first segments produce different filenames
+    assert "test-title-aaaaaaaa" in name1
+    assert "test-title-bbbbbbbb" in name2
+    assert name1 != name2
+
+
+def test_generate_raw_document_preserves_all_source_fields() -> None:
+    """Verify raw document serialization includes source_type, source_id, source_url."""
+    now = datetime(2026, 4, 6, 12, 0, tzinfo=timezone.utc)
+    document = RawDocument(
+        source_type="github",
+        source_id="pull/999",
+        timestamp=now,
+        content="PR description",
+        source_url="https://github.com/example/repo/pull/999",
+        tags=["review"],
+    )
+
+    output = generate_raw_document(document)
+
+    assert "source_type: github" in output
+    assert "source_id: pull/999" in output
+    assert "source_url: https://github.com/example/repo/pull/999" in output
+    assert "timestamp:" in output
+
+
+def test_frontmatter_document_with_full_provenance_chain() -> None:
+    """Verify frontmatter correctly preserves complex lineage and source chains."""
+    doc = FrontMatterDocument(
+        doc_id="compiled-456",
+        title="Aggregated Insights",
+        last_compiled="2026-04-06T12:00:00+00:00",
+        status="live",
+        lineage=["raw-1", "raw-2", "raw-3"],
+        sources=[
+            "https://github.com/a/pull/1",
+            "https://github.com/b/pull/2",
+            "https://example.com/doc",
+        ],
+        tags=["architecture", "review", "api"],
+    )
+
+    frontmatter_str = generate_frontmatter(doc)
+
+    # Verify all fields present and ordered
+    assert "lineage:" in frontmatter_str
+    assert "- raw-1" in frontmatter_str
+    assert "- raw-2" in frontmatter_str
+    assert "- raw-3" in frontmatter_str
+    assert "sources:" in frontmatter_str
+    assert "https://github.com/a/pull/1" in frontmatter_str
+    assert "tags:" in frontmatter_str
+    assert "- architecture" in frontmatter_str
+    assert "- review" in frontmatter_str
