@@ -51,7 +51,7 @@ def draft_node(state: GraphState):
 
     llm = get_llm(draft_provider, draft_model)
     suggested_structure = render_markdown_template(
-        state["target_topic"], state.get("document_type")
+        state["target_topic"], state.get("document_type"), storage
     )
 
     feedback_section = ""

@@ -91,53 +91,53 @@ class TestBuildSourceContext:
 
 class TestPromoteFromRaw:
     def test_empty_list_returns_empty_tuples(self) -> None:
-        lineage, sources, tags = _promote_from_raw([])
-        assert lineage == []
-        assert sources == []
-        assert tags == []
+        result = _promote_from_raw([])
+        assert result.lineage == []
+        assert result.sources == []
+        assert result.tags == []
 
     def test_lineage_contains_all_doc_ids(self) -> None:
         docs = [_raw(source_id="s1"), _raw(source_id="s2")]
-        lineage, _, _ = _promote_from_raw(docs)
-        assert len(lineage) == 2
+        result = _promote_from_raw(docs)
+        assert len(result.lineage) == 2
 
     def test_sources_contains_source_urls(self) -> None:
         docs = [
             _raw(source_url="https://a.com"),
             _raw(source_url="https://b.com", source_id="s2"),
         ]
-        _, sources, _ = _promote_from_raw(docs)
-        assert sources == ["https://a.com", "https://b.com"]
+        result = _promote_from_raw(docs)
+        assert result.sources == ["https://a.com", "https://b.com"]
 
     def test_sources_skips_none_urls(self) -> None:
         docs = [_raw(source_url=None), _raw(source_url="https://x.com", source_id="s2")]
-        _, sources, _ = _promote_from_raw(docs)
-        assert sources == ["https://x.com"]
+        result = _promote_from_raw(docs)
+        assert result.sources == ["https://x.com"]
 
     def test_tags_aggregated_and_sorted(self) -> None:
         docs = [
             _raw(tags=["langgraph", "architecture"]),
             _raw(tags=["architecture", "fastapi"], source_id="s2"),
         ]
-        _, _, tags = _promote_from_raw(docs)
-        assert tags == ["architecture", "fastapi", "langgraph"]
+        result = _promote_from_raw(docs)
+        assert result.tags == ["architecture", "fastapi", "langgraph"]
 
     def test_tags_deduplicated(self) -> None:
         docs = [_raw(tags=["a", "b"]), _raw(tags=["b", "c"], source_id="s2")]
-        _, _, tags = _promote_from_raw(docs)
-        assert tags.count("b") == 1
+        result = _promote_from_raw(docs)
+        assert result.tags.count("b") == 1
 
     def test_empty_tags_on_all_docs_returns_empty(self) -> None:
         docs = [_raw(tags=[]), _raw(tags=[], source_id="s2")]
-        _, _, tags = _promote_from_raw(docs)
-        assert tags == []
+        result = _promote_from_raw(docs)
+        assert result.tags == []
 
     def test_lineage_is_deduplicated_preserving_order(self) -> None:
         first = _raw(source_id="same")
         second = dict(first)
-        lineage, _, _ = _promote_from_raw([first, second])
-        assert len(lineage) == 1
-        assert lineage[0] == first["doc_id"]
+        result = _promote_from_raw([first, second])
+        assert len(result.lineage) == 1
+        assert result.lineage[0] == first["doc_id"]
 
     def test_sources_are_deduplicated_preserving_order(self) -> None:
         docs = [
@@ -145,5 +145,5 @@ class TestPromoteFromRaw:
             _raw(source_id="s2", source_url="https://dup.example"),
             _raw(source_id="s3", source_url="https://unique.example"),
         ]
-        _, sources, _ = _promote_from_raw(docs)
-        assert sources == ["https://dup.example", "https://unique.example"]
+        result = _promote_from_raw(docs)
+        assert result.sources == ["https://dup.example", "https://unique.example"]
