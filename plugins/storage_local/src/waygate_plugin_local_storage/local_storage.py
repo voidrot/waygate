@@ -1,9 +1,14 @@
+from datetime import datetime
 from typing import List
+
+import frontmatter
+from pydantic import ValidationError
 
 from waygate_storage.storage_base import StorageProvider
 from pathlib import Path
 import os
 from waygate_core.plugin_base import RawDocument
+from waygate_core.schemas import SourceMetadataBase, Visibility
 
 
 class LocalStorageProvider(StorageProvider):
@@ -31,14 +36,26 @@ class LocalStorageProvider(StorageProvider):
         for doc in documents:
             filename = f"{doc.timestamp.strftime('%Y%m%d%H%M%S')}_{doc.source_type}.md"
             filepath = self.raw_dir / filename
-            with filepath.open("w", encoding="utf-8") as f:
-                # TODO: Move metadata to a function so that it can be reused by other plugins
-                f.write("---\n")
-                f.write(f"source: {doc.source_type}\n")
-                f.write(f"id: {doc.source_id}\n")
-                f.write(f"tags: {doc.tags}\n")
-                f.write("---\n")
-                f.write(doc.content)
+
+            metadata: dict = {
+                "doc_id": doc.doc_id,
+                "source_type": doc.source_type,
+                "source_id": doc.source_id,
+                "timestamp": doc.timestamp.isoformat(),
+                "tags": doc.tags,
+                "visibility": str(doc.visibility),
+            }
+            if doc.source_url is not None:
+                metadata["source_url"] = doc.source_url
+            if doc.source_hash is not None:
+                metadata["source_hash"] = doc.source_hash
+            if doc.source_metadata is not None:
+                metadata["source_metadata"] = doc.source_metadata.model_dump(
+                    exclude_none=True
+                )
+
+            post = frontmatter.Post(doc.content, **metadata)
+            filepath.write_text(frontmatter.dumps(post), encoding="utf-8")
             saved_uris.append(f"file://{filepath.absolute()}")
         return saved_uris
 
@@ -56,6 +73,45 @@ class LocalStorageProvider(StorageProvider):
             if filepath.is_file():
                 uris.append(f"file://{filepath.absolute()}")
         return uris
+
+    def get_raw_document_metadata(self, doc_id: str) -> RawDocument | None:
+        for filepath in self.raw_dir.glob("*.md"):
+            post = frontmatter.load(str(filepath))
+            if post.metadata.get("doc_id") != doc_id:
+                continue
+
+            m = post.metadata
+            raw_ts = m.get("timestamp")
+            if isinstance(raw_ts, datetime):
+                timestamp = raw_ts
+            else:
+                timestamp = datetime.fromisoformat(str(raw_ts))
+
+            raw_sm = m.get("source_metadata")
+            source_metadata: SourceMetadataBase | None = None
+            if isinstance(raw_sm, dict):
+                try:
+                    source_metadata = SourceMetadataBase.model_validate(raw_sm)
+                except ValidationError:
+                    # Old documents may not have a `kind` field; treat as opaque.
+                    source_metadata = None
+
+            return RawDocument.model_validate(
+                {
+                    "doc_id": m["doc_id"],
+                    "source_type": m["source_type"],
+                    "source_id": m["source_id"],
+                    "timestamp": timestamp,
+                    "content": post.content,
+                    "tags": m.get("tags", []),
+                    "source_url": m.get("source_url"),
+                    "source_hash": m.get("source_hash"),
+                    "visibility": m.get("visibility", Visibility.INTERNAL),
+                    "source_metadata": source_metadata,
+                }
+            )
+
+        return None
 
     def write_live_document(self, document_id: str, content: str) -> str:
         filename = f"{document_id}.md"

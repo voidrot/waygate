@@ -7,10 +7,39 @@
     dependencies    = []
 
 [dependency-groups]
-    dev = ["pytest", "ruff", "pyright"]
+    dev = ["pytest", "pytest-cov", "ruff", "pyright"]
 
 [tool.uv]
     package = false
 
     [tool.uv.workspace]
         members = ["apps/*", "libs/*", "plugins/*"]
+
+[tool.pytest.ini_options]
+    minversion = "8.0"
+    testpaths = ["tests", "apps", "libs", "plugins"]
+    python_files = ["test_*.py", "*_test.py"]
+    addopts = [
+        "-ra",
+        "--strict-config",
+        "--strict-markers",
+        "--cov=apps",
+        "--cov=libs",
+        "--cov=plugins",
+        "--cov-report=term-missing",
+        "--cov-fail-under=20",
+    ]
+    filterwarnings = [
+        # python-frontmatter v1.1.0 uses codecs.open() which is deprecated in Python 3.14+
+        "ignore::DeprecationWarning:frontmatter",
+        # langchain_core ships pydantic v1 compatibility shims that don't work on Python 3.14+
+        "ignore::UserWarning:langchain_core",
+    ]
+
+[tool.coverage.run]
+    branch   = true
+    parallel = true
+
+[tool.coverage.report]
+    show_missing = true
+    skip_covered = false

@@ -1,5 +1,5 @@
 [project]
-    name = "waygate-plugin-local-storage"
+    name = "waygate-plugin-slack-receiver"
     version = "0.1.0"
     description = "Add your description here"
     readme = "README.md"
@@ -7,15 +7,14 @@
         { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
     ]
     requires-python = ">=3.14"
-    dependencies = ["waygate_core", "waygate_storage", "python-frontmatter"]
+    dependencies = ["waygate_core"]
 
 [tool.uv.sources]
-    waygate_core    = { workspace = true }
-    waygate_storage = { workspace = true }
-
-    [project.entry-points."waygate.plugins.storage"]
-        waygate_storage_local = "waygate_plugin_local_storage.local_storage:LocalStorageProvider"
+    waygate_core = { workspace = true }
 
 [build-system]
     requires      = ["uv_build>=0.11.3,<0.12.0"]
     build-backend = "uv_build"
+
+    [project.entry-points."waygate.plugins.receiver"]
+        slack_receiver = "waygate_plugin_slack_receiver.slack_receiver:SlackReceiver"

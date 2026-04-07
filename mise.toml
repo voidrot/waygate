@@ -9,3 +9,9 @@
 
 [tasks."uv:sync"]
     run = "uv sync --all-groups --all-extras --all-packages"
+
+[tasks.test]
+    run = "uv run pytest"
+
+[tasks."test:quick"]
+    run = "uv run pytest -q"

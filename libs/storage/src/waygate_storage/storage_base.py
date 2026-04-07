@@ -99,3 +99,21 @@ class StorageProvider(ABC):
         """
 
         pass
+
+    @abstractmethod
+    def get_raw_document_metadata(self, doc_id: str) -> RawDocument | None:
+        """Retrieve a raw document's metadata by its canonical doc_id.
+
+        Parses the stored frontmatter to reconstruct metadata fields without
+        requiring the caller to re-parse the full document content. Returns
+        ``None`` if no document with the given ``doc_id`` is found.
+
+        Args:
+            doc_id: the globally unique document ID assigned at ingest time.
+
+        Returns:
+            A ``RawDocument`` instance populated from stored frontmatter, or
+            ``None`` if the document does not exist.
+        """
+
+        pass

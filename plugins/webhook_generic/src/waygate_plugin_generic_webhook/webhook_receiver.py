@@ -1,8 +1,10 @@
+import hashlib
 import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from waygate_plugin_generic_webhook.metadata import WebSourceMetadata
 from waygate_core.plugin_base import IngestionPlugin
 from waygate_core.schemas import RawDocument
 
@@ -40,11 +42,17 @@ class WebhookReceiver(IngestionPlugin):
             source_type = self._first_string(defaults, "source_type", "type")
         if source_type is None:
             source_type = self.plugin_name
+        source_type = source_type.lower()
 
         source_id = self._resolve_source_id(payload, defaults, index)
         timestamp = self._resolve_timestamp(payload, defaults)
         tags = self._resolve_tags(payload, defaults)
         content = self._resolve_content(payload)
+        source_url = self._resolve_source_url(payload, defaults)
+        source_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        source_metadata = self._resolve_source_metadata(
+            source_type=source_type, payload=payload, defaults=defaults
+        )
 
         return RawDocument(
             source_type=source_type,
@@ -52,7 +60,45 @@ class WebhookReceiver(IngestionPlugin):
             timestamp=timestamp,
             content=content,
             tags=tags,
+            source_url=source_url,
+            source_hash=source_hash,
+            source_metadata=source_metadata,
         )
+
+    def _resolve_source_url(
+        self, payload: dict[str, Any], defaults: dict[str, Any]
+    ) -> str | None:
+        return self._first_string(
+            payload,
+            "source_url",
+            "url",
+            "link",
+            "html_url",
+            "permalink",
+        ) or self._first_string(
+            defaults,
+            "source_url",
+            "url",
+            "link",
+            "html_url",
+            "permalink",
+        )
+
+    def _resolve_source_metadata(
+        self, source_type: str, payload: dict[str, Any], defaults: dict[str, Any]
+    ) -> WebSourceMetadata | None:
+        merged = {**defaults, **payload}
+
+        if source_type == "web":
+            return WebSourceMetadata(
+                author=self._first_string(merged, "author"),
+                clipped_at=self._first_string(merged, "clipped_at"),
+                domain=self._first_string(merged, "domain"),
+                local_assets=self._coerce_list(merged.get("local_assets")),
+                keywords=self._coerce_list(merged.get("keywords")),
+            )
+
+        return None
 
     def _resolve_source_id(
         self, payload: dict[str, Any], defaults: dict[str, Any], index: int
@@ -160,3 +206,10 @@ class WebhookReceiver(IngestionPlugin):
             if key in payload and payload[key] is not None:
                 return payload[key]
         return None
+
+    def _coerce_list(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        return [str(value)]
