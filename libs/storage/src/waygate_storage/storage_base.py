@@ -112,19 +112,30 @@ class StorageProvider(ABC):
     def write_meta_document(
         self, namespace: str, document_id: str, content: str
     ) -> str:
-        """Save a managed meta document under a provider-controlled namespace."""
+        """Save a managed meta document under a provider-controlled namespace.
+
+        Meta documents use logical URIs of the form `meta/<namespace>/<document_id>`.
+        Storage providers are responsible for mapping those URIs to provider-specific
+        paths such as `meta/<namespace>/<document_id>.md`.
+        """
 
         pass
 
     @abstractmethod
     def read_meta_document(self, uri: str) -> str:
-        """Read a managed meta document from the storage backend."""
+        """Read a managed meta document from the storage backend.
+
+        `uri` should use the logical format `meta/<namespace>/<document_id>`.
+        """
 
         pass
 
     @abstractmethod
     def list_meta_documents(self, namespace: str, prefix: str = "") -> List[str]:
-        """List managed meta documents for a namespace."""
+        """List managed meta documents for a namespace.
+
+        Returned URIs should use the logical format `meta/<namespace>/<document_id>`.
+        """
 
         pass
 

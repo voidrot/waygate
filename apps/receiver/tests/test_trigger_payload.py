@@ -21,7 +21,6 @@ def test_build_initial_state_includes_traceability_fields() -> None:
     assert state["state_version"] == "1"
     assert state["target_topic"] == "Github issue 1"
     assert state["document_type"] == "concepts"
-    assert state["template_name"] == "default"
     assert state["status"] == "pending_draft"
     assert state["new_document_uris"] == ["file:///tmp/raw.md"]
     assert state["revision_count"] == 0

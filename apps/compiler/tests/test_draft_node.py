@@ -35,7 +35,6 @@ def test_draft_node_includes_template_scaffold(monkeypatch) -> None:
         "raw_documents_metadata": [],
         "target_topic": "WayGate Contract",
         "document_type": "concepts",
-        "template_name": "default",
         "current_draft": None,
         "qa_feedback": None,
         "staging_uri": None,

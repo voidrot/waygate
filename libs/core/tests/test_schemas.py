@@ -104,8 +104,8 @@ def test_source_metadata_base_allows_extra_fields() -> None:
 # ---------------------------------------------------------------
 
 
-def test_raw_document_doc_id_is_stable_for_same_inputs() -> None:
-    """Verify doc_id is generated (UUID4 is random but present on each instance)."""
+def test_raw_document_doc_id_is_generated_for_same_inputs() -> None:
+    """Verify each instance gets a generated, non-empty doc_id for identical inputs."""
     now = datetime(2026, 4, 6, 12, 0, 0, tzinfo=timezone.utc)
     doc1 = RawDocument(
         source_type="github",

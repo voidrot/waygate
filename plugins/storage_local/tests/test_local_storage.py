@@ -216,5 +216,6 @@ class TestManagedTopology:
     def test_write_and_list_meta_documents(self, storage: LocalStorageProvider) -> None:
         uri = storage.write_meta_document("templates", "default", "# Template")
 
-        assert "/meta/templates/default.md" in uri
+        assert uri == "meta/templates/default"
+        assert storage.read_meta_document(uri) == "# Template"
         assert storage.list_meta_documents("templates") == [uri]

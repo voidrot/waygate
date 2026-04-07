@@ -28,7 +28,6 @@ def _build_initial_state(documents: List[RawDocument], saved_uris: List[str]) ->
         "raw_documents_metadata": [doc.model_dump(mode="json") for doc in documents],
         "target_topic": infer_initial_topic(documents),
         "document_type": "concepts",
-        "template_name": "default",
         "current_draft": None,
         "qa_feedback": None,
         "staging_uri": None,

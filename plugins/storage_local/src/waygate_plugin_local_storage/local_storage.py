@@ -37,8 +37,35 @@ class LocalStorageProvider(StorageProvider):
     def _get_real_path(self, uri: str) -> Path:
         if uri.startswith("file://"):
             return Path(uri.replace("file://", ""))
-        else:
-            raise ValueError(f"Unsupported URI scheme in {uri}")
+
+        normalized_uri = uri.strip("/")
+        namespace_roots = {
+            "raw": self.raw_dir,
+            "live": self.live_dir,
+            "meta": self.meta_dir,
+        }
+
+        for namespace, root_dir in namespace_roots.items():
+            if normalized_uri == namespace or normalized_uri.startswith(
+                f"{namespace}/"
+            ):
+                relative_parts = normalized_uri.split("/")[1:]
+                candidate = (
+                    root_dir.joinpath(*relative_parts) if relative_parts else root_dir
+                )
+                if relative_parts and candidate.suffix == "":
+                    candidate = candidate.with_suffix(".md")
+
+                resolved_root = root_dir.resolve(strict=False)
+                resolved_candidate = candidate.resolve(strict=False)
+                try:
+                    resolved_candidate.relative_to(resolved_root)
+                except ValueError as exc:
+                    raise ValueError(f"Path escapes storage root in {uri}") from exc
+
+                return resolved_candidate
+
+        raise ValueError(f"Unsupported URI scheme in {uri}")
 
     def _iter_markdown_files(self, directory: Path) -> Iterable[Path]:
         return directory.rglob("*.md")
@@ -167,20 +194,22 @@ class LocalStorageProvider(StorageProvider):
         self, namespace: str, document_id: str, content: str
     ) -> str:
         filename = f"{document_id}.md"
-        filepath = self._meta_namespace_dir(namespace) / filename
+        normalized_namespace = slugify(namespace)
+        filepath = self._meta_namespace_dir(normalized_namespace) / filename
         filepath.write_text(content, encoding="utf-8")
-        return f"file://{filepath.absolute()}"
+        return f"meta/{normalized_namespace}/{document_id}"
 
     def read_meta_document(self, uri: str) -> str:
         filepath = self._get_real_path(uri)
         return filepath.read_text(encoding="utf-8")
 
     def list_meta_documents(self, namespace: str, prefix: str = "") -> List[str]:
-        base_dir = self._meta_namespace_dir(namespace)
+        normalized_namespace = slugify(namespace)
+        base_dir = self._meta_namespace_dir(normalized_namespace)
         uris = []
         for filepath in self._iter_markdown_files(base_dir):
             if filepath.is_file() and filepath.name.startswith(prefix):
-                uris.append(f"file://{filepath.absolute()}")
+                uris.append(f"meta/{normalized_namespace}/{filepath.stem}")
         return uris
 
     def get_live_document_metadata(self, uri: str) -> FrontMatterDocument:
