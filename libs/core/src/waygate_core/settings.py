@@ -18,6 +18,12 @@ class RuntimeSettings(BaseModel):
     review_llm_provider: str = Field(default="ollama")
     review_llm_model: str = Field(default="hermes3:8b")
 
+    mcp_server_host: str = Field(default="127.0.0.1")
+    mcp_server_port: int = Field(default=8000)
+    mcp_server_path: str = Field(default="/mcp")
+    mcp_auth_enabled: bool = Field(default=False)
+    mcp_auth_token: str | None = Field(default=None)
+
 
 def _load_runtime_env() -> dict[str, str]:
     return {
@@ -29,6 +35,11 @@ def _load_runtime_env() -> dict[str, str]:
         "draft_llm_model": os.getenv("DRAFT_LLM_MODEL", "gemma4:e4b"),
         "review_llm_provider": os.getenv("REVIEW_LLM_PROVIDER", "ollama"),
         "review_llm_model": os.getenv("REVIEW_LLM_MODEL", "hermes3:8b"),
+        "mcp_server_host": os.getenv("MCP_SERVER_HOST", "127.0.0.1"),
+        "mcp_server_port": os.getenv("MCP_SERVER_PORT", "8000"),
+        "mcp_server_path": os.getenv("MCP_SERVER_PATH", "/mcp"),
+        "mcp_auth_enabled": os.getenv("MCP_AUTH_ENABLED", "false"),
+        "mcp_auth_token": os.getenv("MCP_AUTH_TOKEN"),
     }
 
 

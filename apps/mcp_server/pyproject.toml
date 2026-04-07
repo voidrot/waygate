@@ -1,0 +1,30 @@
+[project]
+    name = "mcp-server"
+    version = "0.1.0"
+    description = "WayGate MCP-facing briefing service"
+    readme = "README.md"
+    authors = [
+        { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+    ]
+    requires-python = ">=3.14"
+    dependencies = [
+        "mcp[cli]>=1.12.4",
+        "pydantic>=2.12.5",
+        "waygate_agent_sdk",
+        "waygate_core",
+        "waygate_storage",
+        "waygate_plugin_local_storage",
+    ]
+
+    [project.scripts]
+        waygate-mcp-server = "mcp_server.main:main"
+
+[tool.uv.sources]
+    waygate_agent_sdk            = { workspace = true }
+    waygate_core                 = { workspace = true }
+    waygate_storage              = { workspace = true }
+    waygate_plugin_local_storage = { workspace = true }
+
+[build-system]
+    requires      = ["uv_build>=0.11.3,<0.12.0"]
+    build-backend = "uv_build"
