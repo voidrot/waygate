@@ -233,7 +233,9 @@ def test_report_context_error_persists_maintenance_finding() -> None:
     assert finding.finding_type == MaintenanceFindingType.CONTEXT_ERROR
     assert finding.trace_id == "trace-gap-1"
     assert finding.related_doc_ids == ["raw-9"]
-    assert finding.payload["message"] == "Missing escalation policy for database failover"
+    assert (
+        finding.payload["message"] == "Missing escalation policy for database failover"
+    )
     assert finding.payload["role"] == "ops_agent"
     assert finding.payload["requested_visibilities"] == ["public"]
 

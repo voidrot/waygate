@@ -61,9 +61,7 @@ def _load_runtime_env() -> dict[str, object]:
         ),
         "otel_enabled": os.getenv("OTEL_ENABLED", "false"),
         "otel_exporter": os.getenv("OTEL_EXPORTER", "console"),
-        "otel_service_namespace": os.getenv(
-            "OTEL_SERVICE_NAMESPACE", "waygate"
-        ),
+        "otel_service_namespace": os.getenv("OTEL_SERVICE_NAMESPACE", "waygate"),
     }
 
 
