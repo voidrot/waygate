@@ -21,6 +21,7 @@ PLUGIN_MATRIX = [
         "class_name": "GitHubReceiver",
         "source_type": "github",
         "supports_poll": True,
+        "supports_webhook": True,
         "supports_listen": False,
         "expects_typed_metadata": True,
     },
@@ -29,14 +30,25 @@ PLUGIN_MATRIX = [
         "class_name": "SlackReceiver",
         "source_type": "slack",
         "supports_poll": True,
+        "supports_webhook": True,
         "supports_listen": True,
         "expects_typed_metadata": True,
     },
     {
         "plugin_path": "waygate_plugin_generic_webhook.webhook_receiver",
         "class_name": "WebhookReceiver",
-        "source_type": "web",
+        "source_type": "generic_webhook",
         "supports_poll": False,
+        "supports_webhook": True,
+        "supports_listen": False,
+        "expects_typed_metadata": False,
+    },
+    {
+        "plugin_path": "waygate_plugin_linkwarden_receiver.webhook_receiver",
+        "class_name": "LinkwardenReceiver",
+        "source_type": "web",
+        "supports_poll": True,
+        "supports_webhook": False,
         "supports_listen": False,
         "expects_typed_metadata": True,
     },
@@ -66,9 +78,17 @@ def _make_webhook_payload(plugin_class: str) -> dict[str, Any]:
                 "ts": "1712400000.123",
             },
         }
+    if plugin_class == "LinkwardenReceiver":
+        return {
+            "id": "42",
+            "url": "https://example.com/notes/42",
+            "title": "Clip",
+            "description": "hello",
+            "tags": ["research"],
+            "createdAt": "2026-04-06T10:00:00Z",
+        }
     return {
-        "source_type": "web",
-        "source_id": "clip-1",
+        "source_id": "event-1",
         "content": "hello",
         "timestamp": "2026-04-06T10:00:00Z",
     }
@@ -95,6 +115,42 @@ def _prepare_poll_fixture(case: dict[str, Any], tmp_path, monkeypatch) -> None:
         }
         (tmp_path / "export.json").write_text(json.dumps(export), encoding="utf-8")
         monkeypatch.setenv("SLACK_EXPORT_PATH", str(tmp_path))
+    elif case["class_name"] == "LinkwardenReceiver":
+        monkeypatch.setenv("LINKWARDEN_BASE_URL", "https://example.linkwarden")
+        monkeypatch.setenv("LINKWARDEN_TOKEN", "token")
+        page = {
+            "data": {
+                "links": [
+                    {
+                        "id": 42,
+                        "url": "https://example.com/notes/42",
+                        "name": "Clip",
+                        "description": "hello",
+                        "tags": [{"name": "research"}],
+                        "createdAt": "2026-04-06T10:00:00Z",
+                    }
+                ],
+                "nextCursor": None,
+            }
+        }
+
+        class _MockResponse:
+            def __init__(self, payload: dict[str, Any]) -> None:
+                self._payload = payload
+
+            def read(self) -> bytes:
+                return json.dumps(self._payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+        monkeypatch.setattr(
+            "waygate_plugin_linkwarden_receiver.webhook_receiver.urlopen",
+            lambda _req: _MockResponse(page),
+        )
 
 
 def _prepare_listen_fixture(case: dict[str, Any], plugin: Any) -> None:
@@ -126,6 +182,11 @@ def test_plugins_inherit_ingestion_base_contract() -> None:
 @pytest.mark.parametrize("case", PLUGIN_MATRIX)
 def test_webhook_contract_normalizes_to_raw_document(case: dict[str, Any]) -> None:
     plugin = getattr(import_module(case["plugin_path"]), case["class_name"])()
+
+    if not case["supports_webhook"]:
+        with pytest.raises(NotImplementedError):
+            plugin.handle_webhook(_make_webhook_payload(case["class_name"]))
+        return
 
     docs = plugin.handle_webhook(_make_webhook_payload(case["class_name"]))
     assert docs
