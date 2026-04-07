@@ -4,9 +4,8 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from waygate_plugin_generic_webhook.metadata import WebSourceMetadata
 from waygate_core.plugin_base import IngestionPlugin
-from waygate_core.schemas import RawDocument
+from waygate_core.schemas import RawDocument, SourceMetadataBase
 
 
 class WebhookReceiver(IngestionPlugin):
@@ -51,7 +50,7 @@ class WebhookReceiver(IngestionPlugin):
         source_url = self._resolve_source_url(payload, defaults)
         source_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         source_metadata = self._resolve_source_metadata(
-            source_type=source_type, payload=payload, defaults=defaults
+            payload=payload, defaults=defaults
         )
 
         return RawDocument(
@@ -85,19 +84,15 @@ class WebhookReceiver(IngestionPlugin):
         )
 
     def _resolve_source_metadata(
-        self, source_type: str, payload: dict[str, Any], defaults: dict[str, Any]
-    ) -> WebSourceMetadata | None:
+        self, payload: dict[str, Any], defaults: dict[str, Any]
+    ) -> SourceMetadataBase | None:
         merged = {**defaults, **payload}
-
-        if source_type == "web":
-            return WebSourceMetadata(
-                author=self._first_string(merged, "author"),
-                clipped_at=self._first_string(merged, "clipped_at"),
-                domain=self._first_string(merged, "domain"),
-                local_assets=self._coerce_list(merged.get("local_assets")),
-                keywords=self._coerce_list(merged.get("keywords")),
-            )
-
+        raw_source_metadata = merged.get("source_metadata")
+        if isinstance(raw_source_metadata, dict):
+            try:
+                return SourceMetadataBase.model_validate(raw_source_metadata)
+            except (TypeError, ValueError):
+                return None
         return None
 
     def _resolve_source_id(

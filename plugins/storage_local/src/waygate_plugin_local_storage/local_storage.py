@@ -34,9 +34,7 @@ class LocalStorageProvider(StorageProvider):
     def write_raw_documents(self, documents: List[RawDocument]) -> List[str]:
         saved_uris = []
         for doc in documents:
-            filename = (
-                f"{doc.timestamp.strftime('%Y%m%d%H%M%S')}_{doc.source_type}_{doc.doc_id}.md"
-            )
+            filename = f"{doc.timestamp.strftime('%Y%m%d%H%M%S')}_{doc.source_type}_{doc.doc_id}.md"
             filepath = self.raw_dir / filename
 
             metadata: dict = {
@@ -91,7 +89,9 @@ class LocalStorageProvider(StorageProvider):
                 if raw_ts:
                     try:
                         parsed = datetime.fromisoformat(str(raw_ts))
-                        timestamp = parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+                        timestamp = (
+                            parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+                        )
                     except (TypeError, ValueError):
                         pass
 

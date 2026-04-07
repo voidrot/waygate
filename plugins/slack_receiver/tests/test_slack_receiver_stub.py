@@ -1,5 +1,6 @@
 import pytest
 from importlib import import_module
+import json
 
 SlackSourceMetadata = import_module(
     "waygate_plugin_slack_receiver.metadata"
@@ -100,3 +101,64 @@ def test_slack_metadata_model_defaults() -> None:
 
     assert metadata.kind == "slack"
     assert metadata.channel_id == "C123"
+
+
+def test_slack_receiver_poll_ingests_export_messages(tmp_path, monkeypatch) -> None:
+    receiver = SlackReceiver()
+
+    export = {
+        "channel": "C111",
+        "messages": [
+            {
+                "type": "message",
+                "user": "U1",
+                "text": "First",
+                "ts": "1712400000.123",
+            },
+            {
+                "type": "message",
+                "user": "U2",
+                "text": "Second",
+                "ts": "1712400300.000",
+                "thread_ts": "1712400000.123",
+            },
+        ],
+    }
+    export_path = tmp_path / "export.json"
+    export_path.write_text(json.dumps(export), encoding="utf-8")
+
+    monkeypatch.setenv("SLACK_EXPORT_PATH", str(tmp_path))
+    docs = receiver.poll()
+
+    assert len(docs) == 2
+    assert docs[0].source_type == "slack"
+    assert docs[0].source_metadata is not None
+    assert docs[0].source_metadata.channel_id == "C111"
+
+
+@pytest.mark.anyio
+async def test_slack_receiver_listen_emits_normalized_documents() -> None:
+    receiver = SlackReceiver()
+    receiver._listen_events = [
+        {
+            "event_id": "Ev-L1",
+            "event": {
+                "type": "message",
+                "channel": "C123",
+                "user": "U42",
+                "text": "from listen",
+                "ts": "1712400000.123",
+            },
+        }
+    ]
+
+    captured = []
+
+    async def _callback(docs):
+        captured.extend(docs)
+
+    await receiver.listen(_callback)
+
+    assert len(captured) == 1
+    assert captured[0].source_type == "slack"
+    assert captured[0].content == "from listen"

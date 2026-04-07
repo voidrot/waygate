@@ -1,5 +1,6 @@
 import pytest
 from importlib import import_module
+import json
 
 GitHubReceiver = import_module(
     "waygate_plugin_github_receiver.github_receiver"
@@ -110,3 +111,48 @@ def test_github_metadata_model_defaults() -> None:
 
     assert metadata.kind == "github"
     assert metadata.repo_name == "voidrot/waygate"
+
+
+def test_github_receiver_poll_ingests_snapshot_exports(tmp_path, monkeypatch) -> None:
+    receiver = GitHubReceiver()
+
+    snapshot = {
+        "repository": {
+            "full_name": "voidrot/waygate",
+            "html_url": "https://github.com/voidrot/waygate",
+            "owner": {"login": "voidrot"},
+        },
+        "ref": "refs/heads/main",
+        "commit_sha": "deadbeef",
+        "files": [
+            {
+                "path": "README.md",
+                "content": "# WayGate",
+                "language": "Markdown",
+                "sha": "sha-readme",
+            },
+            {
+                "path": "apps/compiler/src/compiler/graph.py",
+                "content": "print('hello')",
+                "language": "Python",
+                "sha": "sha-graph",
+            },
+        ],
+    }
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+
+    monkeypatch.setenv("GITHUB_EXPORT_PATH", str(tmp_path))
+    docs = receiver.poll()
+
+    assert len(docs) == 2
+    for doc in docs:
+        assert doc.source_type == "github"
+        assert doc.source_hash is not None
+        assert doc.source_metadata is not None
+        assert doc.source_metadata.kind == "github"
+        assert doc.source_metadata.repo_name == "voidrot/waygate"
+        assert doc.source_metadata.branch == "main"
+        assert doc.source_metadata.commit_sha == "deadbeef"
+        assert doc.source_metadata.owner == "voidrot"
+        assert "snapshot" in doc.tags
