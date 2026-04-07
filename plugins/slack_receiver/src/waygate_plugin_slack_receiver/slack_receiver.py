@@ -1,6 +1,8 @@
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Awaitable, Callable, List
 from uuid import uuid4
 
@@ -15,11 +17,55 @@ class SlackReceiver(IngestionPlugin):
         return "slack_receiver"
 
     def poll(self, since_timestamp=None) -> List[RawDocument]:
-        return []
+        export_path = os.getenv("SLACK_EXPORT_PATH")
+        if not export_path:
+            return []
+
+        root = Path(export_path)
+        if not root.exists():
+            return []
+
+        documents: list[RawDocument] = []
+        for export_file in sorted(root.glob("*.json")):
+            mtime = datetime.fromtimestamp(export_file.stat().st_mtime, tz=UTC)
+            if since_timestamp and mtime <= since_timestamp:
+                continue
+
+            try:
+                payload = json.loads(export_file.read_text(encoding="utf-8"))
+            except OSError, json.JSONDecodeError:
+                continue
+
+            messages = payload.get("messages") if isinstance(payload, dict) else None
+            if isinstance(messages, list):
+                for message in messages:
+                    if isinstance(message, dict):
+                        docs = self._normalize_payload(
+                            {
+                                "event_id": message.get("event_id") or str(uuid4()),
+                                "event": {
+                                    **message,
+                                    "channel": message.get("channel")
+                                    or payload.get("channel")
+                                    or payload.get("channel_id"),
+                                },
+                            }
+                        )
+                        documents.extend(docs)
+            elif isinstance(payload, dict):
+                documents.extend(self._normalize_payload(payload))
+
+        return documents
 
     def handle_webhook(self, payload: dict) -> List[RawDocument]:
         if not payload:
             raise ValueError("Webhook body cannot be empty")
+
+        return self._normalize_payload(payload)
+
+    def _normalize_payload(self, payload: dict) -> List[RawDocument]:
+        if not payload:
+            return []
 
         raw_event = payload.get("event")
         event: dict[str, Any] = raw_event if isinstance(raw_event, dict) else payload
@@ -102,4 +148,24 @@ class SlackReceiver(IngestionPlugin):
     async def listen(
         self, on_data_callback: Callable[[List[RawDocument]], Awaitable[None]]
     ) -> None:
-        raise NotImplementedError("Slack stream listener stub is not implemented yet")
+        events = getattr(self, "_listen_events", None)
+
+        if events is None:
+            fixture_path = os.getenv("SLACK_STREAM_FIXTURE")
+            if fixture_path:
+                try:
+                    loaded = json.loads(Path(fixture_path).read_text(encoding="utf-8"))
+                except OSError, json.JSONDecodeError:
+                    loaded = []
+                if isinstance(loaded, list):
+                    events = loaded
+
+        if not isinstance(events, list):
+            return
+
+        for payload in events:
+            if not isinstance(payload, dict):
+                continue
+            docs = self._normalize_payload(payload)
+            if docs:
+                await on_data_callback(docs)

@@ -1,6 +1,8 @@
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Awaitable, Callable, List
 from uuid import uuid4
 
@@ -15,7 +17,33 @@ class GitHubReceiver(IngestionPlugin):
         return "github_receiver"
 
     def poll(self, since_timestamp=None) -> List[RawDocument]:
-        return []
+        # TODO: implement process to get repo files as a snapshot
+        export_path = os.getenv("GITHUB_EXPORT_PATH")
+        if not export_path:
+            return []
+
+        root = Path(export_path)
+        if not root.exists():
+            return []
+
+        documents: list[RawDocument] = []
+        for snapshot_file in sorted(root.glob("*.json")):
+            mtime = datetime.fromtimestamp(snapshot_file.stat().st_mtime, tz=UTC)
+            if since_timestamp and mtime <= since_timestamp:
+                continue
+
+            try:
+                snapshot = json.loads(snapshot_file.read_text(encoding="utf-8"))
+            except OSError, json.JSONDecodeError:
+                continue
+
+            documents.extend(
+                self._documents_from_snapshot(
+                    snapshot=snapshot, fallback_timestamp=mtime
+                )
+            )
+
+        return documents
 
     def handle_webhook(self, payload: dict) -> List[RawDocument]:
         if not payload:
@@ -92,6 +120,86 @@ class GitHubReceiver(IngestionPlugin):
             )
         ]
 
+    def _documents_from_snapshot(
+        self, *, snapshot: Any, fallback_timestamp: datetime
+    ) -> list[RawDocument]:
+        if not isinstance(snapshot, dict):
+            return []
+
+        repository = snapshot.get("repository") or {}
+        repo_name = self._string(repository, "full_name")
+        owner = self._string(repository, "owner", "login")
+        branch = self._branch_from_ref(
+            self._string(snapshot, "ref")
+            or self._string(snapshot, "branch")
+            or self._string(snapshot, "default_branch")
+        )
+        commit_sha = self._string(snapshot, "after") or self._string(
+            snapshot, "commit_sha"
+        )
+
+        files = snapshot.get("files")
+        if not isinstance(files, list):
+            return []
+
+        tech_stack = sorted(
+            {
+                str(item.get("language")).lower()
+                for item in files
+                if isinstance(item, dict) and item.get("language")
+            }
+        )
+
+        docs: list[RawDocument] = []
+        for item in files:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if content is None:
+                continue
+            if not isinstance(content, str):
+                content = json.dumps(content, sort_keys=True)
+
+            path = (
+                self._string(item, "path")
+                or self._string(item, "filename")
+                or "unknown"
+            )
+            source_id = (
+                self._string(item, "sha")
+                or self._string(item, "id")
+                or f"{commit_sha or 'snapshot'}:{path}"
+            )
+            source_url = (
+                self._string(item, "html_url")
+                or self._string(item, "url")
+                or self._build_blob_url(repository, branch, path)
+            )
+
+            metadata = GitHubSourceMetadata(
+                repo_name=repo_name,
+                branch=branch,
+                commit_sha=commit_sha,
+                owner=owner,
+                tech_stack=tech_stack,
+                token_count=len(content.split()),
+            )
+
+            docs.append(
+                RawDocument(
+                    source_type="github",
+                    source_id=source_id,
+                    timestamp=fallback_timestamp,
+                    content=content,
+                    tags=[tag for tag in ["github", "snapshot", branch] if tag],
+                    source_url=source_url,
+                    source_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                    source_metadata=metadata,
+                )
+            )
+
+        return docs
+
     def _content_from_payload(
         self,
         *,
@@ -162,6 +270,14 @@ class GitHubReceiver(IngestionPlugin):
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=UTC)
         return parsed
+
+    def _build_blob_url(
+        self, repository: dict[str, Any], branch: str | None, path: str
+    ) -> str | None:
+        html_url = self._string(repository, "html_url")
+        if not html_url or not branch:
+            return None
+        return f"{html_url}/blob/{branch}/{path}"
 
     def _branch_from_ref(self, ref: str | None) -> str | None:
         if not ref:
