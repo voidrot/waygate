@@ -42,6 +42,19 @@ def test_static_bearer_auth_allows_matching_token() -> None:
     assert response.text == "ok"
 
 
+def test_static_bearer_auth_accepts_case_insensitive_scheme() -> None:
+    app = StaticBearerAuthMiddleware(
+        PlainTextResponse("ok"),
+        StaticBearerAuthConfig(enabled=True, token="secret-token"),
+    )
+    client = TestClient(app)
+
+    response = client.get("/", headers={"Authorization": "bearer   secret-token"})
+
+    assert response.status_code == 200
+    assert response.text == "ok"
+
+
 def test_create_http_app_reports_auth_state() -> None:
     settings = RuntimeSettings(
         mcp_server_path="/briefing",

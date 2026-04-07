@@ -105,14 +105,21 @@ class LiveDocumentRepository:
                 continue
 
             breakdown = self.scorer.score(document, request, lineage_ids)
-            if query_terms and breakdown["lexical_score"] == 0:
+            lexical_score = float(breakdown.get("lexical_score", 0.0))
+            score = float(breakdown.get("score", 0.0))
+            normalized_breakdown = {
+                **breakdown,
+                "lexical_score": lexical_score,
+                "score": score,
+            }
+            if query_terms and lexical_score == 0:
                 continue
 
             matches.append(
                 RetrievedLiveDocument(
                     **document.model_dump(),
-                    score=breakdown["score"],
-                    score_breakdown=breakdown,
+                    score=score,
+                    score_breakdown=normalized_breakdown,
                 )
             )
 

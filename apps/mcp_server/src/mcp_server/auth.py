@@ -37,10 +37,13 @@ class StaticBearerAuthMiddleware:
             return
 
         authorization = Headers(scope=scope).get("authorization")
-        expected = f"Bearer {self.config.token}"
-        if authorization == expected:
-            await self.app(scope, receive, send)
-            return
+        if authorization:
+            parts = authorization.strip().split()
+            if len(parts) == 2:
+                scheme, token = parts
+                if scheme.lower() == "bearer" and token == self.config.token:
+                    await self.app(scope, receive, send)
+                    return
 
         response = JSONResponse(
             {"error": "Unauthorized"},

@@ -42,6 +42,16 @@ class ConstantScorer(LexicalDocumentScorer):
         return base
 
 
+class PartialScoreScorer:
+    def score(
+        self,
+        document,
+        request: RetrievalQuery,
+        lineage_ids: set[str],
+    ) -> dict[str, float]:
+        return {"title_matches": 1.0}
+
+
 @pytest.fixture()
 def storage(tmp_path: Path) -> LocalStorageProvider:
     provider = LocalStorageProvider.__new__(LocalStorageProvider)
@@ -333,3 +343,27 @@ def test_retrieve_supports_custom_scorer(storage: LocalStorageProvider) -> None:
     results = repository.retrieve(RetrievalQuery(query="runbook", max_documents=10))
 
     assert [result.metadata.doc_id for result in results] == ["doc-high", "doc-low"]
+
+
+def test_retrieve_tolerates_partial_custom_score_breakdown(
+    storage: LocalStorageProvider,
+) -> None:
+    _write_live_document(
+        storage,
+        doc_id="doc-partial",
+        title="Reference Document",
+        body="reference body",
+        last_compiled="2026-04-06T12:00:00+00:00",
+    )
+
+    repository = LiveDocumentRepository(
+        storage,
+        scorer=PartialScoreScorer(),
+    )
+    results = repository.retrieve(RetrievalQuery(query="", max_documents=10))
+
+    assert len(results) == 1
+    assert results[0].metadata.doc_id == "doc-partial"
+    assert results[0].score == 0.0
+    assert results[0].score_breakdown["lexical_score"] == 0.0
+    assert results[0].score_breakdown["score"] == 0.0

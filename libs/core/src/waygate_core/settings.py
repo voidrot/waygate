@@ -25,7 +25,7 @@ class RuntimeSettings(BaseModel):
     mcp_auth_token: str | None = Field(default=None)
 
 
-def _load_runtime_env() -> dict[str, str]:
+def _load_runtime_env() -> dict[str, str | None]:
     return {
         "storage_provider": os.getenv("STORAGE_PROVIDER", "local"),
         "local_storage_path": os.getenv("LOCAL_STORAGE_PATH", "wiki"),
