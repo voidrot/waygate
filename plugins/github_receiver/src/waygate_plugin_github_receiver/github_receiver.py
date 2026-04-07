@@ -157,7 +157,7 @@ class GitHubReceiver(IngestionPlugin):
 
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return datetime.now(UTC)
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=UTC)
