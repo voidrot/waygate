@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from compiler.state import GraphState
+from waygate_core.observability import start_span
 from waygate_core.schemas import AuditEvent, AuditEventType
 
 PreHook = Callable[[str, GraphState], GraphState]
@@ -97,16 +98,35 @@ def ensure_default_hooks_registered() -> None:
 
 def apply_hooks(node_name: str, node_fn: NodeFunc) -> NodeFunc:
     def wrapped(state: GraphState) -> dict[str, Any]:
-        current_state = state
-        for hook in _pre_hooks:
-            current_state = hook(node_name, current_state)
+        with start_span(
+            f"compiler.node.{node_name}",
+            tracer_name=__name__,
+            attributes={
+                "waygate.node_name": node_name,
+                "waygate.trace_id": state.get("trace_id"),
+                "waygate.revision_count": state.get("revision_count", 0),
+                "waygate.status": state.get("status"),
+            },
+        ) as span:
+            current_state = state
+            for hook in _pre_hooks:
+                current_state = hook(node_name, current_state)
 
-        result = node_fn(current_state)
+            result = node_fn(current_state)
 
-        current_result = result
-        for hook in _post_hooks:
-            current_result = hook(node_name, current_state, current_result)
+            current_result = result
+            for hook in _post_hooks:
+                current_result = hook(node_name, current_state, current_result)
 
-        return current_result
+            if current_result.get("status") is not None:
+                span.set_attribute(
+                    "waygate.result_status", current_result.get("status")
+                )
+            if current_result.get("staging_uri") is not None:
+                span.set_attribute(
+                    "waygate.staging_uri", current_result.get("staging_uri")
+                )
+
+            return current_result
 
     return wrapped

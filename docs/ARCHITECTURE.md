@@ -163,8 +163,9 @@ To prevent downstream agents from exhausting token limits reading granular micro
 
 Asynchronous, multi-agent workflows are highly susceptible to silent failures. WayGate requires a robust observability layer to trace the lifecycle of a document from raw webhook to compiled wiki.
 
-- **OpenTelemetry (OTel) Backbone:** The system implements standard OTel tracing. A unique `trace_id` is generated at the FastAPI Receiver. This ID is passed through the Valkey/Redis queue payload and injected into the LangGraph worker state, creating a unified trace of the entire ingestion-to-publish lifecycle.
-- **LangGraph Auditing (LangSmith / Langfuse):** The LangGraph compiler natively integrates with an LLM observability platform (like LangSmith or the open-source Langfuse). This provides granular UI dashboards to inspect exact prompt inputs, Hermes Review logic loops, token consumption, and generation latency per node.
+- **OpenTelemetry (OTel) Backbone:** The current implementation now exposes an optional OTel helper in `libs/core`. When `OTEL_ENABLED=true`, the receiver configures tracing at startup and emits spans around scheduled polling and queue enqueue, while the compiler emits spans around worker execution and node wrappers. The existing application-level `trace_id` remains the cross-process correlation field and is attached as a span attribute.
+- **No-op by default:** Local development remains dependency-light in behavior even though the packages are present; if `OTEL_ENABLED` is unset or false, the tracing helper does not configure a provider and span calls are effectively no-op.
+- **LangGraph Auditing (LangSmith / Langfuse):** Hosted LLM-observability vendors remain optional follow-on integrations. This first wave stops at the OTel seam plus durable audit artifacts rather than introducing a vendor lock-in path.
 
 ---
 

@@ -27,6 +27,9 @@ class RuntimeSettings(BaseModel):
     mcp_allowed_visibilities: list[str] = Field(
         default_factory=lambda: ["public", "internal"]
     )
+    otel_enabled: bool = Field(default=False)
+    otel_exporter: str = Field(default="console")
+    otel_service_namespace: str = Field(default="waygate")
 
 
 def _parse_csv_env(raw_value: str | None, default: list[str]) -> list[str]:
@@ -55,6 +58,11 @@ def _load_runtime_env() -> dict[str, object]:
         "mcp_allowed_visibilities": _parse_csv_env(
             os.getenv("MCP_ALLOWED_VISIBILITIES"),
             ["public", "internal"],
+        ),
+        "otel_enabled": os.getenv("OTEL_ENABLED", "false"),
+        "otel_exporter": os.getenv("OTEL_EXPORTER", "console"),
+        "otel_service_namespace": os.getenv(
+            "OTEL_SERVICE_NAMESPACE", "waygate"
         ),
     }
 

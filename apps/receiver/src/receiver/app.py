@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI
+from waygate_core.observability import configure_tracing
 
 from receiver.api import webhooks
 from receiver.core.registry import IngestionPlugin, registry
@@ -13,6 +14,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_tracing("waygate-receiver")
     registry.discover_and_register()
 
     setup_scheduler()

@@ -18,6 +18,9 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
     monkeypatch.delenv("MCP_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("MCP_DEFAULT_ROLE", raising=False)
     monkeypatch.delenv("MCP_ALLOWED_VISIBILITIES", raising=False)
+    monkeypatch.delenv("OTEL_ENABLED", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER", raising=False)
+    monkeypatch.delenv("OTEL_SERVICE_NAMESPACE", raising=False)
 
     settings = reload_runtime_settings()
 
@@ -39,6 +42,9 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
         Visibility.PUBLIC,
         Visibility.INTERNAL,
     ]
+    assert settings.otel_enabled is False
+    assert settings.otel_exporter == "console"
+    assert settings.otel_service_namespace == "waygate"
 
 
 def test_runtime_settings_overrides(monkeypatch) -> None:
@@ -57,6 +63,9 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
     monkeypatch.setenv("MCP_AUTH_TOKEN", "secret-token")
     monkeypatch.setenv("MCP_DEFAULT_ROLE", "ops_agent")
     monkeypatch.setenv("MCP_ALLOWED_VISIBILITIES", "public")
+    monkeypatch.setenv("OTEL_ENABLED", "true")
+    monkeypatch.setenv("OTEL_EXPORTER", "otlp")
+    monkeypatch.setenv("OTEL_SERVICE_NAMESPACE", "waygate-prod")
 
     settings = reload_runtime_settings()
 
@@ -75,6 +84,9 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
     assert settings.mcp_auth_token == "secret-token"
     assert settings.mcp_default_role == "ops_agent"
     assert settings.mcp_allowed_visibilities == [Visibility.PUBLIC]
+    assert settings.otel_enabled is True
+    assert settings.otel_exporter == "otlp"
+    assert settings.otel_service_namespace == "waygate-prod"
 
 
 def test_runtime_settings_reload_is_stable(monkeypatch) -> None:

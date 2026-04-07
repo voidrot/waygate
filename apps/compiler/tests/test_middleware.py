@@ -1,10 +1,12 @@
 from compiler import middleware
 from compiler.state import GraphState
+from contextlib import contextmanager
 
 
 def test_apply_hooks_runs_pre_and_post_in_order() -> None:
     middleware.clear_hooks()
     observed: list[str] = []
+    span_calls: list[tuple[str, dict[str, object]]] = []
     initial_state: GraphState = {
         "state_version": "1",
         "trace_id": "trace",
@@ -43,6 +45,18 @@ def test_apply_hooks_runs_pre_and_post_in_order() -> None:
         observed.append(f"node:{state['status']}")
         return {"status": "ok"}
 
+    @contextmanager
+    def fake_start_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, attributes or {}))
+
+        class _FakeSpan:
+            def set_attribute(self, key: str, value: object) -> None:
+                span_calls.append((key, {"value": value}))
+
+        yield _FakeSpan()
+
+    middleware.start_span = fake_start_span
+
     middleware.register_pre_hook(pre_one)
     middleware.register_pre_hook(pre_two)
     middleware.register_post_hook(post_one)
@@ -59,5 +73,7 @@ def test_apply_hooks_runs_pre_and_post_in_order() -> None:
         "post1:draft:pre_two",
         "post2:draft:one",
     ]
+    assert span_calls[0][0] == "compiler.node.draft"
+    assert span_calls[0][1]["waygate.trace_id"] == "trace"
 
     middleware.clear_hooks()

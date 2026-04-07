@@ -3,6 +3,7 @@ import logging
 from receiver.core.registry import registry
 from receiver.core.checkpoints import get_poll_checkpoint, set_poll_checkpoint
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from waygate_core.observability import start_span
 
 from receiver.services.trigger import save_and_trigger_langgraph_async
 
@@ -12,30 +13,36 @@ logger = logging.getLogger(__name__)
 
 
 async def poll_plugin_job(plugin_name: str):
-    plugin = registry.get(plugin_name)
-    if not plugin:
-        logger.error("Plugin '%s' not found for polling job", plugin_name)
-        return
+    with start_span(
+        "receiver.poll_plugin",
+        tracer_name=__name__,
+        attributes={"waygate.plugin_name": plugin_name},
+    ) as span:
+        plugin = registry.get(plugin_name)
+        if not plugin:
+            logger.error("Plugin '%s' not found for polling job", plugin_name)
+            return
 
-    try:
-        last_polled = get_poll_checkpoint(plugin_name)
-        raw_documents = plugin.poll(since_timestamp=last_polled)
+        try:
+            last_polled = get_poll_checkpoint(plugin_name)
+            raw_documents = plugin.poll(since_timestamp=last_polled)
 
-        if raw_documents:
-            await save_and_trigger_langgraph_async(raw_documents)
-            latest_checkpoint = max(doc.timestamp for doc in raw_documents)
-            set_poll_checkpoint(plugin_name, latest_checkpoint)
-            logger.info(
-                "Polled %d new documents from plugin '%s'",
-                len(raw_documents),
-                plugin_name,
+            if raw_documents:
+                span.set_attribute("waygate.document_count", len(raw_documents))
+                await save_and_trigger_langgraph_async(raw_documents)
+                latest_checkpoint = max(doc.timestamp for doc in raw_documents)
+                set_poll_checkpoint(plugin_name, latest_checkpoint)
+                logger.info(
+                    "Polled %d new documents from plugin '%s'",
+                    len(raw_documents),
+                    plugin_name,
+                )
+        except NotImplementedError:
+            logger.warning("Plugin '%s' does not implement polling", plugin_name)
+        except Exception as e:
+            logger.exception(
+                "Error during polling job for plugin '%s': %s", plugin_name, str(e)
             )
-    except NotImplementedError:
-        logger.warning("Plugin '%s' does not implement polling", plugin_name)
-    except Exception as e:
-        logger.exception(
-            "Error during polling job for plugin '%s': %s", plugin_name, str(e)
-        )
 
 
 def setup_scheduler():

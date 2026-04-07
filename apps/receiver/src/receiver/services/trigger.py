@@ -7,6 +7,7 @@ from redis import Redis
 from rq import Queue
 
 from waygate_core.doc_helpers import infer_initial_topic
+from waygate_core.observability import start_span
 from waygate_core.plugin_base import RawDocument
 from waygate_core.schemas import AuditEvent, AuditEventType
 from waygate_core.settings import get_runtime_settings
@@ -49,27 +50,38 @@ async def save_and_trigger_langgraph_async(documents: List[RawDocument]) -> None
 
     initial_state = _build_initial_state(documents, saved_uris)
 
-    job = draft_queue.enqueue(
-        "compiler.worker.execute_graph",
-        initial_state,
-        job_timeout="10m",  # LLM calls can take a while, give it a long timeout
-    )
-
-    storage.write_audit_event(
-        AuditEvent(
-            event_type=AuditEventType.RECEIVER_ENQUEUED,
-            occurred_at=datetime.now(timezone.utc).isoformat(),
-            trace_id=initial_state["trace_id"],
-            document_ids=[document.doc_id for document in documents],
-            uris=saved_uris,
-            payload={
-                "job_id": job.id,
-                "queue_name": settings.draft_queue_name,
-                "target_topic": initial_state["target_topic"],
-                "document_count": len(documents),
-            },
+    with start_span(
+        "receiver.enqueue_documents",
+        tracer_name=__name__,
+        attributes={
+            "waygate.trace_id": initial_state["trace_id"],
+            "waygate.document_count": len(documents),
+            "waygate.target_topic": initial_state["target_topic"],
+            "waygate.queue_name": settings.draft_queue_name,
+        },
+    ) as span:
+        job = draft_queue.enqueue(
+            "compiler.worker.execute_graph",
+            initial_state,
+            job_timeout="10m",  # LLM calls can take a while, give it a long timeout
         )
-    )
+
+        storage.write_audit_event(
+            AuditEvent(
+                event_type=AuditEventType.RECEIVER_ENQUEUED,
+                occurred_at=datetime.now(timezone.utc).isoformat(),
+                trace_id=initial_state["trace_id"],
+                document_ids=[document.doc_id for document in documents],
+                uris=saved_uris,
+                payload={
+                    "job_id": job.id,
+                    "queue_name": settings.draft_queue_name,
+                    "target_topic": initial_state["target_topic"],
+                    "document_count": len(documents),
+                },
+            )
+        )
+        span.set_attribute("waygate.job_id", job.id)
 
     logger.info(
         f"Enqueued LangGraph job with ID: {job.id} and initial state: {initial_state}"

@@ -1,4 +1,5 @@
 from compiler import worker, middleware
+from contextlib import contextmanager
 
 
 class _FakeStorage:
@@ -12,9 +13,23 @@ class _FakeStorage:
 
 def test_execute_graph_emits_worker_and_node_audit_events(monkeypatch) -> None:
     fake_storage = _FakeStorage()
+    span_calls = []
     middleware.clear_hooks()
     monkeypatch.setattr(worker, "storage", fake_storage)
     monkeypatch.setattr(middleware, "_emit_audit_event", fake_storage.write_audit_event)
+    monkeypatch.setattr(worker, "configure_tracing", lambda service_name: True)
+
+    @contextmanager
+    def fake_start_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, attributes or {}))
+
+        class _FakeSpan:
+            def set_attribute(self, key: str, value: object) -> None:
+                span_calls.append((key, {"value": value}))
+
+        yield _FakeSpan()
+
+    monkeypatch.setattr(worker, "start_span", fake_start_span)
 
     def fake_build_graph():
         class _FakeWorkflow:
@@ -58,3 +73,5 @@ def test_execute_graph_emits_worker_and_node_audit_events(monkeypatch) -> None:
     assert str(fake_storage.audit_events[1].event_type) == "compiler_node_started"
     assert str(fake_storage.audit_events[2].event_type) == "compiler_node_completed"
     assert str(fake_storage.audit_events[3].event_type) == "compiler_worker_completed"
+    assert span_calls[0][0] == "compiler.execute_graph"
+    assert span_calls[0][1]["waygate.trace_id"] == "trace-worker-1"

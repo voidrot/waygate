@@ -9,6 +9,7 @@ This page summarizes the top-level applications in `apps/` and links to key sour
   - [apps/compiler README](apps/compiler/README.md)
   - [compiler config](apps/compiler/src/compiler/config.py)
   - [graph builder](apps/compiler/src/compiler/graph.py)
+  - [compiler middleware / node spans](apps/compiler/src/compiler/middleware.py)
   - [worker/runner](apps/compiler/src/compiler/worker.py)
   - [maintenance sweep](apps/compiler/src/compiler/maintenance.py)
   - [state model](apps/compiler/src/compiler/state.py)
@@ -20,9 +21,9 @@ This page summarizes the top-level applications in `apps/` and links to key sour
 - Key files:
   - [apps/receiver README](apps/receiver/README.md)
   - [HTTP API](apps/receiver/src/receiver/api/webhooks.py)
-  - [health endpoint](apps/receiver/src/receiver/api/health.py)
   - [app entry](apps/receiver/src/receiver/app.py)
-  - [clients and services](apps/receiver/src/receiver/clients, apps/receiver/src/receiver/services)
+  - [poll scheduler](apps/receiver/src/receiver/core/scheduler.py)
+  - [enqueue service](apps/receiver/src/receiver/services/trigger.py)
 
 1. MCP Server
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from uuid import UUID
 
 import pytest
@@ -69,8 +70,21 @@ class _FakeQueue:
 async def test_save_and_trigger_langgraph_writes_audit_event(monkeypatch) -> None:
     fake_storage = _FakeStorage()
     fake_queue = _FakeQueue()
+    span_calls = []
     monkeypatch.setattr(trigger, "storage", fake_storage)
     monkeypatch.setattr(trigger, "draft_queue", fake_queue)
+
+    @contextmanager
+    def fake_start_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, attributes or {}))
+
+        class _FakeSpan:
+            def set_attribute(self, key: str, value: object) -> None:
+                span_calls.append((key, {"value": value}))
+
+        yield _FakeSpan()
+
+    monkeypatch.setattr(trigger, "start_span", fake_start_span)
 
     documents = [
         RawDocument(
@@ -92,3 +106,5 @@ async def test_save_and_trigger_langgraph_writes_audit_event(monkeypatch) -> Non
     assert event.payload["job_id"] == "job-123"
     assert event.payload["document_count"] == 1
     UUID(event.trace_id)
+    assert span_calls[0][0] == "receiver.enqueue_documents"
+    assert span_calls[0][1]["waygate.document_count"] == 1

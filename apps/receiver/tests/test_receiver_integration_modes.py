@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import contextmanager
 import logging
 from datetime import datetime, timezone
 
@@ -115,11 +116,24 @@ async def test_poll_plugin_job_uses_and_updates_checkpoint(monkeypatch) -> None:
     )
 
     observed_updates: list[datetime] = []
+    span_calls = []
     monkeypatch.setattr(
         scheduler_module,
         "set_poll_checkpoint",
         lambda _plugin_name, checkpoint: observed_updates.append(checkpoint),
     )
+
+    @contextmanager
+    def fake_start_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, attributes or {}))
+
+        class _FakeSpan:
+            def set_attribute(self, key: str, value: object) -> None:
+                span_calls.append((key, {"value": value}))
+
+        yield _FakeSpan()
+
+    monkeypatch.setattr(scheduler_module, "start_span", fake_start_span)
 
     async def _fake_save(_documents):
         return None
@@ -132,6 +146,8 @@ async def test_poll_plugin_job_uses_and_updates_checkpoint(monkeypatch) -> None:
 
     assert plugin.last_since_timestamp == current_checkpoint
     assert observed_updates == [newer_doc_time]
+    assert span_calls[0][0] == "receiver.poll_plugin"
+    assert span_calls[0][1]["waygate.plugin_name"] == "polling_plugin"
 
 
 @pytest.mark.anyio
@@ -208,6 +224,7 @@ async def test_lifespan_starts_only_overridden_listeners(monkeypatch) -> None:
 
     active = _ActiveListenerPlugin()
     passive = _PassiveListenerPlugin()
+    configured_services = []
 
     monkeypatch.setattr(app_module.registry, "discover_and_register", lambda: None)
     monkeypatch.setattr(
@@ -220,6 +237,11 @@ async def test_lifespan_starts_only_overridden_listeners(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(app_module, "setup_scheduler", lambda: None)
+    monkeypatch.setattr(
+        app_module,
+        "configure_tracing",
+        lambda service_name: configured_services.append(service_name),
+    )
 
     started = False
     shutdown = False
@@ -257,3 +279,4 @@ async def test_lifespan_starts_only_overridden_listeners(monkeypatch) -> None:
     assert shutdown
     assert active.listen_called
     assert len(created_tasks) == 1
+    assert configured_services == ["waygate-receiver"]
