@@ -176,8 +176,12 @@ def test_build_live_document_name_is_deterministic() -> None:
 def test_build_live_document_name_differs_with_different_ids() -> None:
     """Verify different IDs produce different filename prefixes by UUID first part."""
     # build_live_document_name takes first segment before dash
-    name1 = build_live_document_name("Test Title", "aaaaaaaa-1111-2222-3333-444444444444")
-    name2 = build_live_document_name("Test Title", "bbbbbbbb-1111-2222-3333-444444444444")
+    name1 = build_live_document_name(
+        "Test Title", "aaaaaaaa-1111-2222-3333-444444444444"
+    )
+    name2 = build_live_document_name(
+        "Test Title", "bbbbbbbb-1111-2222-3333-444444444444"
+    )
 
     # Different first segments produce different filenames
     assert "test-title-aaaaaaaa" in name1
