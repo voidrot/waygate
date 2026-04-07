@@ -1,5 +1,22 @@
 # **Architectural Standards for Markdown-Based Generation-Augmented Retrieval Systems**
 
+## Implementation Status (WayGate, April 2026)
+
+The sections below describe the broader GAR design space. This section records the currently implemented contract in this repository.
+
+Implemented now:
+
+- Canonical metadata fields on raw/live models: `doc_id`, `source_type`, `source_url`, `source_hash`, `status`, `visibility`, `tags`, `last_compiled`, `lineage`, `sources`, `source_metadata`.
+- `SourceMetadataBase` requires `kind` and permits extra provider-specific keys for forward-compatible round-tripping.
+- Local storage writes canonical raw frontmatter and supports metadata fetch by doc id via `get_raw_document_metadata`.
+- Compiler publish promotes provenance from raw metadata into live frontmatter: lineage from raw `doc_id`, sources from raw `source_url` (with URI fallback), and aggregated tags.
+- Receiver trigger now passes structured raw metadata into compiler graph state for draft/review/publish usage.
+
+Out of scope for this milestone:
+
+- Retrieval-time RBAC filtering engine and policy enforcement across query surfaces.
+- Advanced provenance engines (for example cryptographic receipt/signature chains); current provenance is frontmatter lineage plus `source_hash`.
+
 The paradigm of artificial intelligence is currently undergoing a fundamental transition from stateless, ephemeral interaction models toward persistent, compounding knowledge architectures. Standard Retrieval-Augmented Generation (RAG) frameworks have historically treated data as a collection of fragmented vector chunks, a method that frequently leads to the degradation of hierarchical context and the erosion of semantic relationships between disparate pieces of information.1 In response to these limitations, the Generation-Augmented Retrieval (GAR) pattern has emerged as a superior alternative, drawing inspiration from structured knowledge bases and multi-agent swarm concepts.3 Within a GAR system, a large language model (LLM) acts not merely as a passive search engine but as an autonomous background worker that continuously ingests raw data and synthesizes it into a human-readable, machine-accessible "Live Wiki".2 By utilizing Markdown as the primary medium, these systems establish a transparent, auditable, and version-controlled environment that bridges the gap between human oversight and automated processing.5
 
 ## **The Convergence of Human Readability and Machine Accessibility**

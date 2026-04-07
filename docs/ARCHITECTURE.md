@@ -1,5 +1,23 @@
 # WayGate: Generation-Augmented Retrieval (GAR) System Architecture
 
+## Current Implementation Boundary (April 2026)
+
+This architecture document mixes implemented components and forward-looking design. The following reflects current repository behavior:
+
+Implemented now:
+
+- Receiver normalizes ingestion plugin output to canonical `RawDocument` records and enqueues compile jobs.
+- Local storage persists raw and live markdown documents with canonical YAML frontmatter.
+- Compiler graph runs Draft -> Review -> Publish and writes live articles under `wiki/live`.
+- Publish promotes provenance fields from raw metadata into live frontmatter (`lineage`, `sources`, aggregated `tags`).
+- First-party GitHub and Slack receiver plugins parse webhook payloads into canonical document records.
+
+Not implemented in this milestone (explicitly out of scope):
+
+- Transport-level retrieval/RBAC enforcement engine for downstream query consumers.
+- Full provenance engine beyond current source hash + lineage frontmatter fields.
+- FastMCP/SDK/static-site deployment surfaces described as target architecture.
+
 ## Executive Summary
 
 **WayGate** is a Generation-Augmented Retrieval (GAR) system designed to autonomously compile raw, multi-source data (GitHub, Slack, Web) into a highly structured, self-healing Markdown wiki.
