@@ -113,7 +113,7 @@ class LinkwardenReceiver(IngestionPlugin):
             return None
         try:
             return int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     def _extract_documents(self, payload: Any) -> tuple[list[Any], dict[str, Any]]:

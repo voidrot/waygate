@@ -34,7 +34,7 @@ class GitHubReceiver(IngestionPlugin):
 
             try:
                 snapshot = json.loads(snapshot_file.read_text(encoding="utf-8"))
-            except OSError, json.JSONDecodeError:
+            except (OSError, json.JSONDecodeError):
                 continue
 
             documents.extend(
@@ -265,7 +265,7 @@ class GitHubReceiver(IngestionPlugin):
 
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return datetime.now(UTC)
         if parsed.tzinfo is None:
             return parsed.replace(tzinfo=UTC)
