@@ -4,8 +4,9 @@ Thin briefing service layer for WayGate.
 
 This app wraps `waygate_agent_sdk` and is intended to become the transport-facing
 surface for MCP tool exposure. The current implementation keeps the boundary
-small: generate a token-budgeted briefing and preview ranked retrieval results
-without bypassing the SDK.
+small: generate a token-budgeted briefing, preview ranked retrieval results,
+and persist explicit context-gap reports without bypassing the SDK and storage
+boundaries.
 
 The server uses the official MCP Python SDK via `mcp.server.fastmcp.FastMCP`.
 
@@ -33,3 +34,9 @@ Trace propagation:
 - HTTP requests can send `X-Trace-Id`; if omitted, the server generates one.
 - The response echoes `X-Trace-Id`.
 - MCP retrieval audit events reuse the current trace id.
+
+Available tools:
+
+- `generate_briefing`
+- `preview_retrieval`
+- `report_context_error` for persisting a durable `meta/maintenance` artifact when a caller detects missing context.

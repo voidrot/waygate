@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from mcp_server.service import BriefingService, GenerateBriefingRequest
+from mcp_server.service import (
+    BriefingService,
+    GenerateBriefingRequest,
+    ReportContextErrorRequest,
+)
 from mcp_server.trace import reset_current_trace_id, set_current_trace_id
 from waygate_agent_sdk import BriefingResult
 from waygate_agent_sdk.models import RetrievalScope
@@ -11,6 +15,7 @@ from waygate_core.doc_helpers import generate_frontmatter
 from waygate_core.schemas import (
     AuditEventType,
     FrontMatterDocument,
+    MaintenanceFindingType,
     SourceType,
     Visibility,
 )
@@ -34,10 +39,15 @@ class FakeRepository:
 class FakeAuditStorage:
     def __init__(self) -> None:
         self.audit_events = []
+        self.maintenance_findings = []
 
     def write_audit_event(self, event) -> str:
         self.audit_events.append(event)
         return f"meta/audit/{event.event_id}"
+
+    def write_maintenance_finding(self, finding) -> str:
+        self.maintenance_findings.append(finding)
+        return f"meta/maintenance/{finding.finding_id}"
 
 
 @pytest.fixture()
@@ -188,3 +198,65 @@ def test_generate_briefing_from_storage_uses_sdk_repository(
     assert result.documents
     assert result.documents[0].metadata.doc_id == "doc-1"
     assert "Deployment Runbook" in result.content
+
+
+def test_report_context_error_persists_maintenance_finding() -> None:
+    repository = FakeRepository()
+    meta_storage = FakeAuditStorage()
+    service = BriefingService(
+        repository,
+        default_scope=RetrievalScope(
+            role="ops_agent",
+            allowed_visibilities=[Visibility.PUBLIC],
+        ),
+        maintenance_storage=meta_storage,
+    )
+    token = set_current_trace_id("trace-gap-1")
+
+    try:
+        finding_uri = service.report_context_error(
+            ReportContextErrorRequest(
+                message="Missing escalation policy for database failover",
+                query="database failover escalation policy",
+                role="ignored_role",
+                allowed_visibilities=[Visibility.PUBLIC, Visibility.INTERNAL],
+                lineage_ids=["raw-9"],
+                tags=["ops", "database"],
+            )
+        )
+    finally:
+        reset_current_trace_id(token)
+
+    assert finding_uri.startswith("meta/maintenance/")
+    assert len(meta_storage.maintenance_findings) == 1
+    finding = meta_storage.maintenance_findings[0]
+    assert finding.finding_type == MaintenanceFindingType.CONTEXT_ERROR
+    assert finding.trace_id == "trace-gap-1"
+    assert finding.related_doc_ids == ["raw-9"]
+    assert finding.payload["message"] == "Missing escalation policy for database failover"
+    assert finding.payload["role"] == "ops_agent"
+    assert finding.payload["requested_visibilities"] == ["public"]
+
+
+def test_report_context_error_from_storage_writes_local_artifact(
+    storage: LocalStorageProvider,
+) -> None:
+    service = BriefingService.from_storage(storage)
+    token = set_current_trace_id("trace-gap-2")
+
+    try:
+        finding_uri = service.report_context_error(
+            ReportContextErrorRequest(
+                message="Need deployment rollback checklist",
+                query="deployment rollback checklist",
+                tags=["release"],
+            )
+        )
+    finally:
+        reset_current_trace_id(token)
+
+    saved = storage.read_maintenance_finding(finding_uri)
+    assert saved.finding_type == MaintenanceFindingType.CONTEXT_ERROR
+    assert saved.trace_id == "trace-gap-2"
+    assert saved.payload["query"] == "deployment rollback checklist"
+    assert saved.payload["tags"] == ["release"]

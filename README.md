@@ -28,6 +28,7 @@ Current implementation snapshot (April 2026)
 - First-party GitHub and Slack receivers now parse webhook payloads into canonical `RawDocument` records.
 - Retrieval now has an initial internal SDK for loading, filtering, scoring, and token-budgeting live documents from the compiled wiki.
 - Maintenance now has an explicit sweep command that can detect and persist hash-mismatch and orphan-lineage findings as durable maintenance artifacts.
+- The MCP boundary can now persist explicit context-gap reports as durable maintenance artifacts when downstream callers detect missing or insufficient wiki context.
 - Optional OpenTelemetry tracing can now wrap receiver polling/enqueue and compiler worker/node execution, while remaining disabled by default for local development.
 
 Out of scope (current milestone)

@@ -15,7 +15,11 @@ from waygate_core.settings import RuntimeSettings
 
 from mcp_server.auth import StaticBearerAuthConfig, StaticBearerAuthMiddleware
 from mcp_server.config import briefing_service, settings
-from mcp_server.service import BriefingService, GenerateBriefingRequest
+from mcp_server.service import (
+    BriefingService,
+    GenerateBriefingRequest,
+    ReportContextErrorRequest,
+)
 from mcp_server.trace import TraceContextMiddleware
 
 
@@ -41,6 +45,11 @@ def create_mcp_server(service: BriefingService) -> FastMCP:
     ) -> list[RetrievedLiveDocument]:
         """Preview ranked retrieval results without assembling a briefing."""
         return service.preview_retrieval(request)
+
+    @mcp.tool()
+    def report_context_error(request: ReportContextErrorRequest) -> str:
+        """Persist a context-gap report as a durable maintenance artifact."""
+        return service.report_context_error(request)
 
     return mcp
 

@@ -9,9 +9,11 @@ from waygate_agent_sdk.models import (
     RetrievalScope,
     RetrievedLiveDocument,
 )
+from waygate_core.maintenance import record_context_error
 from waygate_core.schemas import (
     AuditEvent,
     AuditEventType,
+    ContextErrorReport,
     DocumentStatus,
     DocumentType,
     Visibility,
@@ -53,6 +55,17 @@ class GenerateBriefingRequest(BaseModel):
         )
 
 
+class ReportContextErrorRequest(BaseModel):
+    message: str = Field(min_length=1)
+    query: str = ""
+    lineage_ids: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    role: str | None = None
+    allowed_visibilities: list[Visibility] = Field(
+        default_factory=lambda: [Visibility.PUBLIC, Visibility.INTERNAL]
+    )
+
+
 class BriefingRepository(Protocol):
     def build_briefing(
         self, request: RetrievalQuery, scope: RetrievalScope | None = None
@@ -69,10 +82,12 @@ class BriefingService:
         repository: BriefingRepository,
         default_scope: RetrievalScope | None = None,
         audit_storage: StorageProvider | None = None,
+        maintenance_storage: StorageProvider | None = None,
     ):
         self.repository = repository
         self.default_scope = default_scope
         self.audit_storage = audit_storage
+        self.maintenance_storage = maintenance_storage or audit_storage
 
     @classmethod
     def from_storage(
@@ -84,6 +99,7 @@ class BriefingService:
             LiveDocumentRepository(storage_provider),
             default_scope=default_scope,
             audit_storage=storage_provider,
+            maintenance_storage=storage_provider,
         )
 
     def _resolve_scope(self, request: GenerateBriefingRequest) -> RetrievalScope:
@@ -137,3 +153,26 @@ class BriefingService:
             request.to_retrieval_query(),
             scope,
         )
+
+    def report_context_error(self, request: ReportContextErrorRequest) -> str:
+        if self.maintenance_storage is None:
+            raise RuntimeError("Context-error reporting requires a storage provider")
+
+        scope = RetrievalScope(
+            role=request.role,
+            allowed_visibilities=request.allowed_visibilities,
+        )
+        if self.default_scope is not None:
+            scope = RetrievalScope.model_validate(self.default_scope.model_dump())
+
+        report = ContextErrorReport(
+            occurred_at=datetime.now(timezone.utc).isoformat(),
+            message=request.message,
+            trace_id=get_current_trace_id(),
+            query=request.query,
+            role=scope.role,
+            requested_visibilities=scope.allowed_visibilities,
+            lineage_ids=request.lineage_ids,
+            tags=request.tags,
+        )
+        return record_context_error(self.maintenance_storage, report)
