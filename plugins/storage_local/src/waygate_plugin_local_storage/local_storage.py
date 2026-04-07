@@ -95,7 +95,7 @@ class LocalStorageProvider(StorageProvider):
                         timestamp = (
                             parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
                         )
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
 
             raw_sm = m.get("source_metadata")
