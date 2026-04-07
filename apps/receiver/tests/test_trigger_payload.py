@@ -19,7 +19,8 @@ def test_build_initial_state_includes_traceability_fields() -> None:
     state = _build_initial_state(documents, ["file:///tmp/raw.md"])
 
     assert state["state_version"] == "1"
-    assert state["target_topic"] == "Auto-Detect"
+    assert state["target_topic"] == "Github issue 1"
+    assert state["document_type"] == "concepts"
     assert state["status"] == "pending_draft"
     assert state["new_document_uris"] == ["file:///tmp/raw.md"]
     assert state["revision_count"] == 0

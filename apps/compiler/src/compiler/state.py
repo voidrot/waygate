@@ -1,4 +1,5 @@
 from typing import List, Optional, TypedDict
+from typing_extensions import NotRequired
 
 
 class GraphState(TypedDict):
@@ -10,6 +11,7 @@ class GraphState(TypedDict):
     # state passes cleanly through RQ (pickle) and JSON checkpointers alike.
     raw_documents_metadata: List[dict]
     target_topic: str
+    document_type: NotRequired[str]
     current_draft: Optional[str]
     qa_feedback: Optional[str]
     staging_uri: Optional[str]

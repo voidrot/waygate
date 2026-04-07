@@ -76,6 +76,14 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
+    def write_live_document_to_category(
+        self, document_id: str, content: str, category: str
+    ) -> str:
+        """Save a live document into a managed live category."""
+
+        pass
+
+    @abstractmethod
     def read_live_document(self, uri: str) -> str:
         """Retrieve a single live document by its unique ID.
 
@@ -96,6 +104,37 @@ class StorageProvider(ABC):
             prefix: an optional string to filter live document URIs.
         Returns:
             A list of live document URIs that match the prefix filter.
+        """
+
+        pass
+
+    @abstractmethod
+    def write_meta_document(
+        self, namespace: str, document_id: str, content: str
+    ) -> str:
+        """Save a managed meta document under a provider-controlled namespace.
+
+        Meta documents use logical URIs of the form `meta/<namespace>/<document_id>`.
+        Storage providers are responsible for mapping those URIs to provider-specific
+        paths such as `meta/<namespace>/<document_id>.md`.
+        """
+
+        pass
+
+    @abstractmethod
+    def read_meta_document(self, uri: str) -> str:
+        """Read a managed meta document from the storage backend.
+
+        `uri` should use the logical format `meta/<namespace>/<document_id>`.
+        """
+
+        pass
+
+    @abstractmethod
+    def list_meta_documents(self, namespace: str, prefix: str = "") -> List[str]:
+        """List managed meta documents for a namespace.
+
+        Returned URIs should use the logical format `meta/<namespace>/<document_id>`.
         """
 
         pass

@@ -20,9 +20,11 @@ Key goals
 Current implementation snapshot (April 2026)
 
 - Canonical schema fields are implemented on `RawDocument` and `FrontMatterDocument`, including `doc_id`, `source_url`, `source_hash`, `visibility`, `tags`, `lineage`, `sources`, and `source_metadata`.
+- Compiled frontmatter now also carries `document_type`, and live filenames are stable human-readable slugs with identity suffixes instead of topic-only names.
 - Source-specific metadata contract is enforced via `SourceMetadataBase` with required `kind` and source plugins can attach extra metadata fields.
-- Local storage persists canonical raw frontmatter and supports metadata lookup via `get_raw_document_metadata(doc_id)`.
+- Local storage persists canonical raw frontmatter through shared serializers, organizes raw documents by source type, supports live/staging/meta directories, and exposes metadata lookup via `get_raw_document_metadata(doc_id)`.
 - Compiler publish promotes provenance from raw metadata into live frontmatter (`lineage`, `sources`, aggregated `tags`).
+- Draft generation now consumes reusable markdown template scaffolds from the core library, and receiver state seeds a derived topic instead of the old `Auto-Detect` placeholder.
 - First-party GitHub and Slack receivers now parse webhook payloads into canonical `RawDocument` records.
 
 Out of scope (current milestone)

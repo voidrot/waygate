@@ -10,6 +10,7 @@ members = [
     "waygate-core",
     "waygate-plugin-generic-webhook",
     "waygate-plugin-github-receiver",
+    "waygate-plugin-linkwarden-receiver",
     "waygate-plugin-local-storage",
     "waygate-plugin-ollama-provider",
     "waygate-plugin-slack-receiver",
@@ -1328,6 +1329,17 @@ requires-dist = [{ name = "waygate-core", editable = "libs/core" }]
 name = "waygate-plugin-github-receiver"
 version = "0.1.0"
 source = { editable = "plugins/github_receiver" }
+dependencies = [
+    { name = "waygate-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "waygate-core", editable = "libs/core" }]
+
+[[package]]
+name = "waygate-plugin-linkwarden-receiver"
+version = "0.1.0"
+source = { editable = "plugins/linkwarden_receiver" }
 dependencies = [
     { name = "waygate-core" },
 ]

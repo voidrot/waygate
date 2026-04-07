@@ -6,7 +6,13 @@ from pathlib import Path
 import frontmatter
 import pytest
 
-from waygate_core.schemas import RawDocument, SourceMetadataBase, Visibility
+from waygate_core.doc_helpers import generate_frontmatter
+from waygate_core.schemas import (
+    FrontMatterDocument,
+    RawDocument,
+    SourceMetadataBase,
+    Visibility,
+)
 from waygate_plugin_local_storage.local_storage import LocalStorageProvider
 
 
@@ -17,8 +23,15 @@ def storage(tmp_path: Path) -> LocalStorageProvider:
     provider.base_dir = tmp_path
     provider.raw_dir = tmp_path / "raw"
     provider.live_dir = tmp_path / "live"
+    provider.staging_dir = tmp_path / "staging"
+    provider.meta_dir = tmp_path / "meta"
+    provider.templates_dir = provider.meta_dir / "templates"
+    provider.agents_dir = provider.meta_dir / "agents"
     provider.raw_dir.mkdir()
     provider.live_dir.mkdir()
+    provider.staging_dir.mkdir()
+    provider.templates_dir.mkdir(parents=True)
+    provider.agents_dir.mkdir(parents=True)
     return provider
 
 
@@ -51,6 +64,7 @@ class TestWriteRawDocuments:
         uris = storage.write_raw_documents([doc])
         filepath = Path(uris[0].replace("file://", ""))
 
+        assert "raw/web/" in filepath.as_posix()
         post = frontmatter.load(str(filepath))
         assert post.metadata["doc_id"] == doc.doc_id
         assert post.metadata["source_type"] == "web"
@@ -165,3 +179,43 @@ class TestGetRawDocumentMetadata:
 
         assert result is not None
         assert isinstance(result.timestamp, datetime)
+
+
+class TestManagedTopology:
+    def test_write_live_document_to_category(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        uri = storage.write_live_document_to_category(
+            "knowledge-base-12345678",
+            "body",
+            "thematic",
+        )
+
+        assert "/live/thematic/knowledge-base-12345678.md" in uri
+
+    def test_get_live_document_metadata(self, storage: LocalStorageProvider) -> None:
+        content = (
+            generate_frontmatter(
+                FrontMatterDocument(
+                    doc_id="doc-123",
+                    title="Knowledge Base",
+                    status="live",
+                )
+            )
+            + "\nBody"
+        )
+        uri = storage.write_live_document_to_category(
+            "knowledge-base-12345678", content, "concepts"
+        )
+
+        metadata = storage.get_live_document_metadata(uri)
+
+        assert metadata.doc_id == "doc-123"
+        assert metadata.title == "Knowledge Base"
+
+    def test_write_and_list_meta_documents(self, storage: LocalStorageProvider) -> None:
+        uri = storage.write_meta_document("templates", "default", "# Template")
+
+        assert uri == "meta/templates/default"
+        assert storage.read_meta_document(uri) == "# Template"
+        assert storage.list_meta_documents("templates") == [uri]

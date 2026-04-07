@@ -16,16 +16,18 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - Compiler helper and publish-node tests validating source-context rendering and frontmatter promotion correctness.
 - GitHub and Slack receiver plugins with webhook parsing behavior tests.
 - Generic webhook metadata model and metadata-focused receiver tests.
+- Reusable markdown template helpers in `libs/core/src/waygate_core/file_templates.py` with draft-node coverage.
 - This changelog file for ongoing release tracking.
 
 ### Changed
 
 - `RawDocument` and `FrontMatterDocument` now carry canonical provenance fields (`doc_id`, `source_url`, `source_hash`, `visibility`, `tags`, `lineage`, `sources`, `source_metadata`).
-- Frontmatter generation now serializes canonical fields and nested source metadata consistently.
+- `FrontMatterDocument` now includes `document_type`, and frontmatter generation serializes both raw and live canonical fields through shared helper paths.
 - Compiler graph state now carries raw metadata through Draft -> Review -> Publish.
-- Draft prompt now includes structured source context built from raw metadata.
-- Publish node now promotes lineage/sources/tags from raw metadata into live frontmatter.
-- Receiver trigger now forwards structured raw metadata to the compiler queue state.
+- Draft prompt now includes structured source context plus a reusable markdown template scaffold.
+- Publish node now promotes lineage/sources/tags from raw metadata into live frontmatter, derives deterministic compiled document IDs, and writes collision-resistant live filenames.
+- Receiver trigger now forwards structured raw metadata to the compiler queue state and seeds a derived topic instead of the `Auto-Detect` placeholder.
+- Local storage now organizes raw documents by source type and supports managed `meta/templates` and `meta/agents` locations.
 - Webhook receivers now emit canonical metadata defaults and typed source metadata placeholders.
 
 ### Documentation

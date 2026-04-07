@@ -6,6 +6,7 @@ from uuid import uuid4
 from redis import Redis
 from rq import Queue
 
+from waygate_core.doc_helpers import infer_initial_topic
 from waygate_core.plugin_base import RawDocument
 from waygate_core.settings import get_runtime_settings
 from receiver.core.config import storage
@@ -25,7 +26,8 @@ def _build_initial_state(documents: List[RawDocument], saved_uris: List[str]) ->
         "enqueued_at": datetime.now(timezone.utc).isoformat(),
         "new_document_uris": saved_uris,
         "raw_documents_metadata": [doc.model_dump(mode="json") for doc in documents],
-        "target_topic": "Auto-Detect",  # We can have the LLM figure this out later
+        "target_topic": infer_initial_topic(documents),
+        "document_type": "concepts",
         "current_draft": None,
         "qa_feedback": None,
         "staging_uri": None,
