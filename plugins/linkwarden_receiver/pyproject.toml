@@ -1,7 +1,7 @@
 [project]
     name = "waygate-plugin-linkwarden-receiver"
     version = "0.1.0"
-    description = "Linkwarden-focused webhook ingestion plugin"
+    description = "Linkwarden-focused poll-based ingestion plugin"
     readme = "README.md"
     authors = [
         { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },

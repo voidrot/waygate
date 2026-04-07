@@ -91,7 +91,7 @@ class WebhookReceiver(IngestionPlugin):
         if isinstance(raw_source_metadata, dict):
             try:
                 return SourceMetadataBase.model_validate(raw_source_metadata)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return None
         return None
 

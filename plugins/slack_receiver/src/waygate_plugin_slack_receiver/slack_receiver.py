@@ -33,7 +33,7 @@ class SlackReceiver(IngestionPlugin):
 
             try:
                 payload = json.loads(export_file.read_text(encoding="utf-8"))
-            except OSError, json.JSONDecodeError:
+            except (OSError, json.JSONDecodeError):
                 continue
 
             messages = payload.get("messages") if isinstance(payload, dict) else None
@@ -126,10 +126,10 @@ class SlackReceiver(IngestionPlugin):
 
         try:
             return datetime.fromtimestamp(float(timestamp_value), tz=UTC)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             try:
                 parsed = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return datetime.now(UTC)
             if parsed.tzinfo is None:
                 return parsed.replace(tzinfo=UTC)
@@ -155,7 +155,7 @@ class SlackReceiver(IngestionPlugin):
             if fixture_path:
                 try:
                     loaded = json.loads(Path(fixture_path).read_text(encoding="utf-8"))
-                except OSError, json.JSONDecodeError:
+                except (OSError, json.JSONDecodeError):
                     loaded = []
                 if isinstance(loaded, list):
                     events = loaded
