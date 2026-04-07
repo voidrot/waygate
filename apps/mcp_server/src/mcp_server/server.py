@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
@@ -15,6 +16,7 @@ from waygate_core.settings import RuntimeSettings
 from mcp_server.auth import StaticBearerAuthConfig, StaticBearerAuthMiddleware
 from mcp_server.config import briefing_service, settings
 from mcp_server.service import BriefingService, GenerateBriefingRequest
+from mcp_server.trace import TraceContextMiddleware
 
 
 def create_mcp_server(service: BriefingService) -> FastMCP:
@@ -69,6 +71,7 @@ def create_http_app(
 
     return Starlette(
         lifespan=lifespan,
+        middleware=[Middleware(TraceContextMiddleware)],
         routes=[
             Route("/health", healthcheck),
             Mount(runtime_settings.mcp_server_path, app=mcp_app),

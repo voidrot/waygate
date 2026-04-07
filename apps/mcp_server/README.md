@@ -25,3 +25,11 @@ Relevant environment variables:
 - `MCP_SERVER_PATH` default `/mcp`
 - `MCP_AUTH_ENABLED` default `false`
 - `MCP_AUTH_TOKEN` required when auth is enabled
+- `MCP_DEFAULT_ROLE` optional server-side role override for retrieval scope mapping
+- `MCP_ALLOWED_VISIBILITIES` comma-separated server-side visibility allowlist, default `public,internal`
+
+Trace propagation:
+
+- HTTP requests can send `X-Trace-Id`; if omitted, the server generates one.
+- The response echoes `X-Trace-Id`.
+- MCP retrieval audit events reuse the current trace id.

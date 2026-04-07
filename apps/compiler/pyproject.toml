@@ -8,19 +8,22 @@
     ]
     requires-python = ">=3.14"
     dependencies = [
-    "langgraph>=1.1.6",
-    "redis>=7.4.0",
-    "rq>=2.7.0",
-    "waygate_core",
-    "waygate_storage",
-    "waygate_plugin_local_storage",
-    "waygate_plugin_generic_webhook"
-]
+        "langgraph>=1.1.6",
+        "redis>=7.4.0",
+        "rq>=2.7.0",
+        "waygate_core",
+        "waygate_storage",
+        "waygate_plugin_local_storage",
+        "waygate_plugin_generic_webhook",
+    ]
+
+    [project.scripts]
+        waygate-maintenance-sweep = "compiler.maintenance:main"
 
 [tool.uv.sources]
-    waygate_core    = { workspace = true }
-    waygate_storage = { workspace = true }
-    waygate_plugin_local_storage = { workspace = true }
+    waygate_core                   = { workspace = true }
+    waygate_storage                = { workspace = true }
+    waygate_plugin_local_storage   = { workspace = true }
     waygate_plugin_generic_webhook = { workspace = true }
 
 [build-system]

@@ -2,6 +2,7 @@ from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
 from waygate_core.settings import RuntimeSettings
+from waygate_core.schemas import Visibility
 
 from mcp_server.auth import StaticBearerAuthConfig, StaticBearerAuthMiddleware
 from mcp_server.server import create_http_app
@@ -71,6 +72,21 @@ def test_create_http_app_reports_auth_state() -> None:
         "auth_enabled": False,
         "path": "/briefing",
     }
+    assert response.headers["x-trace-id"]
+
+
+def test_create_http_app_preserves_incoming_trace_header() -> None:
+    settings = RuntimeSettings(
+        mcp_server_path="/briefing",
+        mcp_auth_enabled=False,
+    )
+    app = create_http_app(BriefingService(FakeRepository()), settings)
+    client = TestClient(app)
+
+    response = client.get("/health", headers={"x-trace-id": "trace-header-1"})
+
+    assert response.status_code == 200
+    assert response.headers["x-trace-id"] == "trace-header-1"
 
 
 def test_create_http_app_mounts_mcp_route() -> None:
@@ -103,3 +119,13 @@ def test_create_http_app_rejects_enabled_auth_without_token() -> None:
         assert str(error) == "MCP_AUTH_TOKEN must be set when MCP_AUTH_ENABLED=true"
     else:
         raise AssertionError("Expected auth configuration failure")
+
+
+def test_runtime_settings_support_server_scope_defaults() -> None:
+    settings = RuntimeSettings(
+        mcp_default_role="ops_agent",
+        mcp_allowed_visibilities=[Visibility.PUBLIC],
+    )
+
+    assert settings.mcp_default_role == "ops_agent"
+    assert settings.mcp_allowed_visibilities == [Visibility.PUBLIC]
