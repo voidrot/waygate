@@ -80,8 +80,11 @@ class SlackReceiver(IngestionPlugin):
 
         try:
             return datetime.fromtimestamp(float(timestamp_value), tz=UTC)
-        except ValueError:
-            parsed = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            try:
+                parsed = datetime.fromisoformat(timestamp_value.replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                return datetime.now(UTC)
             if parsed.tzinfo is None:
                 return parsed.replace(tzinfo=UTC)
             return parsed

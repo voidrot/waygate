@@ -88,6 +88,17 @@ class TestWriteRawDocuments:
         assert "source_hash" not in post.metadata
         assert "source_metadata" not in post.metadata
 
+    def test_filenames_are_unique_with_same_timestamp_and_source_type(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        doc1 = _make_doc(source_id="src-1")
+        doc2 = _make_doc(source_id="src-2")
+
+        uris = storage.write_raw_documents([doc1, doc2])
+
+        assert len(uris) == 2
+        assert uris[0] != uris[1]
+
 
 class TestGetRawDocumentMetadata:
     def test_returns_matching_document(self, storage: LocalStorageProvider) -> None:
@@ -134,3 +145,23 @@ class TestGetRawDocumentMetadata:
         self, storage: LocalStorageProvider
     ) -> None:
         assert storage.get_raw_document_metadata("any-id") is None
+
+    def test_invalid_timestamp_falls_back_without_crashing(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        filepath = storage.raw_dir / "bad-timestamp.md"
+        post = frontmatter.Post(
+            "Hello",
+            doc_id="doc-bad-ts",
+            source_type="web",
+            source_id="s1",
+            timestamp="not-a-real-timestamp",
+            tags=["x"],
+            visibility="internal",
+        )
+        filepath.write_text(frontmatter.dumps(post), encoding="utf-8")
+
+        result = storage.get_raw_document_metadata("doc-bad-ts")
+
+        assert result is not None
+        assert isinstance(result.timestamp, datetime)

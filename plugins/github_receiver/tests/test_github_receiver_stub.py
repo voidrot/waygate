@@ -85,6 +85,26 @@ def test_github_receiver_uses_comment_body_when_present() -> None:
     assert docs[0].source_url and "issuecomment" in docs[0].source_url
 
 
+def test_github_receiver_invalid_timestamp_falls_back_to_now() -> None:
+    receiver = GitHubReceiver()
+
+    payload = {
+        "event": "issue_comment",
+        "action": "created",
+        "repository": {"full_name": "voidrot/waygate"},
+        "comment": {
+            "id": 9002,
+            "body": "Timestamp fallback",
+            "created_at": "not-a-timestamp",
+        },
+    }
+
+    docs = receiver.handle_webhook(payload)
+
+    assert len(docs) == 1
+    assert docs[0].timestamp.tzinfo is not None
+
+
 def test_github_metadata_model_defaults() -> None:
     metadata = GitHubSourceMetadata(repo_name="voidrot/waygate")
 

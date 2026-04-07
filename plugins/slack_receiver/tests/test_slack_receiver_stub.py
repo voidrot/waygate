@@ -78,6 +78,23 @@ def test_slack_receiver_parses_flat_payload_shape() -> None:
     assert docs[0].source_metadata.channel_id == "C999"
 
 
+def test_slack_receiver_invalid_timestamp_falls_back_to_now() -> None:
+    receiver = SlackReceiver()
+
+    payload = {
+        "type": "message",
+        "channel_id": "C999",
+        "user_id": "U999",
+        "text": "Bad timestamp",
+        "ts": "not-a-timestamp",
+    }
+
+    docs = receiver.handle_webhook(payload)
+
+    assert len(docs) == 1
+    assert docs[0].timestamp.tzinfo is not None
+
+
 def test_slack_metadata_model_defaults() -> None:
     metadata = SlackSourceMetadata(channel_id="C123")
 

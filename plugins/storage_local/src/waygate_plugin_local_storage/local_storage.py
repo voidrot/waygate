@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List
 
 import frontmatter
@@ -34,7 +34,9 @@ class LocalStorageProvider(StorageProvider):
     def write_raw_documents(self, documents: List[RawDocument]) -> List[str]:
         saved_uris = []
         for doc in documents:
-            filename = f"{doc.timestamp.strftime('%Y%m%d%H%M%S')}_{doc.source_type}.md"
+            filename = (
+                f"{doc.timestamp.strftime('%Y%m%d%H%M%S')}_{doc.source_type}_{doc.doc_id}.md"
+            )
             filepath = self.raw_dir / filename
 
             metadata: dict = {
@@ -85,7 +87,13 @@ class LocalStorageProvider(StorageProvider):
             if isinstance(raw_ts, datetime):
                 timestamp = raw_ts
             else:
-                timestamp = datetime.fromisoformat(str(raw_ts))
+                timestamp = datetime.fromtimestamp(filepath.stat().st_mtime, tz=UTC)
+                if raw_ts:
+                    try:
+                        parsed = datetime.fromisoformat(str(raw_ts))
+                        timestamp = parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+                    except (TypeError, ValueError):
+                        pass
 
             raw_sm = m.get("source_metadata")
             source_metadata: SourceMetadataBase | None = None

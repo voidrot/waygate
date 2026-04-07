@@ -131,3 +131,19 @@ class TestPromoteFromRaw:
         docs = [_raw(tags=[]), _raw(tags=[], source_id="s2")]
         _, _, tags = _promote_from_raw(docs)
         assert tags == []
+
+    def test_lineage_is_deduplicated_preserving_order(self) -> None:
+        first = _raw(source_id="same")
+        second = dict(first)
+        lineage, _, _ = _promote_from_raw([first, second])
+        assert len(lineage) == 1
+        assert lineage[0] == first["doc_id"]
+
+    def test_sources_are_deduplicated_preserving_order(self) -> None:
+        docs = [
+            _raw(source_id="s1", source_url="https://dup.example"),
+            _raw(source_id="s2", source_url="https://dup.example"),
+            _raw(source_id="s3", source_url="https://unique.example"),
+        ]
+        _, sources, _ = _promote_from_raw(docs)
+        assert sources == ["https://dup.example", "https://unique.example"]

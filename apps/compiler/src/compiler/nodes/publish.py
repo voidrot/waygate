@@ -26,12 +26,17 @@ def _promote_from_raw(
     lineage: list[str] = []
     sources: list[str] = []
     tags: set[str] = set()
+    seen_lineage: set[str] = set()
+    seen_sources: set[str] = set()
 
     for raw in raw_docs_metadata:
         doc = RawDocument.model_validate(raw)
-        lineage.append(doc.doc_id)
-        if doc.source_url:
+        if doc.doc_id not in seen_lineage:
+            lineage.append(doc.doc_id)
+            seen_lineage.add(doc.doc_id)
+        if doc.source_url and doc.source_url not in seen_sources:
             sources.append(doc.source_url)
+            seen_sources.add(doc.source_url)
         tags.update(doc.tags)
 
     return lineage, sources, sorted(tags)
