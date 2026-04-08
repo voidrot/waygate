@@ -103,10 +103,39 @@ class BriefingService:
             maintenance_storage=storage_provider,
         )
 
+    def _resolve_scope_values(
+        self,
+        request_role: str | None,
+        request_allowed_visibilities: list[Visibility],
+    ) -> RetrievalScope:
+        if self.default_scope is None:
+            return RetrievalScope(
+                role=request_role,
+                allowed_visibilities=request_allowed_visibilities,
+            )
+
+        allowed_values = {
+            str(item) for item in self.default_scope.allowed_visibilities
+        }
+        effective_allowed_visibilities = [
+            item
+            for item in request_allowed_visibilities
+            if str(item) in allowed_values
+        ]
+        return RetrievalScope(
+            role=(
+                self.default_scope.role
+                if self.default_scope.role is not None
+                else request_role
+            ),
+            allowed_visibilities=effective_allowed_visibilities,
+        )
+
     def _resolve_scope(self, request: GenerateBriefingRequest) -> RetrievalScope:
-        if self.default_scope is not None:
-            return RetrievalScope.model_validate(self.default_scope.model_dump())
-        return request.to_retrieval_scope()
+        return self._resolve_scope_values(
+            request.role,
+            request.allowed_visibilities,
+        )
 
     def _write_retrieval_audit_event(
         self,
@@ -192,12 +221,10 @@ class BriefingService:
         if self.maintenance_storage is None:
             raise RuntimeError("Context-error reporting requires a storage provider")
 
-        scope = RetrievalScope(
-            role=request.role,
-            allowed_visibilities=request.allowed_visibilities,
+        scope = self._resolve_scope_values(
+            request.role,
+            request.allowed_visibilities,
         )
-        if self.default_scope is not None:
-            scope = RetrievalScope.model_validate(self.default_scope.model_dump())
 
         with start_span(
             "mcp.report_context_error",

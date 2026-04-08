@@ -14,6 +14,7 @@ This guide helps contributors understand where to look and how to add features.
 - `libs/agent_sdk` provides the live-document retrieval boundary: frontmatter parsing, retrieval-scope visibility filtering, lexical scoring, lineage filtering, and token-budgeted briefing assembly.
 - `apps/mcp_server` is a thin transport adapter over the SDK, exposing `generate_briefing` and `preview_retrieval` through FastMCP.
 - `apps/mcp_server` also exposes `report_context_error`, which persists an explicit context-gap report as a maintenance artifact through the shared storage contract and emits a lineage-backed recompilation signal when replay is possible.
+- The MCP boundary treats request-supplied scope fields as advisory: effective visibilities are clamped to the server-side allowlist, and a configured default role overrides the request role.
 - The compiler package now also exposes an explicit maintenance sweep command that detects and persists maintenance findings through the storage boundary, including optional chrono-decay detection for stale live documents.
 - Storage implementations must also support in-place live document updates via `update_live_document(uri, content)` so maintenance remediation can archive affected docs without changing their URI.
 - `libs/core/src/waygate_core/observability.py` now provides optional OpenTelemetry setup and span helpers for receiver/compiler/MCP seams, including maintenance sweep/remediation flows; tracing is disabled unless `OTEL_ENABLED=true`.

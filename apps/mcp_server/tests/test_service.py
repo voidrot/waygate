@@ -154,6 +154,28 @@ def test_generate_briefing_writes_retrieval_audit_event() -> None:
     assert event.payload["requested_allowed_visibilities"] == ["public", "internal"]
 
 
+def test_generate_briefing_clamps_request_visibilities_to_server_allowlist() -> None:
+    repository = FakeRepository()
+    service = BriefingService(
+        repository,
+        default_scope=RetrievalScope(
+            role="ops_agent",
+            allowed_visibilities=[Visibility.PUBLIC],
+        ),
+    )
+
+    service.generate_briefing(
+        GenerateBriefingRequest(
+            query="incident runbook",
+            allowed_visibilities=[Visibility.STRICTLY_CONFIDENTIAL],
+        )
+    )
+
+    _request, scope = repository.build_calls[0]
+    assert scope.role == "ops_agent"
+    assert scope.allowed_visibilities == []
+
+
 def test_generate_briefing_includes_current_trace_id_in_audit_event() -> None:
     repository = FakeRepository()
     audit_storage = FakeAuditStorage()
@@ -245,6 +267,31 @@ def test_report_context_error_persists_maintenance_finding() -> None:
         finding.payload["recompilation_signal"]["target_topic"]
         == "database failover escalation policy"
     )
+
+
+def test_report_context_error_clamps_requested_visibilities_to_server_allowlist() -> None:
+    repository = FakeRepository()
+    meta_storage = FakeAuditStorage()
+    service = BriefingService(
+        repository,
+        default_scope=RetrievalScope(
+            role="ops_agent",
+            allowed_visibilities=[Visibility.PUBLIC],
+        ),
+        maintenance_storage=meta_storage,
+    )
+
+    service.report_context_error(
+        ReportContextErrorRequest(
+            message="Missing escalation policy",
+            query="database failover escalation policy",
+            allowed_visibilities=[Visibility.STRICTLY_CONFIDENTIAL],
+        )
+    )
+
+    finding = meta_storage.maintenance_findings[0]
+    assert finding.payload["role"] == "ops_agent"
+    assert finding.payload["requested_visibilities"] == []
 
 
 def test_report_context_error_from_storage_writes_local_artifact(

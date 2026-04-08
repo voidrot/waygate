@@ -29,6 +29,11 @@ Relevant environment variables:
 - `MCP_DEFAULT_ROLE` optional server-side role override for retrieval scope mapping
 - `MCP_ALLOWED_VISIBILITIES` comma-separated server-side visibility allowlist, default `public,internal`
 
+Scope handling:
+
+- Client-supplied `allowed_visibilities` are advisory only and are clamped to the server-side `MCP_ALLOWED_VISIBILITIES` allowlist.
+- When `MCP_DEFAULT_ROLE` is set, the server uses that role for retrieval and context-gap reporting instead of trusting the request payload.
+
 Trace propagation:
 
 - HTTP requests can send `X-Trace-Id`; if omitted, the server generates one.
