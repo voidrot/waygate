@@ -166,3 +166,5 @@ def test_persist_maintenance_findings_and_record_context_error(tmp_path: Path) -
     saved = storage.read_maintenance_finding(context_uri)
     assert saved.finding_type == MaintenanceFindingType.CONTEXT_ERROR
     assert saved.trace_id == "trace-ctx-1"
+    assert saved.payload["recompilation_signal"]["reason"] == "context_error"
+    assert saved.payload["recompilation_signal"]["target_topic"] == "escalation policy"

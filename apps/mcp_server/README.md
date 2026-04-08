@@ -39,4 +39,4 @@ Available tools:
 
 - `generate_briefing`
 - `preview_retrieval`
-- `report_context_error` for persisting a durable `meta/maintenance` artifact when a caller detects missing context.
+- `report_context_error` for persisting a durable `meta/maintenance` artifact when a caller detects missing context. When lineage anchors are supplied, the stored artifact also carries a recompilation signal that the maintenance sweep can replay into the compiler queue.

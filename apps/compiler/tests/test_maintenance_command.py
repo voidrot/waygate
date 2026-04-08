@@ -2,13 +2,14 @@ import json
 from datetime import datetime, timezone
 
 from compiler import maintenance as maintenance_module
+from waygate_core.doc_helpers import generate_frontmatter
+from waygate_core.plugin_base import RawDocument
 from waygate_core.schemas import (
     AuditEventType,
     FrontMatterDocument,
     MaintenanceFinding,
     MaintenanceFindingType,
 )
-from waygate_core.plugin_base import RawDocument
 
 
 def test_run_maintenance_sweep_detects_and_persists(monkeypatch) -> None:
@@ -81,12 +82,30 @@ def test_main_outputs_json_summary(monkeypatch, capsys) -> None:
         "finding_types": ["orphan_lineage"],
         "finding_uris": ["meta/maintenance/finding-2"],
         "recompilation_job_ids": [],
+        "replayed_context_error_count": 0,
+        "archived_orphan_uris": [],
     }
 
 
 class _FakeStorage:
     def __init__(self) -> None:
         self.audit_events = []
+        self.maintenance_findings = {}
+        self.updated_live_documents = {}
+        self.live_documents = {
+            "file:///tmp/live/concepts/live-1.md": (
+                generate_frontmatter(
+                    FrontMatterDocument(
+                        doc_id="live-1",
+                        title="Recovered Topic",
+                        document_type="concepts",
+                        last_compiled="2026-04-07T00:00:00+00:00",
+                        status="live",
+                    )
+                )
+                + "\nExisting content"
+            )
+        }
 
     def get_raw_document_metadata(self, doc_id: str):
         return RawDocument(
@@ -108,6 +127,20 @@ class _FakeStorage:
             last_compiled="2026-04-07T00:00:00+00:00",
             status="live",
         )
+
+    def read_live_document(self, uri: str) -> str:
+        return self.live_documents[uri]
+
+    def update_live_document(self, uri: str, content: str) -> str:
+        self.updated_live_documents[uri] = content
+        self.live_documents[uri] = content
+        return uri
+
+    def list_maintenance_findings(self) -> list[str]:
+        return list(self.maintenance_findings)
+
+    def read_maintenance_finding(self, uri: str):
+        return self.maintenance_findings[uri]
 
     def write_audit_event(self, event) -> str:
         self.audit_events.append(event)
@@ -159,6 +192,7 @@ def test_enqueue_recompilation_jobs_uses_embedded_signal(monkeypatch) -> None:
             "job_id": "job-recompile-1",
             "live_document_id": "live-1",
             "live_document_uri": "file:///tmp/live/concepts/live-1.md",
+            "target_topic": "Recovered Topic",
         }
     ]
     assert fake_queue.calls
@@ -202,3 +236,98 @@ def test_enqueue_recompilation_jobs_supports_stale_compilation(monkeypatch) -> N
 
     assert jobs[0]["job_id"] == "job-recompile-1"
     assert fake_storage.audit_events[0].payload["reason"] == "stale_compilation"
+
+
+def test_enqueue_recompilation_jobs_supports_context_errors(monkeypatch) -> None:
+    fake_storage = _FakeStorage()
+    fake_queue = _FakeQueue()
+    finding = MaintenanceFinding(
+        finding_type=MaintenanceFindingType.CONTEXT_ERROR,
+        occurred_at="2026-04-08T00:00:00+00:00",
+        related_doc_ids=["raw-1"],
+        payload={
+            "recompilation_signal": {
+                "signal_id": "signal-context-1",
+                "created_at": "2026-04-08T00:00:00+00:00",
+                "reason": "context_error",
+                "lineage": ["raw-1"],
+                "target_topic": "database failover escalation policy",
+                "document_type": "concepts",
+                "payload": {"message": "Missing policy"},
+            }
+        },
+    )
+
+    monkeypatch.setattr(maintenance_module, "storage", fake_storage)
+    monkeypatch.setattr(maintenance_module, "draft_queue", fake_queue)
+
+    jobs = maintenance_module.enqueue_recompilation_jobs([finding])
+
+    assert jobs[0]["job_id"] == "job-recompile-1"
+    args, _kwargs = fake_queue.calls[0]
+    assert args[1]["target_topic"] == "database failover escalation policy"
+    assert fake_storage.audit_events[0].payload["reason"] == "context_error"
+
+
+def test_load_persisted_context_error_findings_filters_signal_backed_findings(
+    monkeypatch,
+) -> None:
+    fake_storage = _FakeStorage()
+    fake_storage.maintenance_findings = {
+        "meta/maintenance/context-1": MaintenanceFinding(
+            finding_type=MaintenanceFindingType.CONTEXT_ERROR,
+            occurred_at="2026-04-08T00:00:00+00:00",
+            payload={
+                "recompilation_signal": {
+                    "signal_id": "signal-context-1",
+                    "created_at": "2026-04-08T00:00:00+00:00",
+                    "reason": "context_error",
+                    "lineage": ["raw-1"],
+                    "target_topic": "database failover escalation policy",
+                    "document_type": "concepts",
+                    "payload": {},
+                }
+            },
+        ),
+        "meta/maintenance/context-2": MaintenanceFinding(
+            finding_type=MaintenanceFindingType.CONTEXT_ERROR,
+            occurred_at="2026-04-08T00:00:00+00:00",
+            payload={},
+        ),
+    }
+
+    monkeypatch.setattr(maintenance_module, "storage", fake_storage)
+
+    findings = maintenance_module.load_persisted_context_error_findings()
+
+    assert [finding.finding_type for finding in findings] == [
+        MaintenanceFindingType.CONTEXT_ERROR
+    ]
+
+
+def test_archive_orphan_documents_marks_live_doc_archived(monkeypatch) -> None:
+    fake_storage = _FakeStorage()
+    finding = MaintenanceFinding(
+        finding_type=MaintenanceFindingType.ORPHAN_LINEAGE,
+        occurred_at="2026-04-08T00:00:00+00:00",
+        live_document_id="live-1",
+        live_document_uri="file:///tmp/live/concepts/live-1.md",
+        related_doc_ids=["missing-raw"],
+        payload={"missing_lineage_ids": ["missing-raw"]},
+    )
+
+    monkeypatch.setattr(maintenance_module, "storage", fake_storage)
+
+    archived_uris = maintenance_module.archive_orphan_documents(
+        [finding],
+        occurred_at="2026-04-08T00:00:00+00:00",
+    )
+
+    assert archived_uris == ["file:///tmp/live/concepts/live-1.md"]
+    updated_content = fake_storage.updated_live_documents[archived_uris[0]]
+    assert "status: archived" in updated_content
+    assert "Missing lineage IDs: missing-raw" in updated_content
+    assert (
+        fake_storage.audit_events[0].event_type
+        == AuditEventType.MAINTENANCE_ORPHAN_ARCHIVED
+    )

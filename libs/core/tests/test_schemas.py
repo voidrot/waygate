@@ -227,14 +227,14 @@ def test_visibility_enum_values_are_valid() -> None:
 
 def test_audit_event_defaults_and_payload() -> None:
     event = AuditEvent(
-        event_type=AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED,
+        event_type=AuditEventType.MAINTENANCE_ORPHAN_ARCHIVED,
         occurred_at="2026-04-06T12:00:00+00:00",
         trace_id="trace-123",
         payload={"queue_name": "draft_tasks"},
     )
 
     assert event.event_id
-    assert event.event_type == AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED
+    assert event.event_type == AuditEventType.MAINTENANCE_ORPHAN_ARCHIVED
     assert event.trace_id == "trace-123"
     assert event.document_ids == []
     assert event.uris == []
@@ -244,11 +244,11 @@ def test_audit_event_defaults_and_payload() -> None:
 def test_maintenance_models_round_trip_payload() -> None:
     signal = RecompilationSignal(
         created_at="2026-04-06T12:00:00+00:00",
-        live_document_uri="file:///tmp/live/doc-1.md",
-        live_document_id="doc-1",
-        reason="hash_mismatch",
+        reason="context_error",
         lineage=["raw-1"],
-        payload={"expected_source_hash": "abc"},
+        target_topic="incident runbook",
+        document_type="concepts",
+        payload={"message": "Missing context"},
     )
     report = ContextErrorReport(
         occurred_at="2026-04-06T12:00:00+00:00",
@@ -257,13 +257,12 @@ def test_maintenance_models_round_trip_payload() -> None:
         requested_visibilities=[Visibility.PUBLIC],
     )
     finding = MaintenanceFinding(
-        finding_type=MaintenanceFindingType.STALE_COMPILATION,
+        finding_type=MaintenanceFindingType.CONTEXT_ERROR,
         occurred_at="2026-04-06T12:00:00+00:00",
-        live_document_id="doc-1",
         payload={"signal": signal.model_dump(mode="json")},
     )
 
-    assert signal.reason == "hash_mismatch"
+    assert signal.reason == "context_error"
     assert report.requested_visibilities == [Visibility.PUBLIC]
-    assert finding.finding_type == MaintenanceFindingType.STALE_COMPILATION
-    assert finding.payload["signal"]["live_document_id"] == "doc-1"
+    assert finding.finding_type == MaintenanceFindingType.CONTEXT_ERROR
+    assert finding.payload["signal"]["target_topic"] == "incident runbook"

@@ -38,6 +38,7 @@ class DocumentType(StrEnum):
 class AuditEventType(StrEnum):
     RECEIVER_ENQUEUED = "receiver_enqueued"
     MAINTENANCE_RECOMPILATION_ENQUEUED = "maintenance_recompilation_enqueued"
+    MAINTENANCE_ORPHAN_ARCHIVED = "maintenance_orphan_archived"
     COMPILER_WORKER_STARTED = "compiler_worker_started"
     COMPILER_WORKER_COMPLETED = "compiler_worker_completed"
     COMPILER_NODE_STARTED = "compiler_node_started"
@@ -138,10 +139,12 @@ class AuditEvent(BaseModel):
 class RecompilationSignal(BaseModel):
     signal_id: str = Field(default_factory=lambda: str(uuid4()))
     created_at: str
-    live_document_uri: str
-    live_document_id: str
+    live_document_uri: str | None = None
+    live_document_id: str | None = None
     reason: str
     lineage: List[str] = Field(default_factory=list)
+    target_topic: str | None = None
+    document_type: DocumentType | str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
 
 

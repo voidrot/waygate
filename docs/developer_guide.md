@@ -13,8 +13,9 @@ This guide helps contributors understand where to look and how to add features.
 - GitHub/Slack receiver plugins currently parse webhook payloads into canonical `RawDocument` records.
 - `libs/agent_sdk` provides the live-document retrieval boundary: frontmatter parsing, retrieval-scope visibility filtering, lexical scoring, lineage filtering, and token-budgeted briefing assembly.
 - `apps/mcp_server` is a thin transport adapter over the SDK, exposing `generate_briefing` and `preview_retrieval` through FastMCP.
-- `apps/mcp_server` also exposes `report_context_error`, which persists an explicit context-gap report as a maintenance artifact through the shared storage contract.
+- `apps/mcp_server` also exposes `report_context_error`, which persists an explicit context-gap report as a maintenance artifact through the shared storage contract and emits a lineage-backed recompilation signal when replay is possible.
 - The compiler package now also exposes an explicit maintenance sweep command that detects and persists maintenance findings through the storage boundary, including optional chrono-decay detection for stale live documents.
+- Storage implementations must also support in-place live document updates via `update_live_document(uri, content)` so maintenance remediation can archive affected docs without changing their URI.
 - `libs/core/src/waygate_core/observability.py` now provides optional OpenTelemetry setup and span helpers for receiver/compiler seams; tracing is disabled unless `OTEL_ENABLED=true`.
 
 Out of scope for the current milestone:
@@ -46,6 +47,8 @@ Quick pointers to source locations:
 - Maintenance sweep: `mise run maintenance:sweep`
 - Maintenance sweep with queued recompilation handoff: `mise run maintenance:sweep -- --enqueue-recompilation`
 - Maintenance sweep with stale-doc detection: `mise run maintenance:sweep -- --stale-after-hours 24 --enqueue-recompilation`
+- Maintenance sweep replaying persisted context errors: `mise run maintenance:sweep -- --enqueue-recompilation --include-context-errors`
+- Maintenance sweep archiving orphan docs: `mise run maintenance:sweep -- --archive-orphans`
 
 Observability env surface:
 

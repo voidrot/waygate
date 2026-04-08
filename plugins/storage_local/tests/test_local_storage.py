@@ -225,6 +225,29 @@ class TestManagedTopology:
         assert metadata.doc_id == "doc-123"
         assert metadata.title == "Knowledge Base"
 
+    def test_update_live_document_overwrites_existing_file(
+        self, storage: LocalStorageProvider
+    ) -> None:
+        original = (
+            generate_frontmatter(
+                FrontMatterDocument(
+                    doc_id="doc-123",
+                    title="Knowledge Base",
+                    status="live",
+                )
+            )
+            + "\nBody"
+        )
+        uri = storage.write_live_document_to_category(
+            "knowledge-base-12345678", original, "concepts"
+        )
+
+        updated = original.replace("status: live", "status: archived")
+        returned_uri = storage.update_live_document(uri, updated)
+
+        assert returned_uri == uri
+        assert storage.read_live_document(uri) == updated
+
     def test_write_and_list_meta_documents(self, storage: LocalStorageProvider) -> None:
         uri = storage.write_meta_document("templates", "default", "# Template")
 

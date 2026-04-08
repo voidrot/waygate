@@ -98,6 +98,12 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
+    def update_live_document(self, uri: str, content: str) -> str:
+        """Overwrite an existing live document at its current URI."""
+
+        pass
+
+    @abstractmethod
     def get_live_document_metadata(self, uri: str) -> FrontMatterDocument:
         """Retrieve a live document's frontmatter metadata."""
 

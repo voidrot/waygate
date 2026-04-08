@@ -28,3 +28,13 @@ To detect stale live documents and enqueue recompilation jobs for stale or hash-
 
 - `uv run waygate-maintenance-sweep --stale-after-hours 24 --enqueue-recompilation`
 - `mise run maintenance:sweep -- --stale-after-hours 24 --enqueue-recompilation`
+
+To replay persisted context-error findings that include lineage-backed recompilation signals:
+
+- `uv run waygate-maintenance-sweep --enqueue-recompilation --include-context-errors`
+- `mise run maintenance:sweep -- --enqueue-recompilation --include-context-errors`
+
+To archive orphan-lineage live documents in place and prepend a deprecation notice:
+
+- `uv run waygate-maintenance-sweep --archive-orphans`
+- `mise run maintenance:sweep -- --archive-orphans`

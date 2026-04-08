@@ -238,6 +238,11 @@ def test_report_context_error_persists_maintenance_finding() -> None:
     )
     assert finding.payload["role"] == "ops_agent"
     assert finding.payload["requested_visibilities"] == ["public"]
+    assert finding.payload["recompilation_signal"]["reason"] == "context_error"
+    assert (
+        finding.payload["recompilation_signal"]["target_topic"]
+        == "database failover escalation policy"
+    )
 
 
 def test_report_context_error_from_storage_writes_local_artifact(
@@ -262,3 +267,4 @@ def test_report_context_error_from_storage_writes_local_artifact(
     assert saved.trace_id == "trace-gap-2"
     assert saved.payload["query"] == "deployment rollback checklist"
     assert saved.payload["tags"] == ["release"]
+    assert "recompilation_signal" not in saved.payload

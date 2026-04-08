@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from waygate_core.doc_helpers import build_provenance_hash
 from waygate_core.schemas import (
     ContextErrorReport,
+    DocumentType,
     MaintenanceFinding,
     MaintenanceFindingType,
     RecompilationSignal,
@@ -40,6 +41,30 @@ def _build_recompilation_signal(
         reason=reason,
         lineage=lineage,
         payload=payload,
+    )
+
+
+def _build_context_error_recompilation_signal(
+    report: ContextErrorReport,
+) -> RecompilationSignal | None:
+    if not report.lineage_ids:
+        return None
+
+    target_topic = report.query.strip() or report.message.strip() or "Context follow-up"
+    return RecompilationSignal(
+        created_at=report.occurred_at,
+        reason="context_error",
+        lineage=report.lineage_ids,
+        target_topic=target_topic,
+        document_type=DocumentType.CONCEPTS,
+        payload={
+            "message": report.message,
+            "query": report.query,
+            "tags": report.tags,
+            "requested_visibilities": [
+                str(item) for item in report.requested_visibilities
+            ],
+        },
     )
 
 
@@ -170,11 +195,16 @@ def record_context_error(
     storage: StorageProvider,
     report: ContextErrorReport,
 ) -> str:
+    payload = report.model_dump(mode="json")
+    signal = _build_context_error_recompilation_signal(report)
+    if signal is not None:
+        payload["recompilation_signal"] = signal.model_dump(mode="json")
+
     finding = MaintenanceFinding(
         finding_type=MaintenanceFindingType.CONTEXT_ERROR,
         occurred_at=report.occurred_at,
         trace_id=report.trace_id,
         related_doc_ids=report.lineage_ids,
-        payload=report.model_dump(mode="json"),
+        payload=payload,
     )
     return storage.write_maintenance_finding(finding)

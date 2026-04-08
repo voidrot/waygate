@@ -200,6 +200,11 @@ class LocalStorageProvider(StorageProvider):
         filepath = self._get_real_path(uri)
         return filepath.read_text(encoding="utf-8")
 
+    def update_live_document(self, uri: str, content: str) -> str:
+        filepath = self._get_real_path(uri)
+        filepath.write_text(content, encoding="utf-8")
+        return uri
+
     def write_staging_document(self, document_id: str, content: str) -> str:
         filename = f"{document_id}.md"
         filepath = self.staging_dir / filename
