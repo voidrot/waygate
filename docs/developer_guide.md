@@ -16,7 +16,7 @@ This guide helps contributors understand where to look and how to add features.
 - `apps/mcp_server` also exposes `report_context_error`, which persists an explicit context-gap report as a maintenance artifact through the shared storage contract and emits a lineage-backed recompilation signal when replay is possible.
 - The compiler package now also exposes an explicit maintenance sweep command that detects and persists maintenance findings through the storage boundary, including optional chrono-decay detection for stale live documents.
 - Storage implementations must also support in-place live document updates via `update_live_document(uri, content)` so maintenance remediation can archive affected docs without changing their URI.
-- `libs/core/src/waygate_core/observability.py` now provides optional OpenTelemetry setup and span helpers for receiver/compiler seams; tracing is disabled unless `OTEL_ENABLED=true`.
+- `libs/core/src/waygate_core/observability.py` now provides optional OpenTelemetry setup and span helpers for receiver/compiler/MCP seams, including maintenance sweep/remediation flows; tracing is disabled unless `OTEL_ENABLED=true`.
 
 Out of scope for the current milestone:
 

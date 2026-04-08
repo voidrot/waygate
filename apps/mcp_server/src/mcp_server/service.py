@@ -10,6 +10,7 @@ from waygate_agent_sdk.models import (
     RetrievedLiveDocument,
 )
 from waygate_core.maintenance import record_context_error
+from waygate_core.observability import start_span
 from waygate_core.schemas import (
     AuditEvent,
     AuditEventType,
@@ -138,21 +139,54 @@ class BriefingService:
 
     def generate_briefing(self, request: GenerateBriefingRequest) -> BriefingResult:
         scope = self._resolve_scope(request)
-        self._write_retrieval_audit_event(request, scope, "generate_briefing")
-        return self.repository.build_briefing(
-            request.to_retrieval_query(),
-            scope,
-        )
+        with start_span(
+            "mcp.generate_briefing",
+            tracer_name=__name__,
+            attributes={
+                "waygate.trace_id": get_current_trace_id(),
+                "waygate.query": request.query,
+                "waygate.max_documents": request.max_documents,
+                "waygate.token_budget": request.token_budget,
+                "waygate.role": scope.role,
+                "waygate.allowed_visibilities": ",".join(
+                    str(item) for item in scope.allowed_visibilities
+                ),
+                "waygate.lineage_count": len(request.lineage_ids),
+            },
+        ) as span:
+            self._write_retrieval_audit_event(request, scope, "generate_briefing")
+            result = self.repository.build_briefing(
+                request.to_retrieval_query(),
+                scope,
+            )
+            span.set_attribute("waygate.document_count", len(result.documents))
+            return result
 
     def preview_retrieval(
         self, request: GenerateBriefingRequest
     ) -> list[RetrievedLiveDocument]:
         scope = self._resolve_scope(request)
-        self._write_retrieval_audit_event(request, scope, "preview_retrieval")
-        return self.repository.retrieve(
-            request.to_retrieval_query(),
-            scope,
-        )
+        with start_span(
+            "mcp.preview_retrieval",
+            tracer_name=__name__,
+            attributes={
+                "waygate.trace_id": get_current_trace_id(),
+                "waygate.query": request.query,
+                "waygate.max_documents": request.max_documents,
+                "waygate.role": scope.role,
+                "waygate.allowed_visibilities": ",".join(
+                    str(item) for item in scope.allowed_visibilities
+                ),
+                "waygate.lineage_count": len(request.lineage_ids),
+            },
+        ) as span:
+            self._write_retrieval_audit_event(request, scope, "preview_retrieval")
+            results = self.repository.retrieve(
+                request.to_retrieval_query(),
+                scope,
+            )
+            span.set_attribute("waygate.document_count", len(results))
+            return results
 
     def report_context_error(self, request: ReportContextErrorRequest) -> str:
         if self.maintenance_storage is None:
@@ -165,14 +199,30 @@ class BriefingService:
         if self.default_scope is not None:
             scope = RetrievalScope.model_validate(self.default_scope.model_dump())
 
-        report = ContextErrorReport(
-            occurred_at=datetime.now(timezone.utc).isoformat(),
-            message=request.message,
-            trace_id=get_current_trace_id(),
-            query=request.query,
-            role=scope.role,
-            requested_visibilities=scope.allowed_visibilities,
-            lineage_ids=request.lineage_ids,
-            tags=request.tags,
-        )
-        return record_context_error(self.maintenance_storage, report)
+        with start_span(
+            "mcp.report_context_error",
+            tracer_name=__name__,
+            attributes={
+                "waygate.trace_id": get_current_trace_id(),
+                "waygate.query": request.query,
+                "waygate.role": scope.role,
+                "waygate.allowed_visibilities": ",".join(
+                    str(item) for item in scope.allowed_visibilities
+                ),
+                "waygate.lineage_count": len(request.lineage_ids),
+                "waygate.tag_count": len(request.tags),
+            },
+        ) as span:
+            report = ContextErrorReport(
+                occurred_at=datetime.now(timezone.utc).isoformat(),
+                message=request.message,
+                trace_id=get_current_trace_id(),
+                query=request.query,
+                role=scope.role,
+                requested_visibilities=scope.allowed_visibilities,
+                lineage_ids=request.lineage_ids,
+                tags=request.tags,
+            )
+            finding_uri = record_context_error(self.maintenance_storage, report)
+            span.set_attribute("waygate.finding_uri", finding_uri)
+            return finding_uri

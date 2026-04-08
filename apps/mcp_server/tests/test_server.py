@@ -1,3 +1,6 @@
+from importlib import import_module
+
+import anyio
 from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 
@@ -73,6 +76,50 @@ def test_create_http_app_reports_auth_state() -> None:
         "path": "/briefing",
     }
     assert response.headers["x-trace-id"]
+
+
+def test_create_http_app_configures_tracing_on_startup(monkeypatch) -> None:
+    configured = []
+    server_module = import_module("mcp_server.server")
+    monkeypatch.setattr(server_module, "configure_tracing", configured.append)
+
+    class _FakeSessionManager:
+        def __init__(self) -> None:
+            self.entered = 0
+
+        async def __aenter__(self):
+            self.entered += 1
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeRunContext:
+        def __init__(self, session_manager: _FakeSessionManager) -> None:
+            self.session_manager = session_manager
+
+        async def __aenter__(self):
+            await self.session_manager.__aenter__()
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return await self.session_manager.__aexit__(exc_type, exc, tb)
+
+    class _FakeFastMCP:
+        def __init__(self) -> None:
+            self.session_manager = _FakeSessionManager()
+            self.session_manager.run = lambda: _FakeRunContext(self.session_manager)
+
+    fake_mcp = _FakeFastMCP()
+
+    async def run_lifespan() -> None:
+        async with server_module.run_mcp_lifespan(fake_mcp):
+            return None
+
+    anyio.run(run_lifespan)
+
+    assert configured == ["waygate-mcp-server"]
+    assert fake_mcp.session_manager.entered == 1
 
 
 def test_create_http_app_preserves_incoming_trace_header() -> None:

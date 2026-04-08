@@ -15,6 +15,7 @@ from waygate_core.maintenance import (
     detect_maintenance_findings,
     persist_maintenance_findings,
 )
+from waygate_core.observability import configure_tracing, start_span
 from waygate_core.schemas import (
     AuditEvent,
     AuditEventType,
@@ -115,15 +116,20 @@ def _build_recompilation_state(signal: RecompilationSignal) -> dict:
 
 
 def load_persisted_context_error_findings() -> list[MaintenanceFinding]:
-    findings: list[MaintenanceFinding] = []
-    for uri in storage.list_maintenance_findings():
-        finding = storage.read_maintenance_finding(uri)
-        if finding.finding_type != MaintenanceFindingType.CONTEXT_ERROR:
-            continue
-        if _extract_recompilation_signal(finding) is None:
-            continue
-        findings.append(finding)
-    return findings
+    with start_span(
+        "compiler.maintenance.load_context_error_findings",
+        tracer_name=__name__,
+    ) as span:
+        findings: list[MaintenanceFinding] = []
+        for uri in storage.list_maintenance_findings():
+            finding = storage.read_maintenance_finding(uri)
+            if finding.finding_type != MaintenanceFindingType.CONTEXT_ERROR:
+                continue
+            if _extract_recompilation_signal(finding) is None:
+                continue
+            findings.append(finding)
+        span.set_attribute("waygate.finding_count", len(findings))
+        return findings
 
 
 def _extract_live_document_body(content: str) -> str:
@@ -142,7 +148,9 @@ def _build_orphan_archive_notice(
     occurred_at: str,
 ) -> str:
     missing_doc_ids = finding.payload.get("missing_lineage_ids", [])
-    missing = ", ".join(missing_doc_ids) if isinstance(missing_doc_ids, list) else "unknown"
+    missing = (
+        ", ".join(missing_doc_ids) if isinstance(missing_doc_ids, list) else "unknown"
+    )
     return (
         f"> [!WARNING]\n"
         f"> Archived during maintenance sweep at {occurred_at} because raw lineage sources are missing.\n"
@@ -155,131 +163,189 @@ def archive_orphan_documents(
     occurred_at: str | None = None,
 ) -> list[str]:
     timestamp = occurred_at or datetime.now(timezone.utc).isoformat()
-    archived_uris: list[str] = []
+    with start_span(
+        "compiler.maintenance.archive_orphans",
+        tracer_name=__name__,
+        attributes={
+            "waygate.finding_count": len(findings),
+        },
+    ) as span:
+        archived_uris: list[str] = []
 
-    for finding in findings:
-        if finding.finding_type != MaintenanceFindingType.ORPHAN_LINEAGE:
-            continue
-        if not finding.live_document_uri:
-            continue
+        for finding in findings:
+            if finding.finding_type != MaintenanceFindingType.ORPHAN_LINEAGE:
+                continue
+            if not finding.live_document_uri:
+                continue
 
-        metadata = storage.get_live_document_metadata(finding.live_document_uri)
-        body = _extract_live_document_body(storage.read_live_document(finding.live_document_uri))
-        notice = _build_orphan_archive_notice(finding, timestamp)
-        archived_body = body if body.startswith(notice) else (notice if not body else f"{notice}\n\n{body}")
-        updated_metadata = FrontMatterDocument.model_validate(
-            {
-                **metadata.model_dump(mode="json"),
-                "status": DocumentStatus.ARCHIVED,
-                "last_updated": timestamp,
-            }
-        )
-        updated_content = f"{generate_frontmatter(updated_metadata)}\n{archived_body}"
-        storage.update_live_document(finding.live_document_uri, updated_content)
-        storage.write_audit_event(
-            AuditEvent(
-                event_type=AuditEventType.MAINTENANCE_ORPHAN_ARCHIVED,
-                occurred_at=timestamp,
-                trace_id=finding.trace_id,
-                document_ids=[metadata.doc_id, *finding.related_doc_ids],
-                uris=[finding.live_document_uri],
-                payload={
-                    "missing_lineage_ids": finding.payload.get("missing_lineage_ids", []),
-                    "live_document_id": metadata.doc_id,
-                },
+            metadata = storage.get_live_document_metadata(finding.live_document_uri)
+            body = _extract_live_document_body(
+                storage.read_live_document(finding.live_document_uri)
             )
-        )
-        archived_uris.append(finding.live_document_uri)
+            notice = _build_orphan_archive_notice(finding, timestamp)
+            archived_body = (
+                body
+                if body.startswith(notice)
+                else (notice if not body else f"{notice}\n\n{body}")
+            )
+            updated_metadata = FrontMatterDocument.model_validate(
+                {
+                    **metadata.model_dump(mode="json"),
+                    "status": DocumentStatus.ARCHIVED,
+                    "last_updated": timestamp,
+                }
+            )
+            updated_content = (
+                f"{generate_frontmatter(updated_metadata)}\n{archived_body}"
+            )
+            storage.update_live_document(finding.live_document_uri, updated_content)
+            storage.write_audit_event(
+                AuditEvent(
+                    event_type=AuditEventType.MAINTENANCE_ORPHAN_ARCHIVED,
+                    occurred_at=timestamp,
+                    trace_id=finding.trace_id,
+                    document_ids=[metadata.doc_id, *finding.related_doc_ids],
+                    uris=[finding.live_document_uri],
+                    payload={
+                        "missing_lineage_ids": finding.payload.get(
+                            "missing_lineage_ids", []
+                        ),
+                        "live_document_id": metadata.doc_id,
+                    },
+                )
+            )
+            archived_uris.append(finding.live_document_uri)
 
-    return archived_uris
+        span.set_attribute("waygate.archived_count", len(archived_uris))
+        return archived_uris
 
 
 def enqueue_recompilation_jobs(
     findings: list[MaintenanceFinding],
 ) -> list[dict[str, str | None]]:
-    enqueued_jobs: list[dict[str, str | None]] = []
-    for finding in findings:
-        signal = _extract_recompilation_signal(finding)
-        if signal is None:
-            continue
+    with start_span(
+        "compiler.maintenance.enqueue_recompilation",
+        tracer_name=__name__,
+        attributes={
+            "waygate.finding_count": len(findings),
+            "waygate.queue_name": settings.draft_queue_name,
+        },
+    ) as span:
+        enqueued_jobs: list[dict[str, str | None]] = []
+        for finding in findings:
+            signal = _extract_recompilation_signal(finding)
+            if signal is None:
+                continue
 
-        initial_state = _build_recompilation_state(signal)
-        job = draft_queue.enqueue(
-            "compiler.worker.execute_graph",
-            initial_state,
-            job_timeout="10m",
-        )
-        storage.write_audit_event(
-            AuditEvent(
-                event_type=AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED,
-                occurred_at=datetime.now(timezone.utc).isoformat(),
-                trace_id=initial_state["trace_id"],
-                document_ids=[
-                    *([signal.live_document_id] if signal.live_document_id else []),
-                    *signal.lineage,
-                ],
-                uris=[
-                    *([signal.live_document_uri] if signal.live_document_uri else []),
-                    *initial_state["new_document_uris"],
-                ],
-                payload={
-                    "job_id": job.id,
-                    "queue_name": settings.draft_queue_name,
-                    "reason": signal.reason,
-                    "live_document_id": signal.live_document_id,
-                    "target_topic": initial_state["target_topic"],
-                },
+            initial_state = _build_recompilation_state(signal)
+            job = draft_queue.enqueue(
+                "compiler.worker.execute_graph",
+                initial_state,
+                job_timeout="10m",
             )
-        )
-        enqueued_jobs.append(
-            {
-                "job_id": job.id,
-                "live_document_id": signal.live_document_id,
-                "live_document_uri": signal.live_document_uri,
-                "target_topic": initial_state["target_topic"],
-            }
-        )
-    return enqueued_jobs
+            storage.write_audit_event(
+                AuditEvent(
+                    event_type=AuditEventType.MAINTENANCE_RECOMPILATION_ENQUEUED,
+                    occurred_at=datetime.now(timezone.utc).isoformat(),
+                    trace_id=initial_state["trace_id"],
+                    document_ids=[
+                        *([signal.live_document_id] if signal.live_document_id else []),
+                        *signal.lineage,
+                    ],
+                    uris=[
+                        *(
+                            [signal.live_document_uri]
+                            if signal.live_document_uri
+                            else []
+                        ),
+                        *initial_state["new_document_uris"],
+                    ],
+                    payload={
+                        "job_id": job.id,
+                        "queue_name": settings.draft_queue_name,
+                        "reason": signal.reason,
+                        "live_document_id": signal.live_document_id,
+                        "target_topic": initial_state["target_topic"],
+                    },
+                )
+            )
+            enqueued_jobs.append(
+                {
+                    "job_id": job.id,
+                    "live_document_id": signal.live_document_id,
+                    "live_document_uri": signal.live_document_uri,
+                    "target_topic": initial_state["target_topic"],
+                }
+            )
+        span.set_attribute("waygate.job_count", len(enqueued_jobs))
+        return enqueued_jobs
 
 
 def run_maintenance_sweep(
     occurred_at: str | None = None,
     stale_after_hours: int | None = None,
 ) -> tuple[list[MaintenanceFinding], list[str]]:
-    findings = detect_maintenance_findings(
-        storage,
-        occurred_at=occurred_at,
-        stale_after_hours=stale_after_hours,
-    )
-    finding_uris = persist_maintenance_findings(storage, findings)
-    return findings, finding_uris
+    with start_span(
+        "compiler.maintenance.detect_and_persist",
+        tracer_name=__name__,
+        attributes={
+            "waygate.stale_after_hours": stale_after_hours,
+        },
+    ) as span:
+        findings = detect_maintenance_findings(
+            storage,
+            occurred_at=occurred_at,
+            stale_after_hours=stale_after_hours,
+        )
+        finding_uris = persist_maintenance_findings(storage, findings)
+        span.set_attribute("waygate.finding_count", len(findings))
+        return findings, finding_uris
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = _build_parser().parse_args(list(argv) if argv is not None else None)
-    findings, finding_uris = run_maintenance_sweep(
-        occurred_at=args.occurred_at,
-        stale_after_hours=args.stale_after_hours,
-    )
-    replayed_context_errors = (
-        load_persisted_context_error_findings() if args.include_context_errors else []
-    )
-    enqueued_jobs = (
-        enqueue_recompilation_jobs([*findings, *replayed_context_errors])
-        if args.enqueue_recompilation
-        else []
-    )
-    archived_orphan_uris = (
-        archive_orphan_documents(findings, occurred_at=args.occurred_at)
-        if args.archive_orphans
-        else []
-    )
-    summary = {
-        "finding_count": len(findings),
-        "finding_types": [str(finding.finding_type) for finding in findings],
-        "finding_uris": finding_uris,
-        "recompilation_job_ids": [entry["job_id"] for entry in enqueued_jobs],
-        "replayed_context_error_count": len(replayed_context_errors),
-        "archived_orphan_uris": archived_orphan_uris,
-    }
-    print(json.dumps(summary))
+    configure_tracing("waygate-compiler-maintenance")
+    with start_span(
+        "compiler.maintenance.main",
+        tracer_name=__name__,
+        attributes={
+            "waygate.stale_after_hours": args.stale_after_hours,
+            "waygate.enqueue_recompilation": args.enqueue_recompilation,
+            "waygate.include_context_errors": args.include_context_errors,
+            "waygate.archive_orphans": args.archive_orphans,
+        },
+    ) as span:
+        findings, finding_uris = run_maintenance_sweep(
+            occurred_at=args.occurred_at,
+            stale_after_hours=args.stale_after_hours,
+        )
+        replayed_context_errors = (
+            load_persisted_context_error_findings()
+            if args.include_context_errors
+            else []
+        )
+        enqueued_jobs = (
+            enqueue_recompilation_jobs([*findings, *replayed_context_errors])
+            if args.enqueue_recompilation
+            else []
+        )
+        archived_orphan_uris = (
+            archive_orphan_documents(findings, occurred_at=args.occurred_at)
+            if args.archive_orphans
+            else []
+        )
+        summary = {
+            "finding_count": len(findings),
+            "finding_types": [str(finding.finding_type) for finding in findings],
+            "finding_uris": finding_uris,
+            "recompilation_job_ids": [entry["job_id"] for entry in enqueued_jobs],
+            "replayed_context_error_count": len(replayed_context_errors),
+            "archived_orphan_uris": archived_orphan_uris,
+        }
+        span.set_attribute("waygate.finding_count", len(findings))
+        span.set_attribute(
+            "waygate.replayed_context_error_count", len(replayed_context_errors)
+        )
+        span.set_attribute("waygate.job_count", len(enqueued_jobs))
+        span.set_attribute("waygate.archived_count", len(archived_orphan_uris))
+        print(json.dumps(summary))

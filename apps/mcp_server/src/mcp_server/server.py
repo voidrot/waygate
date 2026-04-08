@@ -11,6 +11,7 @@ from mcp.server.fastmcp import FastMCP
 
 from waygate_agent_sdk import BriefingResult
 from waygate_agent_sdk.models import RetrievedLiveDocument
+from waygate_core.observability import configure_tracing
 from waygate_core.settings import RuntimeSettings
 
 from mcp_server.auth import StaticBearerAuthConfig, StaticBearerAuthMiddleware
@@ -21,6 +22,13 @@ from mcp_server.service import (
     ReportContextErrorRequest,
 )
 from mcp_server.trace import TraceContextMiddleware
+
+
+@contextlib.asynccontextmanager
+async def run_mcp_lifespan(mcp_server: FastMCP):
+    configure_tracing("waygate-mcp-server")
+    async with mcp_server.session_manager.run():
+        yield
 
 
 def create_mcp_server(service: BriefingService) -> FastMCP:
@@ -75,7 +83,7 @@ def create_http_app(
 
     @contextlib.asynccontextmanager
     async def lifespan(_: Starlette):
-        async with mcp_server.session_manager.run():
+        async with run_mcp_lifespan(mcp_server):
             yield
 
     return Starlette(

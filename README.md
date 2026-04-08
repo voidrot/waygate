@@ -31,7 +31,7 @@ Current implementation snapshot (April 2026)
 - The maintenance sweep can now optionally enqueue recompilation jobs directly from persisted hash-mismatch or stale-compilation findings, reusing the same compiler queue contract as ingestion.
 - The MCP boundary can now persist explicit context-gap reports as durable maintenance artifacts when downstream callers detect missing or insufficient wiki context, and lineage-backed reports can be replayed into the compiler queue.
 - The maintenance sweep can now archive orphan-lineage live documents in place, downgrading them to `archived` and prepending a deprecation notice.
-- Optional OpenTelemetry tracing can now wrap receiver polling/enqueue and compiler worker/node execution, while remaining disabled by default for local development.
+- Optional OpenTelemetry tracing can now wrap receiver polling/enqueue, compiler worker/node execution, MCP service calls, and maintenance sweep/remediation flows, while remaining disabled by default for local development.
 
 Out of scope (current milestone)
 

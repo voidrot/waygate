@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -268,3 +270,36 @@ def test_report_context_error_from_storage_writes_local_artifact(
     assert saved.payload["query"] == "deployment rollback checklist"
     assert saved.payload["tags"] == ["release"]
     assert "recompilation_signal" not in saved.payload
+
+
+def test_service_operations_emit_observability_spans(monkeypatch) -> None:
+    repository = FakeRepository()
+    maintenance_storage = FakeAuditStorage()
+    service = BriefingService(repository, maintenance_storage=maintenance_storage)
+    service_module = import_module("mcp_server.service")
+    span_calls = []
+
+    @contextmanager
+    def fake_start_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, attributes or {}))
+
+        class _FakeSpan:
+            def set_attribute(self, key: str, value: object) -> None:
+                span_calls.append((key, {"value": value}))
+
+        yield _FakeSpan()
+
+    monkeypatch.setattr(service_module, "start_span", fake_start_span)
+
+    service.generate_briefing(GenerateBriefingRequest(query="incident runbook"))
+    service.preview_retrieval(GenerateBriefingRequest(query="architecture"))
+    service.report_context_error(
+        ReportContextErrorRequest(message="Missing escalation policy")
+    )
+
+    assert span_calls[0][0] == "mcp.generate_briefing"
+    assert span_calls[1] == ("waygate.document_count", {"value": 0})
+    assert span_calls[2][0] == "mcp.preview_retrieval"
+    assert span_calls[3] == ("waygate.document_count", {"value": 0})
+    assert span_calls[4][0] == "mcp.report_context_error"
+    assert span_calls[5][0] == "waygate.finding_uri"

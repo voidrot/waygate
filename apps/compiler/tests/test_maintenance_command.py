@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from compiler import maintenance as maintenance_module
@@ -331,3 +332,66 @@ def test_archive_orphan_documents_marks_live_doc_archived(monkeypatch) -> None:
         fake_storage.audit_events[0].event_type
         == AuditEventType.MAINTENANCE_ORPHAN_ARCHIVED
     )
+
+
+def test_maintenance_functions_emit_observability_spans(monkeypatch, capsys) -> None:
+    fake_storage = _FakeStorage()
+    fake_queue = _FakeQueue()
+    span_calls = []
+    finding = MaintenanceFinding(
+        finding_type=MaintenanceFindingType.CONTEXT_ERROR,
+        occurred_at="2026-04-08T00:00:00+00:00",
+        live_document_id="live-1",
+        live_document_uri="file:///tmp/live/concepts/live-1.md",
+        related_doc_ids=["raw-1"],
+        payload={
+            "recompilation_signal": {
+                "signal_id": "signal-context-1",
+                "created_at": "2026-04-08T00:00:00+00:00",
+                "live_document_uri": "file:///tmp/live/concepts/live-1.md",
+                "live_document_id": "live-1",
+                "reason": "context_error",
+                "lineage": ["raw-1"],
+                "target_topic": "database failover escalation policy",
+                "document_type": "concepts",
+                "payload": {},
+            }
+        },
+    )
+
+    @contextmanager
+    def fake_start_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, attributes or {}))
+
+        class _FakeSpan:
+            def set_attribute(self, key: str, value: object) -> None:
+                span_calls.append((key, {"value": value}))
+
+        yield _FakeSpan()
+
+    monkeypatch.setattr(maintenance_module, "storage", fake_storage)
+    monkeypatch.setattr(maintenance_module, "draft_queue", fake_queue)
+    monkeypatch.setattr(maintenance_module, "start_span", fake_start_span)
+    monkeypatch.setattr(
+        maintenance_module, "configure_tracing", lambda _service_name: None
+    )
+    monkeypatch.setattr(
+        maintenance_module,
+        "run_maintenance_sweep",
+        lambda occurred_at=None, stale_after_hours=None: ([], []),
+    )
+    fake_storage.maintenance_findings = {"meta/maintenance/context-1": finding}
+
+    maintenance_module.load_persisted_context_error_findings()
+    maintenance_module.enqueue_recompilation_jobs([finding])
+    maintenance_module.archive_orphan_documents([])
+    maintenance_module.main(["--enqueue-recompilation", "--include-context-errors"])
+    _ = capsys.readouterr().out
+
+    span_names = [
+        entry[0] for entry in span_calls if not entry[0].startswith("waygate.")
+    ]
+    assert "compiler.maintenance.load_context_error_findings" in span_names
+    assert "compiler.maintenance.enqueue_recompilation" in span_names
+    assert "compiler.maintenance.archive_orphans" in span_names
+    assert "compiler.maintenance.main" in span_names
