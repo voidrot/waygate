@@ -47,7 +47,10 @@ def test_evaluate_candidate_detects_regression() -> None:
 
     assert summary.passed is False
     assert summary.failed_cases == len(summary.results)
-    assert any("missing required grounded facts" in result.failures for result in summary.results)
+    assert any(
+        "missing required grounded facts" in result.failures
+        for result in summary.results
+    )
 
 
 def test_build_draft_node_candidate_runs_through_draft_node() -> None:

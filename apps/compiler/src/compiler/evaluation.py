@@ -103,20 +103,26 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def _score_grounding(case: GoldenCase, candidate_output: str) -> tuple[float, list[str]]:
+def _score_grounding(
+    case: GoldenCase, candidate_output: str
+) -> tuple[float, list[str]]:
     failures: list[str] = []
     normalized_output = _normalize(candidate_output)
     required = case.required_snippets
     if not required:
         score = 1.0
     else:
-        matched = sum(1 for snippet in required if _normalize(snippet) in normalized_output)
+        matched = sum(
+            1 for snippet in required if _normalize(snippet) in normalized_output
+        )
         score = matched / len(required)
         if matched != len(required):
             failures.append("missing required grounded facts")
 
     forbidden_hits = [
-        snippet for snippet in case.forbidden_snippets if _normalize(snippet) in normalized_output
+        snippet
+        for snippet in case.forbidden_snippets
+        if _normalize(snippet) in normalized_output
     ]
     if forbidden_hits:
         failures.append("contains forbidden snippets")
@@ -126,15 +132,23 @@ def _score_grounding(case: GoldenCase, candidate_output: str) -> tuple[float, li
     return score, failures
 
 
-def _score_relevance(case: GoldenCase, candidate_output: str) -> tuple[float, list[str]]:
+def _score_relevance(
+    case: GoldenCase, candidate_output: str
+) -> tuple[float, list[str]]:
     failures: list[str] = []
     normalized_output = _normalize(candidate_output)
     focus_terms = case.focus_terms or [case.target_topic]
-    matched_terms = sum(1 for term in focus_terms if _normalize(term) in normalized_output)
+    matched_terms = sum(
+        1 for term in focus_terms if _normalize(term) in normalized_output
+    )
     focus_score = matched_terms / len(focus_terms)
 
     topic_slug = _normalize(case.target_topic)
-    title_match = 1.0 if candidate_output.lstrip().startswith("#") and topic_slug in normalized_output else 0.0
+    title_match = (
+        1.0
+        if candidate_output.lstrip().startswith("#") and topic_slug in normalized_output
+        else 0.0
+    )
     score = (focus_score + title_match) / 2
 
     if matched_terms != len(focus_terms):
@@ -150,12 +164,12 @@ def _score_markdown(candidate_output: str) -> tuple[float, list[str]]:
         "title": candidate_output.lstrip().startswith("# "),
         "section_headers": "## " in candidate_output,
         "balanced_code_fences": candidate_output.count("```") % 2 == 0,
-        "no_filler": not any(filler in candidate_output.lower() for filler in CONVERSATIONAL_FILLER),
+        "no_filler": not any(
+            filler in candidate_output.lower() for filler in CONVERSATIONAL_FILLER
+        ),
     }
     failures.extend(
-        reason.replace("_", " ")
-        for reason, passed in checks.items()
-        if not passed
+        reason.replace("_", " ") for reason, passed in checks.items() if not passed
     )
     score = sum(1 for passed in checks.values() if passed) / len(checks)
     return score, failures
@@ -195,10 +209,7 @@ def evaluate_candidate(
     dataset: GoldenDataset,
     candidate_runner: CandidateRunner,
 ) -> EvaluationSummary:
-    results = [
-        evaluate_case(case, candidate_runner(case))
-        for case in dataset.cases
-    ]
+    results = [evaluate_case(case, candidate_runner(case)) for case in dataset.cases]
     passed_cases = sum(1 for result in results if result.passed)
     total_cases = len(results)
     return EvaluationSummary(
@@ -251,7 +262,9 @@ def build_draft_node_candidate(llm_factory: LLMFactory) -> CandidateRunner:
         storage = _GoldenDatasetStorage(
             {
                 uri: raw_document.content
-                for uri, raw_document in zip(state["new_document_uris"], case.raw_documents, strict=False)
+                for uri, raw_document in zip(
+                    state["new_document_uris"], case.raw_documents, strict=False
+                )
             }
         )
 
@@ -267,13 +280,17 @@ def build_draft_node_candidate(llm_factory: LLMFactory) -> CandidateRunner:
 
         output = result.get("current_draft")
         if not isinstance(output, str):
-            raise ValueError(f"Draft node did not return a markdown draft for {case.case_id}")
+            raise ValueError(
+                f"Draft node did not return a markdown draft for {case.case_id}"
+            )
         return output
 
     return run_case
 
 
-def _build_live_candidate_runner(provider_name: str | None, model_name: str | None) -> CandidateRunner:
+def _build_live_candidate_runner(
+    provider_name: str | None, model_name: str | None
+) -> CandidateRunner:
     from waygate_core.llm import get_llm
 
     resolved_provider = provider_name or draft.draft_provider
@@ -284,7 +301,9 @@ def _build_live_candidate_runner(provider_name: str | None, model_name: str | No
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the WayGate compiler golden dataset evaluation harness.")
+    parser = argparse.ArgumentParser(
+        description="Run the WayGate compiler golden dataset evaluation harness."
+    )
     parser.add_argument("--dataset", default=str(DEFAULT_GOLDEN_DATASET_PATH))
     parser.add_argument("--provider", default=None)
     parser.add_argument("--model", default=None)

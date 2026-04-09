@@ -1,98 +1,110 @@
 {
-  "version": "1",
-  "description": "Golden compiler evaluation dataset for regression checks across compiler prompts and provider changes.",
-  "cases": [
-    {
-      "case_id": "webhook-hardening",
-      "description": "Compiler should summarize GitHub and Slack webhook hardening requirements without conversational filler.",
-      "target_topic": "Webhook Verification",
-      "document_type": "concepts",
-      "raw_documents": [
+    "version": "1",
+    "description": "Golden compiler evaluation dataset for regression checks across compiler prompts and provider changes.",
+    "cases": [
         {
-          "source_type": "github",
-          "source_id": "issue-49",
-          "timestamp": "2026-04-06T12:00:00+00:00",
-          "tags": ["github", "issues"],
-          "content": "GitHub webhooks must validate the x-hub-signature-256 header against the raw request body. GitHub event type comes from x-github-event and delivery id comes from x-github-delivery.",
-          "source_url": "https://github.com/voidrot/waygate/issues/49"
+            "case_id": "webhook-hardening",
+            "description": "Compiler should summarize GitHub and Slack webhook hardening requirements without conversational filler.",
+            "target_topic": "Webhook Verification",
+            "document_type": "concepts",
+            "raw_documents": [
+                {
+                    "source_type": "github",
+                    "source_id": "issue-49",
+                    "timestamp": "2026-04-06T12:00:00+00:00",
+                    "tags": [
+                        "github",
+                        "issues"
+                    ],
+                    "content": "GitHub webhooks must validate the x-hub-signature-256 header against the raw request body. GitHub event type comes from x-github-event and delivery id comes from x-github-delivery.",
+                    "source_url": "https://github.com/voidrot/waygate/issues/49"
+                },
+                {
+                    "source_type": "slack",
+                    "source_id": "slack-guidance",
+                    "timestamp": "2026-04-06T12:05:00+00:00",
+                    "tags": [
+                        "slack",
+                        "message"
+                    ],
+                    "content": "Slack requests must validate x-slack-signature and reject stale x-slack-request-timestamp values older than five minutes.",
+                    "source_url": "https://api.slack.com/authentication/verifying-requests-from-slack"
+                }
+            ],
+            "expected_output": "# Webhook Verification\n\n## Summary\nWayGate validates webhook authenticity before decoding JSON payloads.\n\n## Key Details\n- GitHub verification uses `x-hub-signature-256` against the raw request body.\n- GitHub event metadata is enriched from `x-github-event` and `x-github-delivery`.\n- Slack verification checks `x-slack-signature` and rejects stale request timestamps.\n\n## References\n- GitHub webhook security guidance\n- Slack request signing guidance\n",
+            "required_snippets": [
+                "x-hub-signature-256",
+                "x-github-event",
+                "x-slack-signature",
+                "stale request timestamps"
+            ],
+            "focus_terms": [
+                "GitHub",
+                "Slack",
+                "signature",
+                "raw request body"
+            ],
+            "forbidden_snippets": [
+                "Certainly!",
+                "In conclusion"
+            ],
+            "thresholds": {
+                "grounding": 1.0,
+                "relevance": 0.75,
+                "markdown": 1.0
+            }
         },
         {
-          "source_type": "slack",
-          "source_id": "slack-guidance",
-          "timestamp": "2026-04-06T12:05:00+00:00",
-          "tags": ["slack", "message"],
-          "content": "Slack requests must validate x-slack-signature and reject stale x-slack-request-timestamp values older than five minutes.",
-          "source_url": "https://api.slack.com/authentication/verifying-requests-from-slack"
+            "case_id": "human-review-resume",
+            "description": "Compiler should describe the resumable human review lifecycle with durable records and resume semantics.",
+            "target_topic": "Human Review Workflow",
+            "document_type": "concepts",
+            "raw_documents": [
+                {
+                    "source_type": "github",
+                    "source_id": "issue-20",
+                    "timestamp": "2026-04-06T13:00:00+00:00",
+                    "tags": [
+                        "github",
+                        "issues"
+                    ],
+                    "content": "Escalated compiler drafts should persist a durable human review record, preserve the staging artifact, and support explicit resume semantics after feedback.",
+                    "source_url": "https://github.com/voidrot/waygate/issues/20"
+                },
+                {
+                    "source_type": "generic_webhook",
+                    "source_id": "design-note",
+                    "timestamp": "2026-04-06T13:05:00+00:00",
+                    "tags": [
+                        "compiler",
+                        "workflow"
+                    ],
+                    "content": "Human feedback may request revision, approve a revised draft for publish, or reject the draft entirely. Each transition should write structured audit events.",
+                    "source_url": "file:///tmp/design-note.md"
+                }
+            ],
+            "expected_output": "# Human Review Workflow\n\n## Summary\nWayGate keeps escalated drafts in a resumable human review state instead of treating escalation as terminal failure.\n\n## Key Details\n- Each escalation writes a staging draft and a structured human review record.\n- Human feedback can request revision, approve a revised draft, or reject the work.\n- Resume actions emit structured audit events so later automation can inspect outcomes.\n\n## References\n- Compiler escalation issue\n- Human review lifecycle notes\n",
+            "required_snippets": [
+                "staging draft",
+                "structured human review record",
+                "request revision",
+                "audit events"
+            ],
+            "focus_terms": [
+                "resume",
+                "feedback",
+                "approve",
+                "reject"
+            ],
+            "forbidden_snippets": [
+                "Here is the summary",
+                "let me know"
+            ],
+            "thresholds": {
+                "grounding": 1.0,
+                "relevance": 0.75,
+                "markdown": 1.0
+            }
         }
-      ],
-      "expected_output": "# Webhook Verification\n\n## Summary\nWayGate validates webhook authenticity before decoding JSON payloads.\n\n## Key Details\n- GitHub verification uses `x-hub-signature-256` against the raw request body.\n- GitHub event metadata is enriched from `x-github-event` and `x-github-delivery`.\n- Slack verification checks `x-slack-signature` and rejects stale request timestamps.\n\n## References\n- GitHub webhook security guidance\n- Slack request signing guidance\n",
-      "required_snippets": [
-        "x-hub-signature-256",
-        "x-github-event",
-        "x-slack-signature",
-        "stale request timestamps"
-      ],
-      "focus_terms": [
-        "GitHub",
-        "Slack",
-        "signature",
-        "raw request body"
-      ],
-      "forbidden_snippets": [
-        "Certainly!",
-        "In conclusion"
-      ],
-      "thresholds": {
-        "grounding": 1.0,
-        "relevance": 0.75,
-        "markdown": 1.0
-      }
-    },
-    {
-      "case_id": "human-review-resume",
-      "description": "Compiler should describe the resumable human review lifecycle with durable records and resume semantics.",
-      "target_topic": "Human Review Workflow",
-      "document_type": "concepts",
-      "raw_documents": [
-        {
-          "source_type": "github",
-          "source_id": "issue-20",
-          "timestamp": "2026-04-06T13:00:00+00:00",
-          "tags": ["github", "issues"],
-          "content": "Escalated compiler drafts should persist a durable human review record, preserve the staging artifact, and support explicit resume semantics after feedback.",
-          "source_url": "https://github.com/voidrot/waygate/issues/20"
-        },
-        {
-          "source_type": "generic_webhook",
-          "source_id": "design-note",
-          "timestamp": "2026-04-06T13:05:00+00:00",
-          "tags": ["compiler", "workflow"],
-          "content": "Human feedback may request revision, approve a revised draft for publish, or reject the draft entirely. Each transition should write structured audit events.",
-          "source_url": "file:///tmp/design-note.md"
-        }
-      ],
-      "expected_output": "# Human Review Workflow\n\n## Summary\nWayGate keeps escalated drafts in a resumable human review state instead of treating escalation as terminal failure.\n\n## Key Details\n- Each escalation writes a staging draft and a structured human review record.\n- Human feedback can request revision, approve a revised draft, or reject the work.\n- Resume actions emit structured audit events so later automation can inspect outcomes.\n\n## References\n- Compiler escalation issue\n- Human review lifecycle notes\n",
-      "required_snippets": [
-        "staging draft",
-        "structured human review record",
-        "request revision",
-        "audit events"
-      ],
-      "focus_terms": [
-        "resume",
-        "feedback",
-        "approve",
-        "reject"
-      ],
-      "forbidden_snippets": [
-        "Here is the summary",
-        "let me know"
-      ],
-      "thresholds": {
-        "grounding": 1.0,
-        "relevance": 0.75,
-        "markdown": 1.0
-      }
-    }
-  ]
+    ]
 }
