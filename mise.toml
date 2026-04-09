@@ -1,6 +1,6 @@
 [tools]
-node = "lts"
-pnpm = "latest"
+    node   = "lts"
+    pnpm   = "latest"
     python = "latest"
     ruff   = "latest"
     uv     = "latest"
@@ -17,6 +17,15 @@ pnpm = "latest"
 
 [tasks."test:quick"]
     run = "uv run pytest -q"
+
+[tasks."operator:install"]
+    run = "pnpm install"
+
+[tasks."operator:dev"]
+    run = "pnpm --filter @waygate/operator dev"
+
+[tasks."operator:typecheck"]
+    run = "pnpm --filter @waygate/operator typecheck"
 
 [tasks."mcp:dev"]
     run = "uv run waygate-mcp-server --reload"

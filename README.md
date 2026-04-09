@@ -43,6 +43,7 @@ Out of scope (current milestone)
 Project layout
 
 - Apps: see [apps/](apps/) — `apps/receiver` handles ingestion; `apps/compiler` builds workflow graphs; `apps/mcp_server` exposes the briefing service boundary.
+- Apps: see [apps/](apps/) — `apps/operator` hosts the Nuxt operator control plane and Better Auth backend; `apps/receiver` handles ingestion; `apps/compiler` builds workflow graphs; `apps/mcp_server` exposes the briefing service boundary.
 - Libraries: see [libs/](libs/) — `libs/core` contains plugin base classes, `libs/storage` defines storage interfaces.
 - Plugins: see [plugins/](plugins/) — example providers for Ollama LLMs and local filesystem storage.
 - Docs: [docs/overview.md](docs/overview.md) provides a high-level tour; developer guidance is in [docs/developer_guide.md](docs/developer_guide.md).
@@ -64,6 +65,18 @@ With `POSTGRES_DSN` configured, the receiver settings API supports:
 - `PATCH /admin/settings/{namespace}` to persist updated values into Postgres.
 
 1. Exercise the receiver with example payloads from `tests.rest` or run individual packages via your workspace tooling.
+
+1. Install the operator frontend workspace dependencies when working on the Nuxt app:
+
+```bash
+mise run operator:install
+```
+
+1. Run the Nuxt operator app in development:
+
+```bash
+pnpm --filter @waygate/operator dev
+```
 
 Testing
 
@@ -127,3 +140,4 @@ Where to look first
 - Storage interface: [libs/storage/src/waygate_storage/storage_base.py](libs/storage/src/waygate_storage/storage_base.py)
 - Compiler entrypoints: [apps/compiler/src/compiler/worker.py](apps/compiler/src/compiler/worker.py)
 - Example plugins: [plugins/ollama_provider](plugins/ollama_provider/README.md), [plugins/storage_local](plugins/storage_local/README.md)
+- Operator frontend bootstrap: [apps/operator/README.md](apps/operator/README.md)

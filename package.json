@@ -1,0 +1,10 @@
+{
+    "name": "waygate-workspace",
+    "private": true,
+    "packageManager": "pnpm@10.33.0",
+    "scripts": {
+        "operator:dev": "pnpm --filter @waygate/operator dev",
+        "operator:build": "pnpm --filter @waygate/operator build",
+        "operator:typecheck": "pnpm --filter @waygate/operator typecheck"
+    }
+}

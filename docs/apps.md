@@ -15,6 +15,19 @@ This page summarizes the top-level applications in `apps/` and links to key sour
   - [state model](apps/compiler/src/compiler/state.py)
   - nodes: [draft](apps/compiler/src/compiler/nodes/draft.py), [review](apps/compiler/src/compiler/nodes/review.py), [publish](apps/compiler/src/compiler/nodes/publish.py)
 
+1. Operator
+
+- Purpose: Provide the human-facing Nuxt control plane and host the Better Auth backend on Postgres.
+- Key files:
+  - [apps/operator README](apps/operator/README.md)
+  - [Nuxt config](apps/operator/nuxt.config.ts)
+  - [Better Auth server config](apps/operator/lib/auth.ts)
+  - [Better Auth client](apps/operator/lib/auth-client.ts)
+  - [Better Auth server route](apps/operator/server/api/auth/[...all].ts)
+  - [Landing page](apps/operator/app/pages/index.vue)
+  - [Sign-in page](apps/operator/app/pages/sign-in.vue)
+  - [Protected dashboard](apps/operator/app/pages/dashboard.vue)
+
 1. Receiver
 
 - Purpose: Accept ingestion inputs (HTTP webhooks, scheduled polls, listeners) and dispatch documents into storage/processing.
