@@ -144,6 +144,9 @@ This document defines the presentation contract that the static-site publishing 
 - this issue defines what metadata the site should show and how it should be framed for humans
 - richer operator navigation can evolve later without changing the core metadata model
 
+The downstream publish-trigger contract that should refresh those rendered pages
+is documented in `docs/publish_deployment_hooks_plan.md`.
+
 ## Relationship To Thematic Synthesis
 
 Thematic overviews and contradiction summaries should follow the same operator-view contract, with a few additions:

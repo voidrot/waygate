@@ -35,6 +35,7 @@ Roadmap anchors:
 - Future thematic synthesis planning is captured in `docs/thematic_synthesis_plan.md`.
 - Future static-site publishing planning is captured in `docs/static_site_publishing_plan.md`.
 - Future operator-facing metadata view planning is captured in `docs/operator_metadata_view_plan.md`.
+- Future publish-triggered deployment-hook planning is captured in `docs/publish_deployment_hooks_plan.md`.
 
 Entry points and configuration
 
