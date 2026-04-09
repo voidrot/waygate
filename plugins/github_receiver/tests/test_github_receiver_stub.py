@@ -256,7 +256,9 @@ def test_github_receiver_rejects_invalid_signature(monkeypatch) -> None:
     monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "secret")
     receiver = GitHubReceiver()
 
-    with pytest.raises(WebhookVerificationError, match="Invalid GitHub webhook signature"):
+    with pytest.raises(
+        WebhookVerificationError, match="Invalid GitHub webhook signature"
+    ):
         receiver.verify_webhook_request(
             {"x-hub-signature-256": "sha256=bad"},
             b"{}",

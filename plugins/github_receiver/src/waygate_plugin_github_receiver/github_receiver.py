@@ -141,11 +141,14 @@ class GitHubReceiver(IngestionPlugin):
         if not signature:
             raise WebhookVerificationError("Missing GitHub signature header")
 
-        expected = "sha256=" + hmac.new(
-            secret.encode("utf-8"),
-            body,
-            hashlib.sha256,
-        ).hexdigest()
+        expected = (
+            "sha256="
+            + hmac.new(
+                secret.encode("utf-8"),
+                body,
+                hashlib.sha256,
+            ).hexdigest()
+        )
         if not hmac.compare_digest(signature, expected):
             raise WebhookVerificationError("Invalid GitHub webhook signature")
 
@@ -394,9 +397,7 @@ class GitHubReceiver(IngestionPlugin):
             if isinstance(item, dict) and item.get("name")
         ]
         raw_assignees = issue.get("assignees")
-        assignees: list[Any] = (
-            raw_assignees if isinstance(raw_assignees, list) else []
-        )
+        assignees: list[Any] = raw_assignees if isinstance(raw_assignees, list) else []
         assignee_names = [
             str(item.get("login"))
             for item in assignees

@@ -1,5 +1,3 @@
-import json
-
 from fastapi.testclient import TestClient
 
 from receiver.api import webhooks

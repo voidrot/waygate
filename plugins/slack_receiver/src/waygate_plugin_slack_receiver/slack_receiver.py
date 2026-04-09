@@ -92,11 +92,14 @@ class SlackReceiver(IngestionPlugin):
             raise WebhookVerificationError("Stale Slack webhook request timestamp")
 
         basestring = f"v0:{timestamp}:".encode("utf-8") + body
-        expected = "v0=" + hmac.new(
-            secret.encode("utf-8"),
-            basestring,
-            hashlib.sha256,
-        ).hexdigest()
+        expected = (
+            "v0="
+            + hmac.new(
+                secret.encode("utf-8"),
+                basestring,
+                hashlib.sha256,
+            ).hexdigest()
+        )
         if not hmac.compare_digest(signature, expected):
             raise WebhookVerificationError("Invalid Slack webhook signature")
 

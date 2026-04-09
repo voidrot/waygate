@@ -173,7 +173,9 @@ def test_slack_receiver_rejects_invalid_signature(monkeypatch) -> None:
     monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
     receiver = SlackReceiver()
 
-    with pytest.raises(WebhookVerificationError, match="Invalid Slack webhook signature"):
+    with pytest.raises(
+        WebhookVerificationError, match="Invalid Slack webhook signature"
+    ):
         receiver.verify_webhook_request(
             {
                 "x-slack-request-timestamp": str(int(datetime.now(UTC).timestamp())),
@@ -205,10 +207,14 @@ def test_slack_receiver_rejects_stale_timestamp(monkeypatch) -> None:
     monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
     receiver = SlackReceiver()
 
-    with pytest.raises(WebhookVerificationError, match="Stale Slack webhook request timestamp"):
+    with pytest.raises(
+        WebhookVerificationError, match="Stale Slack webhook request timestamp"
+    ):
         receiver.verify_webhook_request(
             {
-                "x-slack-request-timestamp": str(int(datetime(2020, 1, 1, tzinfo=UTC).timestamp())),
+                "x-slack-request-timestamp": str(
+                    int(datetime(2020, 1, 1, tzinfo=UTC).timestamp())
+                ),
                 "x-slack-signature": "v0=deadbeef",
             },
             b"{}",
