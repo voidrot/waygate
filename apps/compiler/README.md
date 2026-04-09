@@ -10,6 +10,7 @@ Key files and locations:
 - [graph.py](apps/compiler/src/compiler/graph.py) — graph construction and node wiring.
 - [worker.py](apps/compiler/src/compiler/worker.py) — graph execution entrypoint (`execute_graph`).
 - [maintenance.py](apps/compiler/src/compiler/maintenance.py) — explicit maintenance sweep entrypoint (`waygate-maintenance-sweep`).
+- [evaluation.py](apps/compiler/src/compiler/evaluation.py) — golden-dataset evaluation harness for compiler and provider regressions.
 - [state.py](apps/compiler/src/compiler/state.py) — runtime state model used during execution.
 - Nodes: [draft.py](apps/compiler/src/compiler/nodes/draft.py), [review.py](apps/compiler/src/compiler/nodes/review.py), [publish.py](apps/compiler/src/compiler/nodes/publish.py)
 
@@ -38,3 +39,19 @@ To archive orphan-lineage live documents in place and prepend a deprecation noti
 
 - `uv run waygate-maintenance-sweep --archive-orphans`
 - `mise run maintenance:sweep -- --archive-orphans`
+
+Golden dataset evaluation
+
+The compiler package now ships a reusable golden dataset under `apps/compiler/golden/compiler_golden_dataset.json` and a deterministic evaluation harness for draft-generation regressions.
+
+To run the harness against the current draft provider/model configuration:
+
+- `uv run waygate-compiler-eval`
+
+To target a different provider/model explicitly:
+
+- `uv run waygate-compiler-eval --provider ollama --model hermes3:8b`
+
+To write a CI artifact report and persist generated candidate drafts for review:
+
+- `uv run waygate-compiler-eval --report-path artifacts/compiler-eval.json --write-candidates-dir artifacts/compiler-candidates`

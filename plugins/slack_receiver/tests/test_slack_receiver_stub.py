@@ -1,6 +1,11 @@
 import pytest
 from importlib import import_module
+import hashlib
+import hmac
 import json
+from datetime import UTC, datetime
+
+from waygate_core.plugin_base import WebhookVerificationError
 
 SlackSourceMetadata = import_module(
     "waygate_plugin_slack_receiver.metadata"
@@ -162,3 +167,55 @@ async def test_slack_receiver_listen_emits_normalized_documents() -> None:
     assert len(captured) == 1
     assert captured[0].source_type == "slack"
     assert captured[0].content == "from listen"
+
+
+def test_slack_receiver_rejects_invalid_signature(monkeypatch) -> None:
+    monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
+    receiver = SlackReceiver()
+
+    with pytest.raises(
+        WebhookVerificationError, match="Invalid Slack webhook signature"
+    ):
+        receiver.verify_webhook_request(
+            {
+                "x-slack-request-timestamp": str(int(datetime.now(UTC).timestamp())),
+                "x-slack-signature": "v0=bad",
+            },
+            b"{}",
+        )
+
+
+def test_slack_receiver_accepts_valid_signature(monkeypatch) -> None:
+    monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
+    receiver = SlackReceiver()
+
+    body = b'{"type":"event_callback"}'
+    timestamp = str(int(datetime.now(UTC).timestamp()))
+    basestring = f"v0:{timestamp}:".encode("utf-8") + body
+    signature = "v0=" + hmac.new(b"secret", basestring, hashlib.sha256).hexdigest()
+
+    receiver.verify_webhook_request(
+        {
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signature,
+        },
+        body,
+    )
+
+
+def test_slack_receiver_rejects_stale_timestamp(monkeypatch) -> None:
+    monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
+    receiver = SlackReceiver()
+
+    with pytest.raises(
+        WebhookVerificationError, match="Stale Slack webhook request timestamp"
+    ):
+        receiver.verify_webhook_request(
+            {
+                "x-slack-request-timestamp": str(
+                    int(datetime(2020, 1, 1, tzinfo=UTC).timestamp())
+                ),
+                "x-slack-signature": "v0=deadbeef",
+            },
+            b"{}",
+        )

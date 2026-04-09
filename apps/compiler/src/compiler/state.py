@@ -15,5 +15,6 @@ class GraphState(TypedDict):
     current_draft: Optional[str]
     qa_feedback: Optional[str]
     staging_uri: Optional[str]
+    human_review_uri: NotRequired[str | None]
     revision_count: int
     status: str

@@ -67,10 +67,13 @@ def execute_graph(initial_state: dict):
                 payload={
                     "final_status": final_state.get("status"),
                     "staging_uri": final_state.get("staging_uri"),
+                    "human_review_uri": final_state.get("human_review_uri"),
                 },
             )
         )
-        span.set_attribute("waygate.final_status", final_state.get("status"))
+        final_status = final_state.get("status")
+        if isinstance(final_status, str):
+            span.set_attribute("waygate.final_status", final_status)
 
         logger.info(
             "Graph execution completed trace_id=%s with final state: %s",

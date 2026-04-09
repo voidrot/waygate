@@ -39,16 +39,18 @@ def _emit_audit_event(event: AuditEvent) -> None:
 
 
 def _audit_pre_hook(node_name: str, state: GraphState) -> GraphState:
+    document_ids = [
+        str(entry["doc_id"])
+        for entry in state.get("raw_documents_metadata", [])
+        if isinstance(entry, dict) and entry.get("doc_id")
+    ]
+
     _emit_audit_event(
         AuditEvent(
             event_type=AuditEventType.COMPILER_NODE_STARTED,
             occurred_at=datetime.now(timezone.utc).isoformat(),
             trace_id=state.get("trace_id"),
-            document_ids=[
-                entry.get("doc_id")
-                for entry in state.get("raw_documents_metadata", [])
-                if entry.get("doc_id")
-            ],
+            document_ids=document_ids,
             uris=state.get("new_document_uris", []),
             payload={
                 "node_name": node_name,
@@ -65,21 +67,24 @@ def _audit_post_hook(
     state: GraphState,
     result: dict[str, Any],
 ) -> dict[str, Any]:
+    document_ids = [
+        str(entry["doc_id"])
+        for entry in state.get("raw_documents_metadata", [])
+        if isinstance(entry, dict) and entry.get("doc_id")
+    ]
+
     _emit_audit_event(
         AuditEvent(
             event_type=AuditEventType.COMPILER_NODE_COMPLETED,
             occurred_at=datetime.now(timezone.utc).isoformat(),
             trace_id=state.get("trace_id"),
-            document_ids=[
-                entry.get("doc_id")
-                for entry in state.get("raw_documents_metadata", [])
-                if entry.get("doc_id")
-            ],
+            document_ids=document_ids,
             uris=state.get("new_document_uris", []),
             payload={
                 "node_name": node_name,
                 "result_status": result.get("status"),
                 "staging_uri": result.get("staging_uri"),
+                "human_review_uri": result.get("human_review_uri"),
             },
         )
     )
@@ -118,13 +123,19 @@ def apply_hooks(node_name: str, node_fn: NodeFunc) -> NodeFunc:
             for hook in _post_hooks:
                 current_result = hook(node_name, current_state, current_result)
 
-            if current_result.get("status") is not None:
+            result_status = current_result.get("status")
+            if isinstance(result_status, str):
+                span.set_attribute("waygate.result_status", result_status)
+
+            staging_uri = current_result.get("staging_uri")
+            if isinstance(staging_uri, str):
+                span.set_attribute("waygate.staging_uri", staging_uri)
+
+            human_review_uri = current_result.get("human_review_uri")
+            if isinstance(human_review_uri, str):
                 span.set_attribute(
-                    "waygate.result_status", current_result.get("status")
-                )
-            if current_result.get("staging_uri") is not None:
-                span.set_attribute(
-                    "waygate.staging_uri", current_result.get("staging_uri")
+                    "waygate.human_review_uri",
+                    human_review_uri,
                 )
 
             return current_result

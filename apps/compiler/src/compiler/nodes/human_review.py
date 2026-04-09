@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 
 from compiler.config import storage
+from compiler.human_review_flow import create_human_review_record
 from compiler.state import GraphState
 from waygate_core.doc_helpers import generate_frontmatter, slugify
 from waygate_core.schemas import (
@@ -52,6 +53,7 @@ def human_review_node(state: GraphState) -> dict:
 
     doc_name = f"{slugify(topic)}-{state.get('trace_id', 'unknown')}"
     staging_uri = storage.write_staging_document(doc_name, body)
+    _, human_review_uri = create_human_review_record(state, staging_uri)
     storage.write_audit_event(
         AuditEvent(
             event_type=AuditEventType.COMPILER_HUMAN_REVIEW_ESCALATED,
@@ -62,11 +64,13 @@ def human_review_node(state: GraphState) -> dict:
                 "topic": topic,
                 "revision_count": state.get("revision_count", 0),
                 "staging_uri": staging_uri,
+                "human_review_uri": human_review_uri,
             },
         )
     )
 
     return {
-        "status": "escalated",
+        "status": "awaiting_human_review",
         "staging_uri": staging_uri,
+        "human_review_uri": human_review_uri,
     }
