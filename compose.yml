@@ -1,10 +1,11 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: waygate
       POSTGRES_USER: waygate
       POSTGRES_PASSWORD: waygate
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
