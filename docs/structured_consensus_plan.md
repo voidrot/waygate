@@ -168,6 +168,10 @@ Structured consensus is adjacent to, but separate from, the retrieval roadmap.
 - Consensus retries should not be used to mask true corpus gaps.
 - If reviewers disagree because source material is insufficient, the future missing-context loop should become the next step instead of infinite draft retries.
 
+The later provenance-evaluation roadmap is documented in
+`docs/cryptographic_provenance_plan.md` because consensus confidence and
+cryptographic attestation solve different problems.
+
 ## Human Review Boundary
 
 Human review should remain the final boundary for unresolved consensus failures.
