@@ -4,6 +4,7 @@ import logging
 from fastapi import FastAPI
 from waygate_core.observability import configure_tracing
 
+from receiver.api import settings
 from receiver.api import webhooks
 from receiver.core.registry import IngestionPlugin, registry
 from receiver.core.scheduler import setup_scheduler, scheduler
@@ -38,3 +39,4 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="WayGate Receiver Ingestion API", lifespan=lifespan)
 
 app.include_router(webhooks.router)
+app.include_router(settings.router)

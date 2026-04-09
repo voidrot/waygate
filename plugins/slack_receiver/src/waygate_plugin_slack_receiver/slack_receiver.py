@@ -1,16 +1,18 @@
 import hashlib
 import hmac
 import json
-import os
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Awaitable, Callable, List
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List
 from uuid import uuid4
 
 from waygate_core.plugin_base import IngestionPlugin, WebhookVerificationError
 from waygate_core.schemas import RawDocument
 from waygate_plugin_slack_receiver.metadata import SlackSourceMetadata
+
+if TYPE_CHECKING:
+    from waygate_core.settings_registry import SettingDefinition
 
 
 SLACK_MAX_AGE_SECONDS = 60 * 5
@@ -21,8 +23,35 @@ class SlackReceiver(IngestionPlugin):
     def plugin_name(self) -> str:
         return "slack_receiver"
 
+    @property
+    def settings_definitions(self) -> list["SettingDefinition"]:
+        from waygate_core.settings_registry import SettingDefinition
+
+        return [
+            SettingDefinition(
+                key="export_path",
+                title="Slack export path",
+                env_var="SLACK_EXPORT_PATH",
+                description="Optional directory of Slack export JSON files for poll mode.",
+            ),
+            SettingDefinition(
+                key="signing_secret",
+                title="Slack signing secret",
+                env_var="SLACK_SIGNING_SECRET",
+                description="Shared secret used to validate Slack webhook signatures.",
+                secret=True,
+            ),
+            SettingDefinition(
+                key="stream_fixture",
+                title="Slack stream fixture",
+                env_var="SLACK_STREAM_FIXTURE",
+                description="Optional JSON fixture file used by the listener test path.",
+            ),
+        ]
+
     def poll(self, since_timestamp=None) -> List[RawDocument]:
-        export_path = os.getenv("SLACK_EXPORT_PATH")
+        settings = self.get_settings_values()
+        export_path = settings.get("export_path")
         if not export_path:
             return []
 
@@ -73,7 +102,8 @@ class SlackReceiver(IngestionPlugin):
         headers: Mapping[str, str],
         body: bytes,
     ) -> None:
-        secret = os.getenv("SLACK_SIGNING_SECRET")
+        settings = self.get_settings_values()
+        secret = settings.get("signing_secret")
         if not secret:
             raise WebhookVerificationError("Slack signing secret is not configured")
 
@@ -191,7 +221,8 @@ class SlackReceiver(IngestionPlugin):
         events = getattr(self, "_listen_events", None)
 
         if events is None:
-            fixture_path = os.getenv("SLACK_STREAM_FIXTURE")
+            settings = self.get_settings_values()
+            fixture_path = settings.get("stream_fixture")
             if fixture_path:
                 try:
                     loaded = json.loads(Path(fixture_path).read_text(encoding="utf-8"))

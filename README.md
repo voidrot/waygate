@@ -33,6 +33,7 @@ Current implementation snapshot (April 2026)
 - The maintenance sweep can now archive orphan-lineage live documents in place, downgrading them to `archived` and prepending a deprecation notice.
 - Optional OpenTelemetry tracing can now wrap receiver polling/enqueue, compiler worker/node execution, MCP service calls, and maintenance sweep/remediation flows, while remaining disabled by default for local development.
 - Runtime settings can now be sourced either directly from environment variables or, when explicitly enabled, from a Postgres-backed settings table while documents remain in markdown storage.
+- The receiver now exposes an admin settings API at `/admin/settings` for core runtime settings and discovered plugin namespaces, with secret values redacted in read responses.
 
 Out of scope (current milestone)
 
@@ -55,6 +56,12 @@ docker compose -f compose.yml up -d
 ```
 
 This now starts both Valkey and Postgres. Use `POSTGRES_DSN=postgresql://waygate:waygate@localhost:5432/waygate` when enabling database-backed runtime settings.
+
+With `POSTGRES_DSN` configured, the receiver settings API supports:
+
+- `GET /admin/settings` to list the available namespaces.
+- `GET /admin/settings/{namespace}` to inspect core or plugin settings with effective source metadata.
+- `PATCH /admin/settings/{namespace}` to persist updated values into Postgres.
 
 1. Exercise the receiver with example payloads from `tests.rest` or run individual packages via your workspace tooling.
 

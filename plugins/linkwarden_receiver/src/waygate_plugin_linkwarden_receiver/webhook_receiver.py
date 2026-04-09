@@ -1,6 +1,5 @@
 import hashlib
 import json
-import os
 from datetime import UTC, datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -9,6 +8,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from waygate_core.plugin_base import IngestionPlugin
+from waygate_core.settings_registry import SettingDefinition
 from waygate_core.schemas import RawDocument
 
 from .metadata import LinkwardenSourceMetadata
@@ -19,9 +19,64 @@ class LinkwardenReceiver(IngestionPlugin):
     def plugin_name(self) -> str:
         return "linkwarden_receiver"
 
+    @property
+    def settings_definitions(self) -> list[SettingDefinition]:
+        return [
+            SettingDefinition(
+                key="base_url",
+                title="Linkwarden base URL",
+                env_var="LINKWARDEN_BASE_URL",
+                description="Base URL for the Linkwarden instance used by poll mode.",
+            ),
+            SettingDefinition(
+                key="token",
+                title="Linkwarden token",
+                env_var="LINKWARDEN_TOKEN",
+                description="Bearer token used for Linkwarden API requests.",
+                secret=True,
+            ),
+            SettingDefinition(
+                key="sort",
+                title="Linkwarden sort mode",
+                env_var="LINKWARDEN_SORT",
+                description="Sort parameter passed to the Linkwarden search endpoint.",
+                default_value="0",
+            ),
+            SettingDefinition(
+                key="search_query",
+                title="Linkwarden search query",
+                env_var="LINKWARDEN_SEARCH_QUERY",
+                description="Optional search string used to filter Linkwarden results.",
+                default_value=None,
+            ),
+            SettingDefinition(
+                key="collection_id",
+                title="Linkwarden collection ID",
+                env_var="LINKWARDEN_COLLECTION_ID",
+                description="Optional collection filter for Linkwarden search.",
+                default_value=None,
+            ),
+            SettingDefinition(
+                key="tag_id",
+                title="Linkwarden tag ID",
+                env_var="LINKWARDEN_TAG_ID",
+                description="Optional tag filter for Linkwarden search.",
+                default_value=None,
+            ),
+            SettingDefinition(
+                key="pinned_only",
+                title="Linkwarden pinned only",
+                env_var="LINKWARDEN_PINNED_ONLY",
+                description="Optional pinned-only filter for Linkwarden search.",
+                value_type="boolean",
+                default_value=None,
+            ),
+        ]
+
     def poll(self, since_timestamp=None) -> list[RawDocument]:
-        base_url = os.getenv("LINKWARDEN_BASE_URL")
-        token = os.getenv("LINKWARDEN_TOKEN")
+        settings = self.get_settings_values()
+        base_url = settings.get("base_url")
+        token = settings.get("token")
         if not base_url or not token:
             return []
 
@@ -60,19 +115,20 @@ class LinkwardenReceiver(IngestionPlugin):
         token: str,
         cursor: int | None,
     ) -> dict[str, Any]:
-        query: dict[str, str] = {"sort": os.getenv("LINKWARDEN_SORT", "0")}
-        search_query = os.getenv("LINKWARDEN_SEARCH_QUERY")
+        settings = self.get_settings_values()
+        query: dict[str, str] = {"sort": str(settings.get("sort") or "0")}
+        search_query = settings.get("search_query")
         if search_query:
-            query["searchQueryString"] = search_query
-        collection_id = os.getenv("LINKWARDEN_COLLECTION_ID")
+            query["searchQueryString"] = str(search_query)
+        collection_id = settings.get("collection_id")
         if collection_id:
-            query["collectionId"] = collection_id
-        tag_id = os.getenv("LINKWARDEN_TAG_ID")
+            query["collectionId"] = str(collection_id)
+        tag_id = settings.get("tag_id")
         if tag_id:
-            query["tagId"] = tag_id
-        pinned_only = os.getenv("LINKWARDEN_PINNED_ONLY")
-        if pinned_only:
-            query["pinnedOnly"] = pinned_only
+            query["tagId"] = str(tag_id)
+        pinned_only = settings.get("pinned_only")
+        if pinned_only is not None:
+            query["pinnedOnly"] = "true" if bool(pinned_only) else "false"
         if cursor is not None:
             query["cursor"] = str(cursor)
 

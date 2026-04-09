@@ -1,9 +1,12 @@
 from abc import ABC
 
 from collections.abc import Mapping
-from typing import Any, Awaitable, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional
 from datetime import datetime
 from waygate_core.schemas import RawDocument
+
+if TYPE_CHECKING:
+    from .settings_registry import SettingDefinition
 
 
 class WebhookVerificationError(ValueError):
@@ -48,6 +51,41 @@ class IngestionPlugin(ABC):
         """
 
         return {}
+
+    @property
+    def settings_definitions(self) -> list["SettingDefinition"]:
+        return []
+
+    def get_settings_values(self) -> dict[str, Any]:
+        from waygate_core.settings import get_runtime_settings
+        from waygate_core.settings_registry import resolve_settings_values
+        from waygate_core.settings_store import (
+            PostgresSettingsStore,
+            build_plugin_settings_namespace,
+        )
+
+        definitions = list(self.settings_definitions)
+        if not definitions:
+            return {}
+
+        runtime_settings = get_runtime_settings()
+        stored_values: dict[str, Any] = {}
+        if runtime_settings.runtime_settings_backend == "postgres":
+            if not runtime_settings.postgres_dsn:
+                raise ValueError(
+                    "POSTGRES_DSN must be set when RUNTIME_SETTINGS_BACKEND=postgres"
+                )
+            store = PostgresSettingsStore(runtime_settings.postgres_dsn)
+            stored_values = store.get_namespace(
+                build_plugin_settings_namespace(self.plugin_name)
+            )
+
+        resolved = resolve_settings_values(
+            definitions,
+            stored_values,
+            runtime_backend=runtime_settings.runtime_settings_backend,
+        )
+        return {key: value.value for key, value in resolved.items()}
 
     def poll(self, since_timestamp: Optional[datetime] = None) -> List[RawDocument]:
         """Poll the source for new documents.

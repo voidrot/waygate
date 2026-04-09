@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import json
-import os
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,6 +8,7 @@ from typing import Any, Awaitable, Callable, List
 from uuid import uuid4
 
 from waygate_core.plugin_base import IngestionPlugin, WebhookVerificationError
+from waygate_core.settings_registry import SettingDefinition
 from waygate_core.schemas import RawDocument
 from waygate_plugin_github_receiver.metadata import GitHubSourceMetadata
 
@@ -18,9 +18,28 @@ class GitHubReceiver(IngestionPlugin):
     def plugin_name(self) -> str:
         return "github_receiver"
 
+    @property
+    def settings_definitions(self) -> list[SettingDefinition]:
+        return [
+            SettingDefinition(
+                key="export_path",
+                title="GitHub export path",
+                env_var="GITHUB_EXPORT_PATH",
+                description="Optional directory of GitHub snapshot JSON files for poll mode.",
+            ),
+            SettingDefinition(
+                key="webhook_secret",
+                title="GitHub webhook secret",
+                env_var="GITHUB_WEBHOOK_SECRET",
+                description="Shared secret used to validate GitHub webhook signatures.",
+                secret=True,
+            ),
+        ]
+
     def poll(self, since_timestamp=None) -> List[RawDocument]:
         # TODO: implement process to get repo files as a snapshot
-        export_path = os.getenv("GITHUB_EXPORT_PATH")
+        settings = self.get_settings_values()
+        export_path = settings.get("export_path")
         if not export_path:
             return []
 
@@ -133,7 +152,8 @@ class GitHubReceiver(IngestionPlugin):
         headers: Mapping[str, str],
         body: bytes,
     ) -> None:
-        secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+        settings = self.get_settings_values()
+        secret = settings.get("webhook_secret")
         if not secret:
             raise WebhookVerificationError("GitHub webhook secret is not configured")
 
