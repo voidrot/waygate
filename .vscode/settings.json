@@ -8,4 +8,7 @@
         "mise": true,
         "pytest": true
     },
+    "debug.javascript.defaultRuntimeExecutable": {
+        "pwa-node": "${workspaceFolder}/.vscode/mise-tools/node"
+    },
 }
