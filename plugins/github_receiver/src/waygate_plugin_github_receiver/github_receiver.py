@@ -1,12 +1,14 @@
 import hashlib
+import hmac
 import json
 import os
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Awaitable, Callable, List
 from uuid import uuid4
 
-from waygate_core.plugin_base import IngestionPlugin
+from waygate_core.plugin_base import IngestionPlugin, WebhookVerificationError
 from waygate_core.schemas import RawDocument
 from waygate_plugin_github_receiver.metadata import GitHubSourceMetadata
 
@@ -50,11 +52,13 @@ class GitHubReceiver(IngestionPlugin):
             raise ValueError("Webhook body cannot be empty")
 
         repository = payload.get("repository") or {}
-        sender = payload.get("sender") or {}
         pull_request = payload.get("pull_request") or {}
         issue = payload.get("issue") or {}
         comment = payload.get("comment") or {}
+        review = payload.get("review") or {}
         head_commit = payload.get("head_commit") or {}
+        raw_commits = payload.get("commits")
+        commits: list[Any] = raw_commits if isinstance(raw_commits, list) else []
 
         repo_name = self._string(repository, "full_name")
         branch = self._branch_from_ref(self._string(payload, "ref"))
@@ -67,6 +71,7 @@ class GitHubReceiver(IngestionPlugin):
 
         source_url = (
             self._string(comment, "html_url")
+            or self._string(review, "html_url")
             or self._string(pull_request, "html_url")
             or self._string(issue, "html_url")
             or self._string(head_commit, "url")
@@ -74,6 +79,7 @@ class GitHubReceiver(IngestionPlugin):
         )
         source_id = (
             self._string(payload, "delivery_id")
+            or self._string(review, "id")
             or self._string(comment, "id")
             or self._string(pull_request, "id")
             or self._string(issue, "id")
@@ -86,10 +92,12 @@ class GitHubReceiver(IngestionPlugin):
             pull_request=pull_request,
             issue=issue,
             comment=comment,
+            review=review,
             head_commit=head_commit,
+            commits=commits,
         )
         timestamp = self._timestamp_from_payload(
-            payload, pull_request, issue, comment, head_commit
+            payload, pull_request, issue, comment, review, head_commit
         )
 
         tags = ["github"]
@@ -119,6 +127,46 @@ class GitHubReceiver(IngestionPlugin):
                 source_metadata=metadata,
             )
         ]
+
+    def verify_webhook_request(
+        self,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> None:
+        secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+        if not secret:
+            raise WebhookVerificationError("GitHub webhook secret is not configured")
+
+        signature = headers.get("x-hub-signature-256")
+        if not signature:
+            raise WebhookVerificationError("Missing GitHub signature header")
+
+        expected = "sha256=" + hmac.new(
+            secret.encode("utf-8"),
+            body,
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise WebhookVerificationError("Invalid GitHub webhook signature")
+
+    def prepare_webhook_payload(
+        self,
+        payload: Any,
+        headers: Mapping[str, str],
+    ) -> Any:
+        if not isinstance(payload, dict):
+            return payload
+
+        enriched = dict(payload)
+        if "event" not in enriched:
+            event_name = headers.get("x-github-event")
+            if event_name:
+                enriched["event"] = event_name
+        if "delivery_id" not in enriched:
+            delivery_id = headers.get("x-github-delivery")
+            if delivery_id:
+                enriched["delivery_id"] = delivery_id
+        return enriched
 
     def _documents_from_snapshot(
         self, *, snapshot: Any, fallback_timestamp: datetime
@@ -207,8 +255,30 @@ class GitHubReceiver(IngestionPlugin):
         pull_request: dict[str, Any],
         issue: dict[str, Any],
         comment: dict[str, Any],
+        review: dict[str, Any],
         head_commit: dict[str, Any],
+        commits: list[Any],
     ) -> str:
+        push_summary = self._build_push_summary(
+            payload=payload,
+            repository=self._as_dict(payload.get("repository")),
+            commits=commits,
+        )
+        if push_summary:
+            return push_summary
+
+        review_summary = self._build_review_summary(
+            payload=payload,
+            pull_request=pull_request,
+            review=review,
+        )
+        if review_summary:
+            return review_summary
+
+        issue_summary = self._build_issue_summary(payload=payload, issue=issue)
+        if issue_summary:
+            return issue_summary
+
         comment_body = self._string(comment, "body")
         if comment_body:
             return comment_body
@@ -247,11 +317,15 @@ class GitHubReceiver(IngestionPlugin):
         pull_request: dict[str, Any],
         issue: dict[str, Any],
         comment: dict[str, Any],
+        review: dict[str, Any],
         head_commit: dict[str, Any],
     ) -> datetime:
         value = (
             self._string(comment, "updated_at")
             or self._string(comment, "created_at")
+            or self._string(review, "submitted_at")
+            or self._string(review, "updated_at")
+            or self._string(review, "created_at")
             or self._string(pull_request, "updated_at")
             or self._string(pull_request, "created_at")
             or self._string(issue, "updated_at")
@@ -296,6 +370,114 @@ class GitHubReceiver(IngestionPlugin):
         if current is None:
             return None
         return str(current)
+
+    def _as_dict(self, value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    def _build_issue_summary(
+        self,
+        *,
+        payload: dict[str, Any],
+        issue: dict[str, Any],
+    ) -> str | None:
+        if self._string(payload, "event") != "issues":
+            return None
+
+        title = self._string(issue, "title") or "Untitled issue"
+        number = self._string(issue, "number")
+        action = self._string(payload, "action") or "updated"
+        raw_labels = issue.get("labels")
+        labels: list[Any] = raw_labels if isinstance(raw_labels, list) else []
+        label_names = [
+            str(item.get("name"))
+            for item in labels
+            if isinstance(item, dict) and item.get("name")
+        ]
+        raw_assignees = issue.get("assignees")
+        assignees: list[Any] = (
+            raw_assignees if isinstance(raw_assignees, list) else []
+        )
+        assignee_names = [
+            str(item.get("login"))
+            for item in assignees
+            if isinstance(item, dict) and item.get("login")
+        ]
+        body = self._string(issue, "body") or ""
+
+        lines = [f"GitHub issue {number or '?'} {action}: {title}"]
+        if label_names:
+            lines.append(f"Labels: {', '.join(label_names)}")
+        if assignee_names:
+            lines.append(f"Assignees: {', '.join(assignee_names)}")
+        if body:
+            lines.append("")
+            lines.append(body)
+        return "\n".join(lines)
+
+    def _build_review_summary(
+        self,
+        *,
+        payload: dict[str, Any],
+        pull_request: dict[str, Any],
+        review: dict[str, Any],
+    ) -> str | None:
+        event_name = self._string(payload, "event")
+        if event_name not in {"pull_request_review", "pull_request_review_comment"}:
+            return None
+
+        pr_title = self._string(pull_request, "title") or "Untitled pull request"
+        pr_number = self._string(pull_request, "number")
+        action = self._string(payload, "action") or "updated"
+        state = self._string(review, "state")
+        body = self._string(review, "body")
+        if event_name == "pull_request_review_comment" and not body:
+            comment = self._as_dict(payload.get("comment"))
+            body = self._string(comment, "body")
+
+        lines = [f"GitHub PR review for #{pr_number or '?'} {action}: {pr_title}"]
+        if state:
+            lines.append(f"Review state: {state}")
+        if body:
+            lines.append("")
+            lines.append(body)
+        return "\n".join(lines)
+
+    def _build_push_summary(
+        self,
+        *,
+        payload: dict[str, Any],
+        repository: dict[str, Any],
+        commits: list[Any],
+    ) -> str | None:
+        if self._string(payload, "event") != "push":
+            return None
+
+        repo_name = self._string(repository, "full_name") or "unknown repository"
+        ref = self._branch_from_ref(self._string(payload, "ref")) or "unknown"
+        commit_dicts = [item for item in commits if isinstance(item, dict)]
+
+        lines = [
+            f"GitHub push to {repo_name} on {ref}",
+            f"Commit count: {len(commit_dicts)}",
+        ]
+        changed_files: set[str] = set()
+        if commit_dicts:
+            lines.append("")
+            lines.append("Commits:")
+        for commit in commit_dicts:
+            commit_id = self._string(commit, "id") or "unknown"
+            message = self._string(commit, "message") or "(no message)"
+            lines.append(f"- {commit_id[:7]} {message}")
+            for key in ("added", "modified", "removed"):
+                values = commit.get(key)
+                if isinstance(values, list):
+                    changed_files.update(str(item) for item in values if item)
+
+        if changed_files:
+            lines.append("")
+            lines.append("Changed files:")
+            lines.extend(f"- {path}" for path in sorted(changed_files))
+        return "\n".join(lines)
 
     async def listen(
         self, on_data_callback: Callable[[List[RawDocument]], Awaitable[None]]

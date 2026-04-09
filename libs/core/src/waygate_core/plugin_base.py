@@ -1,8 +1,13 @@
 from abc import ABC
 
-from typing import Awaitable, Callable, List, Optional
+from collections.abc import Mapping
+from typing import Any, Awaitable, Callable, List, Optional
 from datetime import datetime
 from waygate_core.schemas import RawDocument
+
+
+class WebhookVerificationError(ValueError):
+    """Raised when a webhook request fails authenticity or freshness checks."""
 
 
 class IngestionPlugin(ABC):
@@ -67,6 +72,28 @@ class IngestionPlugin(ABC):
         """
 
         raise NotImplementedError()
+
+    def verify_webhook_request(
+        self,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> None:
+        """Verify webhook authenticity before payload decoding.
+
+        Implementations should raise `WebhookVerificationError` when a
+        request must be rejected.
+        """
+
+        return None
+
+    def prepare_webhook_payload(
+        self,
+        payload: Any,
+        headers: Mapping[str, str],
+    ) -> Any:
+        """Optionally enrich a decoded webhook payload using request headers."""
+
+        return payload
 
     async def listen(
         self, on_data_callback: Callable[[List[RawDocument]], Awaitable[None]]

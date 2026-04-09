@@ -1,14 +1,19 @@
 import hashlib
+import hmac
 import json
 import os
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Awaitable, Callable, List
 from uuid import uuid4
 
-from waygate_core.plugin_base import IngestionPlugin
+from waygate_core.plugin_base import IngestionPlugin, WebhookVerificationError
 from waygate_core.schemas import RawDocument
 from waygate_plugin_slack_receiver.metadata import SlackSourceMetadata
+
+
+SLACK_MAX_AGE_SECONDS = 60 * 5
 
 
 class SlackReceiver(IngestionPlugin):
@@ -62,6 +67,38 @@ class SlackReceiver(IngestionPlugin):
             raise ValueError("Webhook body cannot be empty")
 
         return self._normalize_payload(payload)
+
+    def verify_webhook_request(
+        self,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> None:
+        secret = os.getenv("SLACK_SIGNING_SECRET")
+        if not secret:
+            raise WebhookVerificationError("Slack signing secret is not configured")
+
+        timestamp = headers.get("x-slack-request-timestamp")
+        signature = headers.get("x-slack-signature")
+        if not timestamp or not signature:
+            raise WebhookVerificationError("Missing Slack signature headers")
+
+        try:
+            timestamp_value = int(timestamp)
+        except ValueError as exc:
+            raise WebhookVerificationError("Invalid Slack request timestamp") from exc
+
+        now = int(datetime.now(UTC).timestamp())
+        if abs(now - timestamp_value) > SLACK_MAX_AGE_SECONDS:
+            raise WebhookVerificationError("Stale Slack webhook request timestamp")
+
+        basestring = f"v0:{timestamp}:".encode("utf-8") + body
+        expected = "v0=" + hmac.new(
+            secret.encode("utf-8"),
+            basestring,
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise WebhookVerificationError("Invalid Slack webhook signature")
 
     def _normalize_payload(self, payload: dict) -> List[RawDocument]:
         if not payload:

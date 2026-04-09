@@ -1,6 +1,10 @@
 import pytest
 from importlib import import_module
+import hashlib
+import hmac
 import json
+
+from waygate_core.plugin_base import WebhookVerificationError
 
 GitHubReceiver = import_module(
     "waygate_plugin_github_receiver.github_receiver"
@@ -156,3 +160,132 @@ def test_github_receiver_poll_ingests_snapshot_exports(tmp_path, monkeypatch) ->
         assert doc.source_metadata.commit_sha == "deadbeef"
         assert doc.source_metadata.owner == "voidrot"
         assert "snapshot" in doc.tags
+
+
+def test_github_receiver_parses_issue_payload_with_labels_and_assignees() -> None:
+    receiver = GitHubReceiver()
+
+    payload = {
+        "event": "issues",
+        "action": "opened",
+        "repository": {"full_name": "voidrot/waygate"},
+        "issue": {
+            "id": 100,
+            "number": 9,
+            "title": "Receiver bug",
+            "body": "Webhook processing fails.",
+            "labels": [{"name": "bug"}, {"name": "receiver"}],
+            "assignees": [{"login": "buck"}],
+            "created_at": "2026-04-06T12:00:00Z",
+        },
+    }
+
+    docs = receiver.handle_webhook(payload)
+
+    assert "GitHub issue 9 opened: Receiver bug" in docs[0].content
+    assert "Labels: bug, receiver" in docs[0].content
+    assert "Assignees: buck" in docs[0].content
+
+
+def test_github_receiver_parses_pull_request_review_payload() -> None:
+    receiver = GitHubReceiver()
+
+    payload = {
+        "event": "pull_request_review",
+        "action": "submitted",
+        "repository": {"full_name": "voidrot/waygate"},
+        "pull_request": {
+            "id": 42,
+            "number": 42,
+            "title": "Improve receiver",
+            "html_url": "https://github.com/voidrot/waygate/pull/42",
+        },
+        "review": {
+            "id": 77,
+            "state": "approved",
+            "body": "Looks solid.",
+            "submitted_at": "2026-04-06T12:00:00Z",
+        },
+    }
+
+    docs = receiver.handle_webhook(payload)
+
+    assert docs[0].source_id == "77"
+    assert "GitHub PR review for #42 submitted: Improve receiver" in docs[0].content
+    assert "Review state: approved" in docs[0].content
+    assert "Looks solid." in docs[0].content
+
+
+def test_github_receiver_parses_push_payload_into_commit_batch_summary() -> None:
+    receiver = GitHubReceiver()
+
+    payload = {
+        "event": "push",
+        "ref": "refs/heads/main",
+        "after": "abc1234567",
+        "repository": {"full_name": "voidrot/waygate"},
+        "commits": [
+            {
+                "id": "abc1234567",
+                "message": "Add webhook validation",
+                "added": ["apps/receiver/src/receiver/api/webhooks.py"],
+                "modified": ["README.md"],
+                "removed": [],
+            },
+            {
+                "id": "def7654321",
+                "message": "Add tests",
+                "added": [],
+                "modified": ["apps/receiver/tests/test_webhooks_api.py"],
+                "removed": [],
+            },
+        ],
+    }
+
+    docs = receiver.handle_webhook(payload)
+
+    assert "GitHub push to voidrot/waygate on main" in docs[0].content
+    assert "Commit count: 2" in docs[0].content
+    assert "- abc1234 Add webhook validation" in docs[0].content
+    assert "- def7654 Add tests" in docs[0].content
+    assert "Changed files:" in docs[0].content
+    assert "apps/receiver/src/receiver/api/webhooks.py" in docs[0].content
+
+
+def test_github_receiver_rejects_invalid_signature(monkeypatch) -> None:
+    monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "secret")
+    receiver = GitHubReceiver()
+
+    with pytest.raises(WebhookVerificationError, match="Invalid GitHub webhook signature"):
+        receiver.verify_webhook_request(
+            {"x-hub-signature-256": "sha256=bad"},
+            b"{}",
+        )
+
+
+def test_github_receiver_accepts_valid_signature(monkeypatch) -> None:
+    monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "secret")
+    receiver = GitHubReceiver()
+
+    body = b'{"event":"issues"}'
+    signature = "sha256=" + hmac.new(b"secret", body, hashlib.sha256).hexdigest()
+
+    receiver.verify_webhook_request(
+        {"x-hub-signature-256": signature},
+        body,
+    )
+
+
+def test_github_receiver_prepares_payload_from_headers() -> None:
+    receiver = GitHubReceiver()
+
+    payload = receiver.prepare_webhook_payload(
+        {"action": "opened"},
+        {
+            "x-github-event": "issues",
+            "x-github-delivery": "delivery-1",
+        },
+    )
+
+    assert payload["event"] == "issues"
+    assert payload["delivery_id"] == "delivery-1"
