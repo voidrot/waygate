@@ -3,6 +3,9 @@
 This document defines the first retrieval contract for WayGate's live markdown
 documents and serves as the design anchor for Epic #6 issue #30.
 
+For future hybrid-search planning beyond this first lexical contract, see
+`docs/hybrid_retrieval_plan.md`.
+
 ## Scope
 
 The first implementation targets filesystem-backed live markdown documents with

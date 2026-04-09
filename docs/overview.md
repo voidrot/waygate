@@ -25,6 +25,11 @@ Explicitly out of scope for this milestone:
 - Non-lexical search backends such as vector indexes or LLM re-ranking adapters.
 - Broader cryptographic provenance systems beyond current hash + lineage fields.
 
+Roadmap anchors:
+
+- Future hybrid retrieval planning is captured in `docs/hybrid_retrieval_plan.md`.
+- Future graph-overlay planning is captured in `docs/graph_overlay_plan.md`.
+
 Entry points and configuration
 
 - `compose.yml`: simple compose file used for local services. See [compose.yml](compose.yml).
