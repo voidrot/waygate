@@ -72,8 +72,9 @@ def test_graph_escalates_after_three_rejections(monkeypatch) -> None:
     def fake_human_review(_state: GraphState) -> dict:
         calls["human_review"] += 1
         return {
-            "status": "escalated",
+            "status": "awaiting_human_review",
             "staging_uri": "file:///tmp/staging/escalated.md",
+            "human_review_uri": "meta/human-review/review-1",
         }
 
     monkeypatch.setattr(graph, "draft_node", fake_draft)
@@ -83,6 +84,7 @@ def test_graph_escalates_after_three_rejections(monkeypatch) -> None:
     app = graph.build_graph()
     final_state = app.invoke(_base_state())
 
-    assert final_state["status"] == "escalated"
+    assert final_state["status"] == "awaiting_human_review"
     assert final_state["staging_uri"].startswith("file:///tmp/staging/")
+    assert final_state["human_review_uri"].startswith("meta/human-review/")
     assert calls == {"draft": 3, "review": 3, "human_review": 1}

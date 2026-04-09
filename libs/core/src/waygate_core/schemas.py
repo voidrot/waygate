@@ -45,6 +45,8 @@ class AuditEventType(StrEnum):
     COMPILER_NODE_COMPLETED = "compiler_node_completed"
     COMPILER_PUBLISH_COMPLETED = "compiler_publish_completed"
     COMPILER_HUMAN_REVIEW_ESCALATED = "compiler_human_review_escalated"
+    COMPILER_HUMAN_REVIEW_FEEDBACK_RECORDED = "compiler_human_review_feedback_recorded"
+    COMPILER_HUMAN_REVIEW_RESUMED = "compiler_human_review_resumed"
     MCP_RETRIEVAL_REQUESTED = "mcp_retrieval_requested"
 
 
