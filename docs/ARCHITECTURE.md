@@ -12,7 +12,10 @@ Implemented now:
 - Publish promotes provenance fields from raw metadata into live frontmatter (`lineage`, `sources`, aggregated `tags`).
 - First-party GitHub and Slack receiver plugins parse webhook payloads into canonical document records.
 - `libs/agent_sdk` loads live markdown documents, applies retrieval-scope visibility filtering, performs deterministic lexical scoring, and assembles token-budgeted briefings.
-- `apps/mcp_server` exposes the SDK through FastMCP with `generate_briefing` and `preview_retrieval`, a health endpoint, and optional static bearer auth.
+- `apps/mcp_server` exposes the SDK through FastMCP with `generate_briefing`, `preview_retrieval`, and `report_context_error`, a health endpoint, optional static bearer auth, and server-side scope clamping against configured visibility allowlists.
+- Durable audit and maintenance artifacts are persisted under storage-managed `meta/audit` and `meta/maintenance` namespaces.
+- Maintenance routines can detect stale compilations, orphan lineage, and explicit context errors, replay recompilation signals, and archive orphaned live documents in place.
+- Optional OpenTelemetry spans now cover receiver handoff, compiler worker and node execution, MCP service operations, and maintenance sweep/remediation flows.
 
 Not implemented in this milestone (explicitly out of scope):
 
@@ -64,7 +67,7 @@ Provenance Pipeline: source_type, source_url, source_hash, and tags are extracte
 
 Execution Pipeline: status, last_compiled, and lineage are dynamically managed by the LangGraph Compiler worker during the synthesis loop.
 
-Security Pipeline: visibility is currently enforced inside the retrieval SDK using a caller-supplied retrieval scope, while transport auth is limited to optional static bearer middleware on the MCP server.
+Security Pipeline: visibility is enforced inside the retrieval SDK using the effective retrieval scope, while the MCP transport clamps caller-requested visibilities to the configured server allowlist and can require optional static bearer middleware.
 
 ---
 
@@ -143,10 +146,10 @@ The Markdown filesystem is the immutable source of truth; secondary indexes are 
 
 To maintain continuous parity between the `raw/` data ingestion tier and the `live/` wiki:
 
-1. **Hash-Mismatch Invalidation:** Background cron jobs compare new raw SHA-256 hashes against the dependent `live/` document `source_hash`. Mismatches trigger an automatic Recompile Task.
-2. **Chrono-Decay Sweeps:** Documents exceeding a designated TTL (based on `last_compiled`) trigger a Verification Agent. Unverified documents are downgraded to `stale_warning`.
-3. **Agentic Feedback Loop:** Agents encountering context errors issue a `report_context_error` command, flagging the document for immediate Recompile or Human Review.
-4. **Orphan Detection:** The compiler prunes the `lineage` graph. Documents pointing to missing raw sources are marked `archived` with a deprecation warning prepended to the Markdown.
+1. **Hash-Mismatch Invalidation:** Maintenance findings persist durable hash-mismatch artifacts that can drive recompilation handoff.
+2. **Chrono-Decay Sweeps:** The maintenance command can detect stale live documents from `last_compiled` age and persist actionable findings.
+3. **Agentic Feedback Loop:** Downstream callers can issue `report_context_error`, which persists a durable maintenance artifact and can embed a recompilation signal when lineage anchors are present.
+4. **Orphan Detection:** Orphan-lineage live documents can be archived in place, switching status to `archived` and prepending a deprecation warning.
 
 ---
 
@@ -163,7 +166,7 @@ To prevent downstream agents from exhausting token limits reading granular micro
 
 Asynchronous, multi-agent workflows are highly susceptible to silent failures. WayGate requires a robust observability layer to trace the lifecycle of a document from raw webhook to compiled wiki.
 
-- **OpenTelemetry (OTel) Backbone:** The current implementation now exposes an optional OTel helper in `libs/core`. When `OTEL_ENABLED=true`, the receiver configures tracing at startup and emits spans around scheduled polling and queue enqueue, while the compiler emits spans around worker execution and node wrappers. The existing application-level `trace_id` remains the cross-process correlation field and is attached as a span attribute.
+- **OpenTelemetry (OTel) Backbone:** The current implementation now exposes an optional OTel helper in `libs/core`. When `OTEL_ENABLED=true`, the receiver configures tracing at startup and emits spans around scheduled polling and queue enqueue, the compiler emits spans around worker execution, node wrappers, and maintenance routines, and the MCP server emits spans around startup and service operations. The existing application-level `trace_id` remains the cross-process correlation field and is attached as a span attribute.
 - **No-op by default:** Local development remains dependency-light in behavior even though the packages are present; if `OTEL_ENABLED` is unset or false, the tracing helper does not configure a provider and span calls are effectively no-op.
 - **LangGraph Auditing (LangSmith / Langfuse):** Hosted LLM-observability vendors remain optional follow-on integrations. This first wave stops at the OTel seam plus durable audit artifacts rather than introducing a vendor lock-in path.
 
@@ -193,8 +196,9 @@ The internal "Hermes Quality Gate" (Section 4\) handles real-time draft reviews,
 
 Current behavior:
 
-- **Retrieval-layer visibility enforcement:** The SDK accepts a caller-supplied `RetrievalScope` and removes documents whose `visibility` is not allowed before ranking or briefing assembly.
+- **Retrieval-layer visibility enforcement:** The SDK removes documents whose `visibility` is not allowed by the effective retrieval scope before ranking or briefing assembly.
 - **Optional transport auth:** The FastMCP service can require a static bearer token via `MCP_AUTH_ENABLED` and `MCP_AUTH_TOKEN`.
+- **Server-side scope mapping:** When MCP default scope is configured, the transport preserves the configured role and clamps caller-requested visibilities to the server allowlist instead of trusting request payloads.
 - **Hard block:** Documents outside the allowed visibility set never enter the ranked result set or final briefing payload.
 
 Future work:

@@ -12,7 +12,10 @@ Implemented now:
 - Compiler publish promotes provenance from raw metadata into live frontmatter: lineage from raw `doc_id`, sources from raw `source_url` (with URI fallback), and aggregated tags.
 - Receiver trigger now passes structured raw metadata into compiler graph state for draft/review/publish usage.
 - The retrieval SDK now loads live markdown, applies caller-supplied visibility policy, performs deterministic lexical ranking, and assembles token-budgeted briefing payloads.
-- The MCP app exposes that SDK through FastMCP with briefing and retrieval-preview tools.
+- The MCP app exposes that SDK through FastMCP with briefing, retrieval-preview, and context-error-reporting tools, while clamping caller-requested visibilities to the configured server allowlist when a default scope is configured.
+- Storage providers persist durable audit artifacts and maintenance findings through `meta/audit` and `meta/maintenance` namespaces.
+- Maintenance flows can replay recompilation signals from persisted findings and archive orphan-lineage live documents in place.
+- Optional tracing spans now cover receiver enqueue, compiler worker/node execution, MCP service operations, and maintenance sweep/remediation flows.
 
 Out of scope for this milestone:
 
@@ -73,7 +76,7 @@ A core set of metadata fields is required for all documents to ensure interopera
 - `last_compiled` (`ISO 8601`, compiler): used by chrono-decay sweeps to flag stale documents.
 - `lineage` (`Array`, compiler): recursive `doc_id` links for mapping document ancestry.
 
-The visibility field is currently enforced inside the retrieval layer through a caller-supplied scope of allowed visibilities, preventing sensitive documents from entering the ranking or final briefing output. The source\_hash field ensures that the system is self-healing; when a query is performed, the system can compare the current raw file hash against the hash recorded at the time of synthesis to identify stale or invalid claims.1
+The visibility field is enforced inside the retrieval layer through the effective retrieval scope, preventing sensitive documents from entering the ranking or final briefing output. At the MCP boundary, caller-requested visibilities are treated as advisory and clamped to the configured server allowlist when present. The source\_hash field ensures that the system is self-healing; when maintenance runs, it can compare current raw metadata against the hash recorded at the time of synthesis to identify stale or invalid claims.1
 
 ## **Source-Specific Metadata Enrichment Strategies**
 
@@ -170,15 +173,15 @@ By maintaining the Markdown files as the "source of truth" on the local filesyst
 
 ## **Autonomous Maintenance and Self-Healing Knowledge**
 
-A central tenet of the GAR pattern is that the LLM is responsible for the "disciplined maintenance" of the wiki, a task that often involves periodic "linting" passes to ensure health and consistency.2 These health checks scan the knowledge base for several critical issues that could degrade the quality of the retrieved context.4
+A central tenet of the GAR pattern is that the LLM is responsible for the "disciplined maintenance" of the wiki, a task that often involves periodic "linting" passes to ensure health and consistency.2 In the current repository, those health checks already persist maintenance artifacts for several critical issues that could degrade the quality of the retrieved context.4
 
 ### **Linting for Contradictions and Staleness**
 
-As new sources—such as updated Slack threads or new GitHub commits—are ingested, they may contradict existing articles in the wiki.1 The linting pass identifies these discrepancies, noting where new data challenges the evolving synthesis and flagging those articles for human or autonomous review.1 Similarly, the system identifies "stale claims" that have been superseded by more recent documentation.1
+As new sources—such as updated Slack threads or new GitHub commits—are ingested, they may contradict existing articles in the wiki.1 The maintenance sweep identifies these discrepancies as durable findings, noting where new data challenges the evolving synthesis and flagging those articles for recompilation or human review.1 Similarly, the system identifies stale compilations and orphan lineage through persisted maintenance artifacts rather than plain logs.1
 
 ### **Identification of Knowledge Gaps**
 
-A sophisticated GAR system is capable of detecting when its current knowledge is insufficient to answer a specific query.3 During a briefing generation, if the engine identifies a "context gap," it can asynchronously dispatch a Research Agent to find the missing data in the raw/ sources or perform a web search.3 This researcher then updates the wiki and returns the new information to the main agent loop, creating a self-expanding intelligence layer.3
+A sophisticated GAR system is capable of detecting when its current knowledge is insufficient to answer a specific query.3 In the current repository, downstream callers can persist a durable `report_context_error` artifact through the MCP boundary; when lineage anchors are available, that artifact also carries a recompilation signal the maintenance sweep can replay into the compiler queue.3 Future research-agent automation can build on top of that durable gap-reporting path.
 
 ## **Governance, Security, and Consensus**
 
