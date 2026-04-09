@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from typing import cast
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +10,9 @@ from pydantic import BaseModel, Field
 class RuntimeSettings(BaseModel):
     storage_provider: str = Field(default="local")
     local_storage_path: str = Field(default="wiki")
+    runtime_settings_backend: str = Field(default="env")
+    runtime_settings_namespace: str = Field(default="runtime")
+    postgres_dsn: str | None = Field(default=None)
 
     redis_url: str = Field(default="redis://localhost:6379/0")
     draft_queue_name: str = Field(default="draft_tasks")
@@ -43,6 +47,11 @@ def _load_runtime_env() -> dict[str, object]:
     return {
         "storage_provider": os.getenv("STORAGE_PROVIDER", "local"),
         "local_storage_path": os.getenv("LOCAL_STORAGE_PATH", "wiki"),
+        "runtime_settings_backend": os.getenv("RUNTIME_SETTINGS_BACKEND", "env"),
+        "runtime_settings_namespace": os.getenv(
+            "RUNTIME_SETTINGS_NAMESPACE", "runtime"
+        ),
+        "postgres_dsn": os.getenv("POSTGRES_DSN"),
         "redis_url": os.getenv("REDIS_URL", "redis://localhost:6379/0"),
         "draft_queue_name": os.getenv("DRAFT_QUEUE_NAME", "draft_tasks"),
         "draft_llm_provider": os.getenv("DRAFT_LLM_PROVIDER", "ollama"),
@@ -65,9 +74,47 @@ def _load_runtime_env() -> dict[str, object]:
     }
 
 
+def load_settings_namespace(
+    backend: str,
+    postgres_dsn: str | None,
+    namespace: str,
+) -> dict[str, object]:
+    normalized_backend = backend.lower().strip()
+    if normalized_backend == "env":
+        return {}
+    if normalized_backend != "postgres":
+        raise ValueError("RUNTIME_SETTINGS_BACKEND must be one of: env, postgres")
+    if not postgres_dsn:
+        raise ValueError(
+            "POSTGRES_DSN must be set when RUNTIME_SETTINGS_BACKEND=postgres"
+        )
+
+    from waygate_core.settings_store import PostgresSettingsStore
+
+    store = PostgresSettingsStore(postgres_dsn)
+    return store.get_namespace(namespace)
+
+
 @lru_cache(maxsize=1)
 def get_runtime_settings() -> RuntimeSettings:
-    return RuntimeSettings.model_validate(_load_runtime_env())
+    env_settings = _load_runtime_env()
+    database_settings = load_settings_namespace(
+        str(env_settings["runtime_settings_backend"]),
+        cast(str | None, env_settings["postgres_dsn"]),
+        str(env_settings["runtime_settings_namespace"]),
+    )
+
+    bootstrap_fields = {
+        "runtime_settings_backend",
+        "runtime_settings_namespace",
+        "postgres_dsn",
+    }
+    merged_settings = dict(env_settings)
+    for key, value in database_settings.items():
+        if key in RuntimeSettings.model_fields and key not in bootstrap_fields:
+            merged_settings[key] = value
+
+    return RuntimeSettings.model_validate(merged_settings)
 
 
 def reload_runtime_settings() -> RuntimeSettings:

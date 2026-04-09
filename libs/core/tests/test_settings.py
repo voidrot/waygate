@@ -1,10 +1,16 @@
+import pytest
+
 from waygate_core.schemas import Visibility
+from waygate_core import settings as settings_module
 from waygate_core.settings import reload_runtime_settings
 
 
 def test_runtime_settings_defaults(monkeypatch) -> None:
     monkeypatch.delenv("STORAGE_PROVIDER", raising=False)
     monkeypatch.delenv("LOCAL_STORAGE_PATH", raising=False)
+    monkeypatch.delenv("RUNTIME_SETTINGS_BACKEND", raising=False)
+    monkeypatch.delenv("RUNTIME_SETTINGS_NAMESPACE", raising=False)
+    monkeypatch.delenv("POSTGRES_DSN", raising=False)
     monkeypatch.delenv("REDIS_URL", raising=False)
     monkeypatch.delenv("DRAFT_QUEUE_NAME", raising=False)
     monkeypatch.delenv("DRAFT_LLM_PROVIDER", raising=False)
@@ -26,6 +32,9 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
 
     assert settings.storage_provider == "local"
     assert settings.local_storage_path == "wiki"
+    assert settings.runtime_settings_backend == "env"
+    assert settings.runtime_settings_namespace == "runtime"
+    assert settings.postgres_dsn is None
     assert settings.redis_url == "redis://localhost:6379/0"
     assert settings.draft_queue_name == "draft_tasks"
     assert settings.draft_llm_provider == "ollama"
@@ -50,6 +59,11 @@ def test_runtime_settings_defaults(monkeypatch) -> None:
 def test_runtime_settings_overrides(monkeypatch) -> None:
     monkeypatch.setenv("STORAGE_PROVIDER", "s3")
     monkeypatch.setenv("LOCAL_STORAGE_PATH", "/tmp/waygate")
+    monkeypatch.setenv("RUNTIME_SETTINGS_BACKEND", "env")
+    monkeypatch.setenv("RUNTIME_SETTINGS_NAMESPACE", "runtime")
+    monkeypatch.setenv(
+        "POSTGRES_DSN", "postgresql://waygate:waygate@localhost:5432/waygate"
+    )
     monkeypatch.setenv("REDIS_URL", "redis://example:6380/4")
     monkeypatch.setenv("DRAFT_QUEUE_NAME", "compile")
     monkeypatch.setenv("DRAFT_LLM_PROVIDER", "test-provider")
@@ -71,6 +85,11 @@ def test_runtime_settings_overrides(monkeypatch) -> None:
 
     assert settings.storage_provider == "s3"
     assert settings.local_storage_path == "/tmp/waygate"
+    assert settings.runtime_settings_backend == "env"
+    assert settings.runtime_settings_namespace == "runtime"
+    assert (
+        settings.postgres_dsn == "postgresql://waygate:waygate@localhost:5432/waygate"
+    )
     assert settings.redis_url == "redis://example:6380/4"
     assert settings.draft_queue_name == "compile"
     assert settings.draft_llm_provider == "test-provider"
@@ -95,3 +114,40 @@ def test_runtime_settings_reload_is_stable(monkeypatch) -> None:
     second = reload_runtime_settings()
 
     assert first.redis_url == second.redis_url == "redis://example:6380/4"
+
+
+def test_runtime_settings_can_load_postgres_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("RUNTIME_SETTINGS_BACKEND", "postgres")
+    monkeypatch.setenv(
+        "POSTGRES_DSN", "postgresql://waygate:waygate@localhost:5432/waygate"
+    )
+    monkeypatch.setenv("RUNTIME_SETTINGS_NAMESPACE", "runtime")
+    monkeypatch.setenv("REDIS_URL", "redis://env:6379/0")
+
+    monkeypatch.setattr(
+        settings_module,
+        "load_settings_namespace",
+        lambda backend, postgres_dsn, namespace: {
+            "redis_url": "redis://db:6379/2",
+            "draft_queue_name": "db-queue",
+            "mcp_allowed_visibilities": ["public"],
+        },
+    )
+
+    settings = reload_runtime_settings()
+
+    assert settings.runtime_settings_backend == "postgres"
+    assert settings.redis_url == "redis://db:6379/2"
+    assert settings.draft_queue_name == "db-queue"
+    assert settings.mcp_allowed_visibilities == [Visibility.PUBLIC]
+
+
+def test_runtime_settings_postgres_backend_requires_dsn(monkeypatch) -> None:
+    monkeypatch.setenv("RUNTIME_SETTINGS_BACKEND", "postgres")
+    monkeypatch.delenv("POSTGRES_DSN", raising=False)
+
+    with pytest.raises(
+        ValueError,
+        match="POSTGRES_DSN must be set when RUNTIME_SETTINGS_BACKEND=postgres",
+    ):
+        reload_runtime_settings()

@@ -32,6 +32,7 @@ Current implementation snapshot (April 2026)
 - The MCP boundary can now persist explicit context-gap reports as durable maintenance artifacts when downstream callers detect missing or insufficient wiki context, and lineage-backed reports can be replayed into the compiler queue.
 - The maintenance sweep can now archive orphan-lineage live documents in place, downgrading them to `archived` and prepending a deprecation notice.
 - Optional OpenTelemetry tracing can now wrap receiver polling/enqueue, compiler worker/node execution, MCP service calls, and maintenance sweep/remediation flows, while remaining disabled by default for local development.
+- Runtime settings can now be sourced either directly from environment variables or, when explicitly enabled, from a Postgres-backed settings table while documents remain in markdown storage.
 
 Out of scope (current milestone)
 
@@ -52,6 +53,8 @@ Quickstart (development)
 ```bash
 docker compose -f compose.yml up -d
 ```
+
+This now starts both Valkey and Postgres. Use `POSTGRES_DSN=postgresql://waygate:waygate@localhost:5432/waygate` when enabling database-backed runtime settings.
 
 1. Exercise the receiver with example payloads from `tests.rest` or run individual packages via your workspace tooling.
 
