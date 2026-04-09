@@ -48,7 +48,9 @@ async def test_trace_id_survives_receiver_enqueue_into_compiler_worker(
     monkeypatch.setattr(trigger, "storage", shared_storage)
     monkeypatch.setattr(trigger, "draft_queue", fake_queue)
     monkeypatch.setattr(worker, "storage", shared_storage)
-    monkeypatch.setattr(middleware, "_emit_audit_event", shared_storage.write_audit_event)
+    monkeypatch.setattr(
+        middleware, "_emit_audit_event", shared_storage.write_audit_event
+    )
     monkeypatch.setattr(worker, "configure_tracing", lambda _service_name: None)
 
     @contextmanager
@@ -115,12 +117,15 @@ async def test_trace_id_survives_receiver_enqueue_into_compiler_worker(
         for name, attributes in span_calls
         if not name.startswith("waygate.")
     }
-    assert named_spans["receiver.enqueue_documents"]["waygate.trace_id"] == initial_state[
-        "trace_id"
-    ]
-    assert named_spans["compiler.execute_graph"]["waygate.trace_id"] == initial_state[
-        "trace_id"
-    ]
-    assert named_spans["compiler.node.draft"]["waygate.trace_id"] == initial_state[
-        "trace_id"
-    ]
+    assert (
+        named_spans["receiver.enqueue_documents"]["waygate.trace_id"]
+        == initial_state["trace_id"]
+    )
+    assert (
+        named_spans["compiler.execute_graph"]["waygate.trace_id"]
+        == initial_state["trace_id"]
+    )
+    assert (
+        named_spans["compiler.node.draft"]["waygate.trace_id"]
+        == initial_state["trace_id"]
+    )

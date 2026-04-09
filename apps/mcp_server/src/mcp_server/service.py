@@ -114,13 +114,9 @@ class BriefingService:
                 allowed_visibilities=request_allowed_visibilities,
             )
 
-        allowed_values = {
-            str(item) for item in self.default_scope.allowed_visibilities
-        }
+        allowed_values = {str(item) for item in self.default_scope.allowed_visibilities}
         effective_allowed_visibilities = [
-            item
-            for item in request_allowed_visibilities
-            if str(item) in allowed_values
+            item for item in request_allowed_visibilities if str(item) in allowed_values
         ]
         return RetrievalScope(
             role=(

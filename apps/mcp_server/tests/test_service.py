@@ -269,7 +269,9 @@ def test_report_context_error_persists_maintenance_finding() -> None:
     )
 
 
-def test_report_context_error_clamps_requested_visibilities_to_server_allowlist() -> None:
+def test_report_context_error_clamps_requested_visibilities_to_server_allowlist() -> (
+    None
+):
     repository = FakeRepository()
     meta_storage = FakeAuditStorage()
     service = BriefingService(
