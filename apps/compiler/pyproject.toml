@@ -19,6 +19,7 @@
 
     [project.scripts]
         waygate-maintenance-sweep = "compiler.maintenance:main"
+        waygate-compiler-eval = "compiler.evaluation:main"
 
 [tool.uv.sources]
     waygate_core                   = { workspace = true }
