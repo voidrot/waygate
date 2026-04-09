@@ -88,3 +88,56 @@ def test_write_evaluation_report_and_candidate_outputs(tmp_path) -> None:
     assert len(output_paths) == len(summary.results)
     assert all(path.exists() for path in output_paths)
     assert output_paths[0].read_text(encoding="utf-8").startswith("# ")
+
+
+def test_main_writes_report_and_candidates(monkeypatch, tmp_path, capsys) -> None:
+    dataset = evaluation.load_golden_dataset()
+
+    monkeypatch.setattr(
+        evaluation,
+        "_build_live_candidate_runner",
+        lambda _provider, _model: lambda case: case.expected_output,
+    )
+
+    report_path = tmp_path / "artifacts" / "eval.json"
+    candidates_dir = tmp_path / "artifacts" / "candidates"
+
+    exit_code = evaluation.main(
+        [
+            "--dataset",
+            str(evaluation.DEFAULT_GOLDEN_DATASET_PATH),
+            "--report-path",
+            str(report_path),
+            "--write-candidates-dir",
+            str(candidates_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert '"passed": true' in captured.out
+    assert report_path.exists()
+    assert len(list(candidates_dir.glob("*.md"))) == len(dataset.cases)
+
+
+def test_main_returns_nonzero_for_regression(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        evaluation,
+        "_build_live_candidate_runner",
+        lambda _provider, _model: (
+            lambda _case: (
+                "Certainly! Here is the summary.\nNo relevant markdown sections."
+            )
+        ),
+    )
+
+    exit_code = evaluation.main(
+        [
+            "--dataset",
+            str(evaluation.DEFAULT_GOLDEN_DATASET_PATH),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert '"passed": false' in captured.out
