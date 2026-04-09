@@ -32,6 +32,7 @@ Roadmap anchors:
 - Future missing-context loop planning is captured in `docs/missing_context_loop_plan.md`.
 - Future structured-consensus planning is captured in `docs/structured_consensus_plan.md`.
 - Future cryptographic provenance evaluation is captured in `docs/cryptographic_provenance_plan.md`.
+- Future thematic synthesis planning is captured in `docs/thematic_synthesis_plan.md`.
 
 Entry points and configuration
 
