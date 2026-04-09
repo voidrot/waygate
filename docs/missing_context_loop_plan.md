@@ -81,6 +81,10 @@ The missing-context loop depends on the retrieval and graph roadmap defined in i
 - The classifier should distinguish between a retrieval miss and a true source-coverage gap.
 - Graph traversal should be attempted before dispatching external research when the current corpus likely contains adjacent evidence.
 
+The adjacent compiler-side consensus roadmap is documented in
+`docs/structured_consensus_plan.md` so disagreement can be separated from true
+knowledge gaps.
+
 ## Receiver And Compiler Integration
 
 Future research results should re-enter the system through the same ingest-to-compile contract used today.
