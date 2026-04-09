@@ -9,6 +9,7 @@ This `docs/` folder holds an overview and module pages for the WayGate repositor
 - Retrieval model: `retrieval_model.md`
 - Hybrid retrieval roadmap: `hybrid_retrieval_plan.md`
 - Graph overlay roadmap: `graph_overlay_plan.md`
+- Missing-context loop roadmap: `missing_context_loop_plan.md`
 - Setup and developer guide: `setup.md`, `developer_guide.md`
 
 Open the files below to quickly navigate to source links and short summaries of each component.

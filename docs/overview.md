@@ -29,6 +29,7 @@ Roadmap anchors:
 
 - Future hybrid retrieval planning is captured in `docs/hybrid_retrieval_plan.md`.
 - Future graph-overlay planning is captured in `docs/graph_overlay_plan.md`.
+- Future missing-context loop planning is captured in `docs/missing_context_loop_plan.md`.
 
 Entry points and configuration
 

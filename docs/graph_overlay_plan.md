@@ -116,6 +116,9 @@ The graph overlay depends on the hybrid-search boundary from issue `#44`, but it
 - Future BM25 or vector candidates can feed the same traversal adapter.
 - Graph traversal should remain orthogonal to future semantic search adapters.
 
+The follow-on missing-context loop that should consume this traversal boundary is
+documented in `docs/missing_context_loop_plan.md`.
+
 ## Operational Model
 
 The graph projection should behave like other secondary indexes.
