@@ -98,6 +98,9 @@ The thematic worker exists partly to reduce retrieval pressure for broad questio
 - contradiction summaries can become high-value context for topics with unstable or disputed knowledge
 - the retrieval contract itself should remain unchanged; preference logic can be layered later
 
+The downstream human-facing publishing path that should eventually render these
+documents is documented in `docs/static_site_publishing_plan.md`.
+
 ## Suggested Execution Model
 
 Recommended trigger patterns for later implementation:

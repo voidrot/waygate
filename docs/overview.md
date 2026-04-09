@@ -33,6 +33,7 @@ Roadmap anchors:
 - Future structured-consensus planning is captured in `docs/structured_consensus_plan.md`.
 - Future cryptographic provenance evaluation is captured in `docs/cryptographic_provenance_plan.md`.
 - Future thematic synthesis planning is captured in `docs/thematic_synthesis_plan.md`.
+- Future static-site publishing planning is captured in `docs/static_site_publishing_plan.md`.
 
 Entry points and configuration
 
