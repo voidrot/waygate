@@ -98,6 +98,9 @@ Recommended initial rendering rules:
 
 The operator-facing view model for richer lineage and provenance display belongs to issue `#46` and should refine this baseline later.
 
+That operator-facing metadata contract is documented in
+`docs/operator_metadata_view_plan.md`.
+
 ## Relationship To Thematic Synthesis
 
 Thematic documents should be first-class site content once they exist.

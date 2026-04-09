@@ -14,6 +14,7 @@ This `docs/` folder holds an overview and module pages for the WayGate repositor
 - Cryptographic provenance roadmap: `cryptographic_provenance_plan.md`
 - Thematic synthesis roadmap: `thematic_synthesis_plan.md`
 - Static-site publishing roadmap: `static_site_publishing_plan.md`
+- Operator metadata view roadmap: `operator_metadata_view_plan.md`
 - Setup and developer guide: `setup.md`, `developer_guide.md`
 
 Open the files below to quickly navigate to source links and short summaries of each component.
