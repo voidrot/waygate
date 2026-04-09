@@ -76,6 +76,7 @@ class EvaluationSummary(BaseModel):
     total_cases: int
     passed_cases: int
     failed_cases: int
+    average_metrics: EvaluationMetrics
     results: list[EvaluationCaseResult]
 
 
@@ -212,13 +213,47 @@ def evaluate_candidate(
     results = [evaluate_case(case, candidate_runner(case)) for case in dataset.cases]
     passed_cases = sum(1 for result in results if result.passed)
     total_cases = len(results)
+    average_metrics = EvaluationMetrics(
+        grounding=(sum(result.metrics.grounding for result in results) / total_cases),
+        relevance=(sum(result.metrics.relevance for result in results) / total_cases),
+        markdown=(sum(result.metrics.markdown for result in results) / total_cases),
+    )
     return EvaluationSummary(
         passed=passed_cases == total_cases,
         total_cases=total_cases,
         passed_cases=passed_cases,
         failed_cases=total_cases - passed_cases,
+        average_metrics=average_metrics,
         results=results,
     )
+
+
+def write_evaluation_report(
+    summary: EvaluationSummary,
+    destination: str | Path,
+) -> Path:
+    report_path = Path(destination)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(summary.model_dump(mode="json"), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return report_path
+
+
+def write_candidate_outputs(
+    summary: EvaluationSummary,
+    destination_dir: str | Path,
+) -> list[Path]:
+    base_dir = Path(destination_dir)
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    output_paths: list[Path] = []
+    for result in summary.results:
+        output_path = base_dir / f"{result.case_id}.md"
+        output_path.write_text(result.candidate_output + "\n", encoding="utf-8")
+        output_paths.append(output_path)
+    return output_paths
 
 
 def _build_state_for_case(case: GoldenCase) -> GraphState:
@@ -307,6 +342,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dataset", default=str(DEFAULT_GOLDEN_DATASET_PATH))
     parser.add_argument("--provider", default=None)
     parser.add_argument("--model", default=None)
+    parser.add_argument("--report-path", default=None)
+    parser.add_argument("--write-candidates-dir", default=None)
     args = parser.parse_args(argv)
 
     dataset = load_golden_dataset(args.dataset)
@@ -314,6 +351,11 @@ def main(argv: list[str] | None = None) -> int:
         dataset,
         _build_live_candidate_runner(args.provider, args.model),
     )
+
+    if args.report_path:
+        write_evaluation_report(summary, args.report_path)
+    if args.write_candidates_dir:
+        write_candidate_outputs(summary, args.write_candidates_dir)
 
     print(json.dumps(summary.model_dump(mode="json"), indent=2))
     return 0 if summary.passed else 1
@@ -333,4 +375,6 @@ __all__ = [
     "evaluate_case",
     "load_golden_dataset",
     "main",
+    "write_candidate_outputs",
+    "write_evaluation_report",
 ]

@@ -34,6 +34,7 @@ def test_evaluate_candidate_passes_reference_outputs() -> None:
 
     assert summary.passed is True
     assert summary.failed_cases == 0
+    assert summary.average_metrics.grounding == 1.0
     assert all(result.passed for result in summary.results)
 
 
@@ -64,3 +65,26 @@ def test_build_draft_node_candidate_runs_through_draft_node() -> None:
     assert output == case.expected_output
     assert fake_llm.messages is not None
     assert case.target_topic in fake_llm.messages[0].content
+
+
+def test_write_evaluation_report_and_candidate_outputs(tmp_path) -> None:
+    dataset = evaluation.load_golden_dataset()
+    summary = evaluation.evaluate_candidate(
+        dataset,
+        lambda case: case.expected_output,
+    )
+
+    report_path = evaluation.write_evaluation_report(
+        summary,
+        tmp_path / "reports" / "eval.json",
+    )
+    output_paths = evaluation.write_candidate_outputs(
+        summary,
+        tmp_path / "candidates",
+    )
+
+    assert report_path.exists()
+    assert '"passed": true' in report_path.read_text(encoding="utf-8")
+    assert len(output_paths) == len(summary.results)
+    assert all(path.exists() for path in output_paths)
+    assert output_paths[0].read_text(encoding="utf-8").startswith("# ")

@@ -51,3 +51,7 @@ To run the harness against the current draft provider/model configuration:
 To target a different provider/model explicitly:
 
 - `uv run waygate-compiler-eval --provider ollama --model hermes3:8b`
+
+To write a CI artifact report and persist generated candidate drafts for review:
+
+- `uv run waygate-compiler-eval --report-path artifacts/compiler-eval.json --write-candidates-dir artifacts/compiler-candidates`
