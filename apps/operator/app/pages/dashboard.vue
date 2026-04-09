@@ -170,7 +170,9 @@ function initialDraftValue(setting: SettingsEntryView): DraftValue {
   return String(setting.effective_value ?? setting.default_value ?? "");
 }
 
-function buildPatchPayload(namespace: SettingsNamespaceView): Record<string, unknown> {
+function buildPatchPayload(
+  namespace: SettingsNamespaceView,
+): Record<string, unknown> {
   const values: Record<string, unknown> = {};
 
   for (const setting of namespace.settings) {
@@ -193,7 +195,11 @@ function buildPatchPayload(namespace: SettingsNamespaceView): Record<string, unk
     }
 
     if (setting.value_type === "integer") {
-      if (draftValue === "" || draftValue === undefined || draftValue === null) {
+      if (
+        draftValue === "" ||
+        draftValue === undefined ||
+        draftValue === null
+      ) {
         continue;
       }
       const numericValue =
@@ -205,19 +211,19 @@ function buildPatchPayload(namespace: SettingsNamespaceView): Record<string, unk
     }
 
     if (setting.value_type === "string_list") {
-      const items = typeof draftValue === "string"
-        ? draftValue
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean)
-        : [];
+      const items =
+        typeof draftValue === "string"
+          ? draftValue
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : [];
       values[setting.key] = items;
       continue;
     }
 
-    values[setting.key] = typeof draftValue === "string"
-      ? draftValue
-      : String(draftValue ?? "");
+    values[setting.key] =
+      typeof draftValue === "string" ? draftValue : String(draftValue ?? "");
   }
 
   return values;
@@ -362,7 +368,9 @@ async function signOut() {
       <div class="session-card stack">
         <div>
           <div class="meta-label">Signed in as</div>
-          <div class="meta-value">{{ session?.user?.email || "Unknown user" }}</div>
+          <div class="meta-value">
+            {{ session?.user?.email || "Unknown user" }}
+          </div>
         </div>
         <div>
           <div class="meta-label">Receiver namespaces</div>
@@ -414,10 +422,16 @@ async function signOut() {
         <div class="split-header">
           <div>
             <div class="meta-label">Selected namespace</div>
-            <div class="meta-value">{{ namespaceData?.title || "Waiting for selection" }}</div>
+            <div class="meta-value">
+              {{ namespaceData?.title || "Waiting for selection" }}
+            </div>
           </div>
           <div class="inline-actions">
-            <button class="ghost-button" type="button" @click="refreshNamespace()">
+            <button
+              class="ghost-button"
+              type="button"
+              @click="refreshNamespace()"
+            >
               Refresh
             </button>
             <button
@@ -432,7 +446,9 @@ async function signOut() {
         </div>
 
         <div v-if="saveError" class="banner is-error">{{ saveError }}</div>
-        <div v-if="saveMessage" class="banner is-success">{{ saveMessage }}</div>
+        <div v-if="saveMessage" class="banner is-success">
+          {{ saveMessage }}
+        </div>
 
         <div v-if="namespacePending" class="empty-state">
           Loading namespace details...
@@ -486,7 +502,11 @@ async function signOut() {
               <div class="setting-detail">
                 <div class="meta-label">Default value</div>
                 <div class="setting-detail-value">
-                  {{ setting.secret ? "Hidden" : JSON.stringify(setting.default_value) }}
+                  {{
+                    setting.secret
+                      ? "Hidden"
+                      : JSON.stringify(setting.default_value)
+                  }}
                 </div>
               </div>
             </div>
@@ -495,14 +515,21 @@ async function signOut() {
               <div v-if="setting.value_type === 'boolean'" class="field">
                 <label :for="setting.key">Value</label>
                 <label class="checkbox-row" :for="setting.key">
-                  <input :id="setting.key" v-model="draftValues[setting.key]" type="checkbox" />
+                  <input
+                    :id="setting.key"
+                    v-model="draftValues[setting.key]"
+                    type="checkbox"
+                  />
                   <span>
                     {{ draftValues[setting.key] ? "Enabled" : "Disabled" }}
                   </span>
                 </label>
               </div>
 
-              <div v-else-if="setting.value_type === 'string_list'" class="field">
+              <div
+                v-else-if="setting.value_type === 'string_list'"
+                class="field"
+              >
                 <label :for="setting.key">Comma-separated values</label>
                 <textarea
                   :id="setting.key"
@@ -524,7 +551,11 @@ async function signOut() {
                   :id="setting.key"
                   v-model="draftValues[setting.key]"
                   :type="setting.secret ? 'password' : 'text'"
-                  :placeholder="setting.secret && setting.stored ? 'Stored secret is hidden' : ''"
+                  :placeholder="
+                    setting.secret && setting.stored
+                      ? 'Stored secret is hidden'
+                      : ''
+                  "
                 />
               </div>
             </div>
@@ -537,7 +568,11 @@ async function signOut() {
                 :disabled="resettingKey === setting.key"
                 @click="resetStoredValue(setting.key)"
               >
-                {{ resettingKey === setting.key ? "Resetting..." : "Reset stored override" }}
+                {{
+                  resettingKey === setting.key
+                    ? "Resetting..."
+                    : "Reset stored override"
+                }}
               </button>
             </div>
           </article>
