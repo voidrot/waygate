@@ -1,0 +1,39 @@
+[project]
+name = "waygate-core"
+version = "0.1.0"
+description = "Core library for WayGate"
+readme = "README.md"
+authors = [
+    { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "camel-converter>=5.1.0",
+    "langchain-core>=1.2.28",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "structlog>=25.5.0",
+    "tortoise-orm[accel,asyncpg]>=1.1.7",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
+
+[build-system]
+requires      = ["uv_build>=0.11.6,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.tortoise]
+tortoise_orm = "waygate_core.database.settings.TORTOISE_ORM"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "--cov=waygate_core",
+    "--cov-report=term-missing",
+]

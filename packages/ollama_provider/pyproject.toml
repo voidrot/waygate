@@ -1,0 +1,40 @@
+[project]
+name = "waygate-plugin-ollama-provider"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "langchain-ollama>=1.1.0",
+    "ollama>=0.6.1",
+    "pydantic-settings>=2.13.1",
+    "waygate-core",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
+
+[tool.uv.sources]
+waygate-core = { workspace = true }
+
+[project.entry-points."waygate.plugins.llm"]
+ollama = "waygate_plugin_ollama_provider.plugin:OllamaProvider"
+
+[build-system]
+requires      = ["uv_build>=0.11.6,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "--cov=waygate_core",
+    "--cov-report=term-missing",
+]

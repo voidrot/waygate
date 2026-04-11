@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    env_file:
+      - .env.compose
+    environment:
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+      POSTGRES_DB: ${PG_DB:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    env_file:
+      - .env.compose
+    environment:
+      IS_PERSISTENT: TRUE
+    volumes:
+      - chromadb_data:/chroma/chroma/
+    ports:
+      - "8000:8000"
+
+  ollama:
+    image: ollama/ollama:latest
+    env_file:
+      - .env.compose
+    environment:
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-5m}
+      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-1}
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+
+  valkey:
+    image: valkey/valkey:latest
+    command: valkey-server --save 60 1 --loglevel warning
+    env_file:
+      - .env.compose
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: [ "CMD", "valkey-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  chromadb_data:
+  ollama_data:
+  valkey_data:

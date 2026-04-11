@@ -1,0 +1,41 @@
+[tools]
+prek   = "latest"
+python = "3.14"
+uv     = "latest"
+
+[env]
+_.file        = '.env'
+_.python.venv = { path = '.venv', create = false }
+
+[tasks."uv:sync"]
+run = "uv sync --all-groups --all-extras --all-packages"
+
+[tasks.test]
+run = "uv run pytest"
+
+[tasks."test:quick"]
+run = "uv run pytest -q"
+
+[tasks."test:core"]
+run = "uv run pytest packages/core/tests"
+
+[tasks."test:api"]
+run = "uv run pytest apps/api/tests"
+
+[tasks."docker:up"]
+run = "docker compose up -d"
+
+[tasks."docker:down"]
+run = "docker compose down"
+
+[tasks."ollama:pull"]
+run = [
+    "docker compose exec ollama ollama pull ${DRAFT_MODEL}",
+    "docker compose exec ollama ollama pull ${REVIEW_MODEL}",
+]
+depends = "docker:up"
+
+[tasks."dev:api"]
+description = "Run the API server with hot reload"
+dir         = "{{ config_root }}/apps/api"
+run         = "fastapi dev --port 8080 --reload"
