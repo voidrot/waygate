@@ -1,7 +1,9 @@
-from typing import List, NotRequired, Optional, TypedDict
+from typing import List, Optional
+from dataclasses import dataclass
 
 
-class GraphState(TypedDict):
+@dataclass
+class GraphState:
     """
     State of the compiler graph.
     """
@@ -12,10 +14,10 @@ class GraphState(TypedDict):
     new_document_uris: List[str]
     raw_documents_metadata: List[dict]
     target_topic: str
-    document_type: NotRequired[str]
     current_draft: Optional[str]
     review_feedback: Optional[str]
     staging_uri: Optional[str]
-    human_review_uri: NotRequired[str | None]
     revision_count: int
     status: str
+    document_type: Optional[str] = None
+    human_review_uri: Optional[str | None] = None

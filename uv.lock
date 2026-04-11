@@ -1577,6 +1577,7 @@ source = { editable = "packages/core" }
 dependencies = [
     { name = "camel-converter" },
     { name = "langchain-core" },
+    { name = "langgraph" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "structlog" },
@@ -1593,6 +1594,7 @@ dev = [
 requires-dist = [
     { name = "camel-converter", specifier = ">=5.1.0" },
     { name = "langchain-core", specifier = ">=1.2.28" },
+    { name = "langgraph", specifier = ">=1.1.6" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "structlog", specifier = ">=25.5.0" },
