@@ -64,8 +64,34 @@ services:
       timeout: 5s
       retries: 5
 
+  mqtt:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    env_file:
+      - .env.compose
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto_config/:/mosquitto/config/
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+
+  mqtt-explorer:
+    image: ghcr.io/thomasnordquist/mqtt-explorer:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - MQTT_EXPLORER_USERNAME=admin
+      - MQTT_EXPLORER_PASSWORD=password
+      - PORT=3000
+    volumes:
+      - mqtt-explorer-data:/app/data
+
 volumes:
   postgres_data:
   chromadb_data:
   ollama_data:
   valkey_data:
+  mqtt_data:
+  mqtt_log:
+  mqtt-explorer-data:

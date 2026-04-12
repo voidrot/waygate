@@ -1,0 +1,20 @@
+### Generic Webhook Receiver Plugin
+POST http://localhost:8080/webhooks/generic-webhook
+Content-Type: application/json
+
+{
+  "metadata": {
+    "event": "document.created",
+    "source": "waygate-core",
+    "topics": ["waygate", "plugin"],
+    "originated_at": "2026-04-11T00:00:00.000Z"
+  },
+  "documents": [
+    {
+      "document_type": "text",
+      "document_name": "plugin_base.py",
+      "document_path": "libs/core/src/waygate_core/plugin_base.py",
+      "content": "from abc import ABC\n\nclass WayGatePluginBase(ABC): ..."
+    }
+  ]
+}

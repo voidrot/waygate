@@ -1,9 +1,9 @@
-from .raw_document import RawDocument
+from .document import RawDocument
 from .graph_state import GraphState
-from .visibility import Visibility
+from .frontmatter import RawDocumentFrontmatter
 
 __all__ = [
     "RawDocument",
     "GraphState",
-    "Visibility",
+    "RawDocumentFrontmatter",
 ]

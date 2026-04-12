@@ -35,6 +35,6 @@ addopts = [
     "-ra",
     "--strict-config",
     "--strict-markers",
-    "--cov=waygate_core",
+    "--cov=waygate_plugin_ollama_provider",
     "--cov-report=term-missing",
 ]

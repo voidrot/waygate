@@ -22,6 +22,13 @@ class CoreSettings(BaseSettings):
         DEFAULT_REDIS_DSN, validation_alias=AliasChoices("redis_url")
     )
 
+    mqtt_host: str = Field(default="localhost")
+    mqtt_port: int = Field(default=1883)
+
+    mqtt_draft_topic: str = Field(default="waygate/drafts")
+
     draft_queue_name: str = Field(default="draft_queue")
+
+    storage_plugin_name: str = Field(default="local-storage")
 
     model_config = SettingsConfigDict(env_prefix="waygate_")

@@ -30,6 +30,6 @@ addopts = [
     "-ra",
     "--strict-config",
     "--strict-markers",
-    "--cov=waygate_core",
+    "--cov=waygate_plugin_local_storage",
     "--cov-report=term-missing",
 ]

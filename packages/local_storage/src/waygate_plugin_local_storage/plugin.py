@@ -1,5 +1,6 @@
-from typing import Iterable
-from waygate_core.schema import RawDocument
+from waygate_core.plugin.storage_base import (
+    StorageNamespace,
+)
 from pathlib import Path
 from pydantic import Field
 from . import __version__
@@ -44,11 +45,11 @@ class LocalStorageConfig(BaseSettings):
         description="Directory for agent files within the base path.",
     )
     soft_delete: bool = Field(
-        default=True,
+        default=False,
         description="Whether to use soft delete (move to a deleted directory) instead of hard delete.",
     )
     keep_versioned: bool = Field(
-        default=True,
+        default=False,
         description="Whether to keep versioned copies of files when they are updated or deleted.",
     )
 
@@ -70,6 +71,16 @@ class LocalStorageProvider(StoragePlugin):
         self.deleted_dir = self.base_dir / "deleted"
         self.soft_delete = self._config.soft_delete
         self.keep_versioned = self._config.keep_versioned
+
+        self.namespace_dirs = {
+            "raw": self.raw_dir,
+            "staging": self.staging_dir,
+            "review": self.review_dir,
+            "published": self.publish_dir,
+            "metadata": self.metadata_dir,
+            "templates": self.templates_dir,
+            "agents": self.agents_dir,
+        }
 
         self._setup_storage()
 
@@ -108,110 +119,76 @@ class LocalStorageProvider(StoragePlugin):
             if directory is not None:
                 directory.mkdir(parents=True, exist_ok=True)
 
-    def _get_real_path(self, uri: str) -> Path:
+    def _strip_prefix(self, uri: str) -> str:
         """
-        Convert a file path with the file prefix to a real file system path.
+        Strip the file prefix from a URI if it exists.
 
         Args:
-            uri (str): The file URI to convert.
+            uri (str): The URI to strip the prefix from.
         Returns:
-            Path: The real file system path corresponding to the given URI.
+            str: The absolute URI without the file prefix.
         """
         if uri.startswith(self._config.file_prefix):
-            return self.base_dir / uri.replace(self._config.file_prefix, "")
+            stripped = uri[len(self._config.file_prefix) :]
+            return stripped.lstrip("/") if stripped.startswith("/") else stripped
+        if uri.startswith("/"):
+            return uri.lstrip("/")
+        return uri
 
-        normalized_uri = uri.strip("/")
-
-        namespaced_roots = {
-            "raw": self.raw_dir,
-            "staging": self.staging_dir,
-            "review": self.review_dir,
-            "published": self.publish_dir,
-            "metadata": self.metadata_dir,
-            "templates": self.templates_dir,
-            "agents": self.agents_dir,
-            "versioned": self.versioned_dir,
-            "deleted": self.deleted_dir,
-        }
-
-        for namespace, root_dir in namespaced_roots.items():
-            if normalized_uri == namespace or normalized_uri.startswith(
-                f"{namespace}/"
-            ):
-                relative_parts = normalized_uri.split("/")[1:]
-                candidate = (
-                    root_dir.joinpath(*relative_parts) if relative_parts else root_dir
-                )
-                if relative_parts and candidate.suffix == "":
-                    candidate = candidate.with_suffix(".md")
-
-                resolved_root = root_dir.resolve(strict=False)
-                resolved_candidate = candidate.resolve(strict=False)
-                try:
-                    resolved_candidate.relative_to(resolved_root)
-                except ValueError as exc:
-                    raise ValueError(f"Path escapes storage root in {uri}") from exc
-
-                return resolved_candidate
-
-        raise ValueError(f"Unsupported URI scheme in {uri}")
-
-    def _iter_markdown_files(self, directory: Path) -> Iterable[Path]:
-        return directory.rglob("*.md")
-
-    def _write_file(self, path: Path, content: str) -> None:
+    def _build_path(self, document_path: str) -> Path:
         """
-        Write content to a file, creating parent directories if necessary.
+        Build a file system path based on the document path.
 
         Args:
-            path (Path): The file path to write to.
-            content (str): The content to write to the file.
+            document_path (str): The relative path for the document within the namespace.
+        Returns:
+            Path: The full file system path for the document.
         """
-        if self.keep_versioned and path.exists():
-            versioned_path = self.versioned_dir / path.relative_to(self.base_dir)
-            versioned_path.parent.mkdir(parents=True, exist_ok=True)
-            path.rename(versioned_path)
+
+        clean_doc_path = self._strip_prefix(document_path)
+
+        return Path(self.base_dir / clean_doc_path)
+
+    def _build_plugin_path(
+        self, namespace: StorageNamespace, document_path: str
+    ) -> str:
+        """
+        Build a file system path for soft-deleted documents based on the namespace and document path.
+
+        Args:
+            namespace (StorageNamespace): The namespace for the document (e.g. "raw", "staging").
+            document_path (str): The relative path for the document within the namespace.
+        Returns:
+            str: The full soft path to the document.
+        """
+
+        return f"file://{namespace}/{document_path}"
+
+    def build_namespaced_path(
+        self, namespace: StorageNamespace, document_path: str
+    ) -> str:
+        """
+        Build a namespaced path for a document.
+
+        Args:
+            namespace (StorageNamespace): The namespace for the document.
+            document_path (str): The original document path.
+        Returns:
+            str: The namespaced document path.
+        """
+        # make sure that path is not already namespaced
+        cleaned_path = self._strip_prefix(document_path)
+        is_namespaced = any(
+            cleaned_path.startswith(f"{ns}/") for ns in self.namespace_dirs.keys()
+        )
+        if is_namespaced:
+            raise ValueError(
+                f"Document path '{document_path}' appears to already be namespaced."
+            )
+        return f"{namespace}/{cleaned_path}"
+
+    def write_document(self, document_path: str, content: str) -> str:
+        path = self._build_path(document_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
-
-    def _read_file(self, path: Path) -> str:
-        """Read content from a file.
-
-        Args:
-            path (Path): The file path to read from.
-        Returns:
-            str: The content of the file.
-        """
-        return path.read_text()
-
-    def _delete_file(self, path: Path) -> None:
-        """Delete a file, either by moving it to a deleted directory or by removing it.
-
-        Args:
-            path (Path): The file path to delete.
-        """
-        if self.soft_delete:
-            deleted_path = self.deleted_dir / path.relative_to(self.base_dir)
-            deleted_path.parent.mkdir(parents=True, exist_ok=True)
-            path.rename(deleted_path)
-        else:
-            path.unlink()
-
-    def write_raw_document(self, document: RawDocument) -> None:
-        path = (
-            self.raw_dir
-            / f"{document.timestamp.strftime('%Y%m%d%H%M%S')}_{document.doc_id}.md"
-        )
-        self._write_file(path, document.content)
-
-    def write_raw_documents(self, documents: list[RawDocument]) -> None:
-        for document in documents:
-            self.write_raw_document(document)
-
-    def read_raw_document(self, uri: str) -> str:
-        path = self._get_real_path(uri)
-        return self._read_file(path)
-
-    def delete_raw_document(self, uri: str) -> None:
-        path = self._get_real_path(uri)
-        self._delete_file(path)
+        return f"file://{self._strip_prefix(document_path)}"

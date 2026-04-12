@@ -470,3 +470,5 @@ $RECYCLE.BIN/
 
 .env*
 *.log
+
+./wiki/

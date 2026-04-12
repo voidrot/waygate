@@ -1,14 +1,70 @@
+from waygate_api.clients import mqtt_client
+from contextlib import asynccontextmanager
+from typing import Any
 from waygate_api.routes.webhooks import webhook_router
-from waygate_core.logging import configure_logging
+from waygate_api.config import webhook_registry, core_config
+from waygate_core.logging import configure_logging, get_logger
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
 configure_logging()
+
+logger = get_logger()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting MQTT client...")
+    mqtt_client.connect(core_config.mqtt_host, core_config.mqtt_port)
+    mqtt_client.loop_start()
+    yield
+    logger.info("Stopping MQTT client...")
+    mqtt_client.loop_stop()
+    mqtt_client.disconnect()
+
 
 app = FastAPI(
     title="WayGate API",
     description="API for WayGate",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
+
+def custom_openapi() -> dict[str, Any]:
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # Merge each plugin's payload-schema definitions into components/schemas so
+    # that $ref values like "#/components/schemas/Foo" (produced by router.py
+    # via ref_template) resolve correctly in Swagger UI / ReDoc.
+    component_schemas: dict = schema.setdefault("components", {}).setdefault(
+        "schemas", {}
+    )
+    for plugin in webhook_registry.get_all().values():
+        payload_schema = plugin.openapi_payload_schema
+        if payload_schema is None:
+            continue
+        full = payload_schema.model_json_schema(
+            ref_template="#/components/schemas/{model}"
+        )
+        # $defs holds the nested-model definitions; hoist them to the top level.
+        defs: dict = full.pop("$defs", {})
+        component_schemas.update(defs)
+        component_schemas[payload_schema.__name__] = full
+
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]  # ty:ignore[invalid-assignment]
 
 
 @app.get("/")

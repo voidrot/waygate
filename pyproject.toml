@@ -4,7 +4,7 @@ version         = "0.1.0"
 description     = "A Platform for building and maintaining a GAR based knowledge graph"
 readme          = "README.md"
 requires-python = ">=3.14"
-dependencies    = []
+dependencies    = ["rich>=14.3.3"]
 
 [dependency-groups]
 dev = ["pytest", "pytest-cov", "ruff", "pyright", "tiktoken", "ty"]
@@ -17,7 +17,7 @@ members = ["packages/*", "apps/*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["apps/api/tests", "packages/core/tests"]
+testpaths = ["apps/*", "packages/*"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = [
     "-ra",

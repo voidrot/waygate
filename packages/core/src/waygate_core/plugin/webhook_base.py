@@ -1,5 +1,13 @@
+from __future__ import annotations
+from waygate_core.schema import RawDocument
+
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
 from waygate_core.plugin.base import WayGatePluginBase
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 
 class WebhookVerificationError(ValueError):
@@ -11,7 +19,7 @@ class WebhookPlugin(WayGatePluginBase):
     Base class for webhook plugins.
     """
 
-    async def handle_webhook(self, payload: dict):
+    async def handle_webhook(self, payload: dict) -> list[RawDocument]:
         """
         Handle an incoming webhook payload.
 
@@ -53,3 +61,20 @@ class WebhookPlugin(WayGatePluginBase):
             dict: The enriched payload to be passed to handle_webhook.
         """
         return payload
+
+    # --- OpenAPI metadata ---
+
+    @property
+    def openapi_summary(self) -> str:
+        """Short summary shown as the route title in /docs. Defaults to the plugin name."""
+        return self.name
+
+    @property
+    def openapi_payload_schema(self) -> type[BaseModel] | None:
+        """Return a Pydantic model *class* describing the expected JSON body, or None to leave the body untyped."""
+        return None
+
+    @property
+    def openapi_response_schema(self) -> type[BaseModel] | None:
+        """Return a Pydantic model *class* describing the success response body, or None to use the default."""
+        return None
