@@ -5,14 +5,19 @@ from collections.abc import Mapping
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from waygate_core.schema import RawDocument
-from waygate_core.plugin import WebhookPlugin
-from . import __version__
+from waygate_core.plugin import WebhookPlugin, hookimpl
+from . import PLUGIN_NAME, __version__
 
 
 class GenericWebhookProvider(WebhookPlugin):
+    @staticmethod
+    @hookimpl
+    def waygate_webhook_plugin() -> type[WebhookPlugin]:
+        return GenericWebhookProvider
+
     @property
     def name(self) -> str:
-        return "generic-webhook"
+        return PLUGIN_NAME
 
     @property
     def description(self) -> str:
@@ -61,7 +66,7 @@ class GenericWebhookProvider(WebhookPlugin):
                 else payload.metadata.tags
             )
             raw_doc = RawDocument(
-                source_type="generic-webhook",
+                source_type=PLUGIN_NAME,
                 source_id=doc.document_name or None,
                 source_hash=doc.document_hash or None,
                 source_uri=doc.document_path or None,

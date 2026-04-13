@@ -1,9 +1,9 @@
 from typing import TypeVar, Generic
 from waygate_core.config.schema import CoreSettings
-from waygate_core.plugin.base import WayGatePluginBase
+from waygate_core.plugin.manager import WayGatePluginManager, shared_plugin_manager
+from waygate_core.plugin.registry import PluginGroups
 from waygate_core.logging import get_logger
 from pydantic_settings import BaseSettings
-import importlib.metadata
 
 logger = get_logger()
 
@@ -15,42 +15,28 @@ class ConfigRegistry(Generic[PluginT]):
     Registry for settings classes.
     """
 
-    def __init__(self):
+    def __init__(self, plugin_manager: WayGatePluginManager | None = None):
         self._registry = {}
+        self._plugin_manager = plugin_manager or shared_plugin_manager
         self.register("core", CoreSettings)
 
     def discover(self) -> None:
         """
         Discover and register settings classes.
         """
-        entrypoints = importlib.metadata.entry_points(group="waygate.plugins")
-        for ep in entrypoints:
-            try:
-                plugin_class = ep.load()
-                if issubclass(plugin_class, WayGatePluginBase):
-                    plugin_instance = plugin_class()
-                    config = plugin_instance.config
-                    if config is not None and issubclass(config, BaseSettings):
-                        if plugin_instance.name in self._registry:
-                            logger.warning(
-                                f"Name for for plugin {plugin_instance.name} is already registered, skipping.",
-                                plugin_name=plugin_instance.name,
-                            )
-                        else:
-                            self.register(plugin_instance.name, config)
-                            logger.info(
-                                f"Registered config for plugin: {plugin_instance.name}"
-                            )
-                    if config is None:
-                        logger.debug(
-                            f"No config found for plugin: {plugin_instance.name}, skipping config registration."
-                        )
-                else:
-                    logger.warning(
-                        f"Plugin {ep.name} does not inherit from WayGatePluginBase, skipping config registration."
-                    )
-            except Exception as e:
-                logger.error(f"Failed to load config from entry point {ep.name}: {e}")
+        config_types = self._plugin_manager.get_plugin_configs(
+            PluginGroups.all_groups()
+        )
+
+        for plugin_name, config_type in config_types.items():
+            if plugin_name in self._registry:
+                logger.warning(
+                    f"Name for for plugin {plugin_name} is already registered, skipping.",
+                    plugin_name=plugin_name,
+                )
+                continue
+
+            self.register(plugin_name, config_type)
 
     def register(self, name: str, config: type[PluginT]) -> None:
         """

@@ -39,3 +39,15 @@ depends = "docker:up"
 description = "Run the API server with hot reload"
 dir         = "{{ config_root }}/apps/api"
 run         = "fastapi dev --port 8080 --reload"
+
+[tasks."migration:generate"]
+description = "Generate an Alembic migration from SQLAlchemy model changes"
+run         = "uv run alembic revision --autogenerate -m \"${MIGRATION_MESSAGE:-update schema}\""
+
+[tasks."migration:up"]
+description = "Apply Alembic migrations (default: head)"
+run         = "uv run alembic upgrade ${REVISION:-head}"
+
+[tasks."migration:down"]
+description = "Downgrade Alembic migrations (default: -1)"
+run         = "uv run alembic downgrade ${REVISION:--1}"

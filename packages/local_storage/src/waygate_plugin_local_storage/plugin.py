@@ -3,8 +3,8 @@ from waygate_core.plugin.storage_base import (
 )
 from pathlib import Path
 from pydantic import Field
-from . import __version__
-from waygate_core.plugin import StoragePlugin
+from . import PLUGIN_NAME, __version__
+from waygate_core.plugin import PluginConfigRegistration, StoragePlugin, hookimpl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -57,6 +57,19 @@ class LocalStorageConfig(BaseSettings):
 
 
 class LocalStorageProvider(StoragePlugin):
+    @staticmethod
+    @hookimpl
+    def waygate_storage_plugin() -> type[StoragePlugin]:
+        return LocalStorageProvider
+
+    @staticmethod
+    @hookimpl
+    def waygate_plugin_config() -> PluginConfigRegistration:
+        return PluginConfigRegistration(
+            name=PLUGIN_NAME,
+            config=LocalStorageConfig,
+        )
+
     def __init__(self):
         self._config = LocalStorageConfig()
         self.base_dir = Path(self._config.base_path)
@@ -86,7 +99,7 @@ class LocalStorageProvider(StoragePlugin):
 
     @property
     def name(self) -> str:
-        return "local-storage"
+        return PLUGIN_NAME
 
     @property
     def description(self) -> str:
@@ -95,11 +108,6 @@ class LocalStorageProvider(StoragePlugin):
     @property
     def version(self) -> str:
         return __version__
-
-    @property
-    def config(self) -> BaseSettings:
-
-        return self._config
 
     def _setup_storage(self) -> None:
         """

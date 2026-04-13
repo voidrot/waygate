@@ -1,2 +1,3 @@
-def hello() -> str:
-    return "Hello from waygate-core!"
+from .bootstrap import init_app
+
+__all__ = ["init_app"]

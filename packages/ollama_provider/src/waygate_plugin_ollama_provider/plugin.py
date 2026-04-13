@@ -1,10 +1,9 @@
-from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from langchain_core.runnables import Runnable
-from waygate_core.plugin import BaseLLMProvider
+from waygate_core.plugin import BaseLLMProvider, PluginConfigRegistration, hookimpl
 from langchain_ollama import ChatOllama
-from . import __version__
+from . import PLUGIN_NAME, __version__
 
 
 class OllamaProviderConfig(BaseSettings):
@@ -55,7 +54,7 @@ class OllamaProviderConfig(BaseSettings):
         default=1.1,
         description="The repeat_penalty setting for the Ollama model when used in draft workflows.",
     )
-    draft_seed: Optional[int] = Field(
+    draft_seed: int | None = Field(
         default=None,
         description="The seed for the Ollama model when used in draft workflows. If None, a random seed will be used.",
     )
@@ -63,7 +62,7 @@ class OllamaProviderConfig(BaseSettings):
         default=1.0,
         description="The tfs_z setting for the Ollama model when used in draft workflows.",
     )
-    draft_keep_alive: Optional[int, str] = Field(
+    draft_keep_alive: int | str | None = Field(
         default=None,
         description="The keepalive setting for the Ollama model when used in draft workflows. Can be an integer number of seconds or the string 'inf' for infinite keepalive.",
     )
@@ -109,7 +108,7 @@ class OllamaProviderConfig(BaseSettings):
         default=1.1,
         description="The repeat_penalty setting for the Ollama model when used in review workflows.",
     )
-    review_seed: Optional[int] = Field(
+    review_seed: int | None = Field(
         default=None,
         description="The seed for the Ollama model when used in review workflows. If None, a random seed will be used.",
     )
@@ -117,7 +116,7 @@ class OllamaProviderConfig(BaseSettings):
         default=1.0,
         description="The tfs_z setting for the Ollama model when used in review workflows.",
     )
-    review_keep_alive: Optional[int, str] = Field(
+    review_keep_alive: int | str | None = Field(
         default=None,
         description="The keepalive setting for the Ollama model when used in review workflows. Can be an integer number of seconds or the string 'inf' for infinite keepalive.",
     )
@@ -128,12 +127,25 @@ class OllamaProvider(BaseLLMProvider):
     Ollama LLM provider plugin for WayGate.
     """
 
+    @staticmethod
+    @hookimpl
+    def waygate_llm_plugin() -> type[BaseLLMProvider]:
+        return OllamaProvider
+
+    @staticmethod
+    @hookimpl
+    def waygate_plugin_config() -> PluginConfigRegistration:
+        return PluginConfigRegistration(
+            name=PLUGIN_NAME,
+            config=OllamaProviderConfig,
+        )
+
     def __init__(self):
         self._config = OllamaProviderConfig()
 
     @property
     def name(self) -> str:
-        return "OllamaProvider"
+        return PLUGIN_NAME
 
     @property
     def description(self) -> str:
