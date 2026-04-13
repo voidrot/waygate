@@ -1,6 +1,5 @@
 from typing import List
 from enum import StrEnum
-from waygate_core.schema import RawDocument
 from waygate_core.plugin.base import WayGatePluginBase
 
 
@@ -66,7 +65,7 @@ class StoragePlugin(WayGatePluginBase):
             paths.append(self.write_document(document_path, content))
         return paths
 
-    def read_document(self, document_path: str) -> RawDocument:
+    def read_document(self, document_path: str) -> str:
         """
         Read a document from storage.
 
@@ -80,7 +79,7 @@ class StoragePlugin(WayGatePluginBase):
             "Storage plugins must implement the read_document method."
         )
 
-    def read_documents(self, documents: List[str]) -> List[RawDocument]:
+    def read_documents(self, documents: List[str]) -> List[str]:
         """
         Read multiple documents from storage.
 
@@ -92,6 +91,7 @@ class StoragePlugin(WayGatePluginBase):
         """
         docs = []
         for document_path in documents:
+            # TODO: we should probably return a tuple with the document path and content, or a custom object that includes metadata about the document along with the content, instead of just returning the raw content, but for now we'll just return the raw content
             docs.append(self.read_document(document_path))
         return docs
 

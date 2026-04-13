@@ -17,4 +17,6 @@ def send_draft_message(raw_documents: List[str]) -> None:
             trace_id=str(uuid4()), enqueued_at=datetime.now(timezone.utc).isoformat()
         ),
     )
-    mqtt_client.publish("waygate/drafts", payload=initial_state.model_dump_json())
+    mqtt_client.publish(
+        "waygate/drafts", payload=initial_state.model_dump_json(), qos=2
+    )

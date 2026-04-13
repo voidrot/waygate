@@ -12,4 +12,15 @@ core_config = _core_config if _core_config is not None else CoreSettings()
 storage_registry = PluginRegistry(PluginGroups.STORAGE, StoragePlugin)
 storage_registry.register_plugins()
 
-storage = storage_registry.get(core_config.storage_plugin_name)
+_storage = storage_registry.get(core_config.storage_plugin_name)
+storage = (
+    _storage
+    if _storage is not None
+    else (
+        lambda: (_ for _ in ()).throw(
+            ValueError(
+                f"Storage plugin '{core_config.storage_plugin_name}' not found in registry"
+            )
+        )
+    )()
+)

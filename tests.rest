@@ -14,7 +14,7 @@ Content-Type: application/json
       "document_type": "text",
       "document_name": "plugin_base.py",
       "document_path": "libs/core/src/waygate_core/plugin_base.py",
-      "content": "from abc import ABC\n\nclass WayGatePluginBase(ABC): ..."
+      "content": "from abc import ABC\n\nclass WayGatePluginBase(ABC): a..."
     }
   ]
 }

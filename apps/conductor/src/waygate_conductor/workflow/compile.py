@@ -1,8 +1,8 @@
-from waygate_core.nodes.publish import publish_node
-from waygate_core.nodes.human import human_review_node
-from waygate_core.nodes.review import review_node
-from waygate_core.nodes.metadata import metadata_node
-from waygate_core.nodes.draft import draft_node
+from waygate_conductor.nodes.publish import publish_node
+from waygate_conductor.nodes.human import human_review_node
+from waygate_conductor.nodes.review import review_node
+from waygate_conductor.nodes.metadata import metadata_node
+from waygate_conductor.nodes.draft import draft_node
 from waygate_core.logging import get_logger
 from waygate_core.schema import GraphState
 from langgraph.graph import StateGraph, END

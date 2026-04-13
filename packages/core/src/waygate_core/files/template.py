@@ -45,3 +45,8 @@ def render_raw_document(
     return raw_doc_template.render(
         frontmatter=serialized_frontmatter, raw_content=raw_doc.content
     )
+
+
+def render_draft_document(context: dict, content: str, doc_uri: str) -> str:
+    template = template_env.get_template("draft_source_text.j2")
+    return template.render(context=context, content=content, doc_uri=doc_uri)

@@ -192,3 +192,7 @@ class LocalStorageProvider(StoragePlugin):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
         return f"file://{self._strip_prefix(document_path)}"
+
+    def read_document(self, document_path: str) -> str:
+        path = self._build_path(document_path)
+        return path.read_text()
