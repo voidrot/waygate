@@ -2,13 +2,13 @@ from waygate_core.plugin.storage_base import (
     StorageNamespace,
 )
 from pathlib import Path
-from pydantic import Field
+from datetime import UTC, datetime
+from pydantic import Field, BaseModel
 from . import PLUGIN_NAME, __version__
 from waygate_core.plugin import PluginConfigRegistration, StoragePlugin, hookimpl
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class LocalStorageConfig(BaseSettings):
+class LocalStorageConfig(BaseModel):
     """
     Configuration for the Local Storage plugin.
     """
@@ -53,8 +53,6 @@ class LocalStorageConfig(BaseSettings):
         description="Whether to keep versioned copies of files when they are updated or deleted.",
     )
 
-    model_config = SettingsConfigDict(env_prefix="waygate_local_storage_")
-
 
 class LocalStorageProvider(StoragePlugin):
     @staticmethod
@@ -70,8 +68,8 @@ class LocalStorageProvider(StoragePlugin):
             config=LocalStorageConfig,
         )
 
-    def __init__(self):
-        self._config = LocalStorageConfig()
+    def __init__(self, config: LocalStorageConfig | None = None):
+        self._config = config or LocalStorageConfig()
         self.base_dir = Path(self._config.base_path)
         self.raw_dir = self.base_dir / self._config.raw_dir
         self.staging_dir = self.base_dir / self._config.staging_dir
@@ -204,3 +202,47 @@ class LocalStorageProvider(StoragePlugin):
     def read_document(self, document_path: str) -> str:
         path = self._build_path(document_path)
         return path.read_text()
+
+    def list_documents(self, search_path: str, prefix: str = "") -> list[str]:
+        root = self._build_path(search_path)
+
+        if not root.exists():
+            return []
+
+        if root.is_file():
+            rel = root.relative_to(self.base_dir).as_posix()
+            if prefix and not rel.startswith(prefix):
+                return []
+            return [f"file://{rel}"]
+
+        matches: list[str] = []
+        for file_path in root.rglob("*"):
+            if not file_path.is_file():
+                continue
+            rel = file_path.relative_to(self.base_dir).as_posix()
+            if prefix and not rel.startswith(prefix):
+                continue
+            matches.append(f"file://{rel}")
+
+        return sorted(matches)
+
+    def delete_document(self, document_path: str) -> None:
+        path = self._build_path(document_path)
+        if not path.exists() or not path.is_file():
+            return
+
+        if self.keep_versioned:
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+            versioned_target = (
+                self.versioned_dir / f"{self._strip_prefix(document_path)}.{timestamp}"
+            )
+            versioned_target.parent.mkdir(parents=True, exist_ok=True)
+            versioned_target.write_text(path.read_text())
+
+        if self.soft_delete:
+            deleted_target = self.deleted_dir / self._strip_prefix(document_path)
+            deleted_target.parent.mkdir(parents=True, exist_ok=True)
+            path.replace(deleted_target)
+            return
+
+        path.unlink()

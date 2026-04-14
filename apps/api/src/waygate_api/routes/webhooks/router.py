@@ -1,19 +1,24 @@
+from uuid import uuid7
+from waygate_core import get_app_context
 from waygate_api.clients import send_draft_message
 from waygate_core.files.template import render_raw_document
 from waygate_core.plugin.storage_base import StorageNamespace
-from waygate_api.config.storage_registry import storage
 from waygate_core.logging import get_logger
 import json
 from collections.abc import Callable
 
 from fastapi import APIRouter, HTTPException, Request
 
-from waygate_api.config import webhook_registry
-from waygate_core.plugin import WebhookPlugin, WebhookVerificationError
+from waygate_core.plugin import (
+    WebhookPlugin,
+    WebhookVerificationError,
+)
 
 webhook_router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 logger = get_logger()
+app_context = get_app_context()
+storage = app_context.plugins.storage[app_context.config.core.storage_plugin_name]
 
 
 def _make_handler(plugin: WebhookPlugin) -> Callable:
@@ -37,9 +42,9 @@ def _make_handler(plugin: WebhookPlugin) -> Callable:
                 for doc in raw_documents:
                     path = (
                         storage.build_namespaced_path(
-                            StorageNamespace.Raw, f"{plugin.name}/{doc.doc_id}"
+                            StorageNamespace.Raw, f"{uuid7()}"
                         )
-                        + ".md"
+                        + ".txt"
                     )
                     written_paths.append(
                         storage.write_document(path, render_raw_document(doc))
@@ -115,7 +120,7 @@ def _build_openapi_extra(plugin: WebhookPlugin) -> dict | None:
 
 # Dynamically register one route per discovered plugin so each endpoint has
 # its own OpenAPI entry with a plugin-supplied schema and description.
-for _plugin in webhook_registry.get_all().values():
+for _plugin in app_context.plugins.webhooks.values():
     _openapi_extra = _build_openapi_extra(_plugin)
 
     webhook_router.add_api_route(

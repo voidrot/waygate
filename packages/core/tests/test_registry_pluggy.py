@@ -4,16 +4,23 @@ import pluggy
 from waygate_core.config.registry import ConfigRegistry
 from waygate_core.plugin import PluginConfigRegistration, WayGatePluginManager, hookimpl
 from waygate_core.plugin.base import WayGatePluginBase
-from waygate_core.plugin.llm_base import BaseLLMProvider
-from waygate_core.plugin.storage_base import StoragePlugin
-from waygate_core.plugin.webhook_base import WebhookPlugin
 from waygate_core.plugin.registry import PluginGroups, PluginRegistry
+from waygate_core.plugin.webhook_base import WebhookPlugin
 
 
-class _ValidPlugin(WayGatePluginBase):
+class _ValidPlugin(WebhookPlugin):
     @property
     def name(self) -> str:
         return "valid-plugin"
+
+    async def handle_webhook(self, payload: dict) -> list:
+        return []
+
+    async def verify_webhook_request(self, headers, body: bytes) -> None:
+        return None
+
+    async def enrich_webhook_payload(self, payload: dict, headers) -> dict:
+        return payload
 
 
 class _InvalidPlugin:
@@ -74,13 +81,12 @@ def test_plugin_registry_uses_pluggy_entrypoint_loading(
 
     registry = PluginRegistry(
         PluginGroups.WEBHOOKS,
-        WayGatePluginBase,
         plugin_manager=WayGatePluginManager(),
     )
 
     registry.register_plugins()
 
-    assert loaded_groups == [PluginGroups.WEBHOOKS]
+    assert loaded_groups == list(PluginGroups.all_groups())
     assert registry.get("valid-plugin") is not None
     assert registry.get("invalid") is None
 
@@ -102,17 +108,17 @@ def test_config_registry_discovers_configs_via_plugin_registry(
 
     registry = ConfigRegistry(plugin_manager=WayGatePluginManager())
 
-    registry.discover()
+    config = registry.build_config()
 
-    assert registry.get("core") is not None
-    config = registry.get("config-plugin")
-    assert config is not None
-    assert isinstance(config, _TestSettings)
-    assert registry.get("no-config-plugin") is None
+    dumped = config.model_dump()
+    assert config.core is not None
+    assert "config_plugin" in dumped
+    assert dumped["config_plugin"]["enabled"] is True
+    assert "no_config_plugin" not in dumped
 
 
 def test_real_webhook_plugin_is_discovered_via_pluggy() -> None:
-    registry = PluginRegistry(PluginGroups.WEBHOOKS, WebhookPlugin)
+    registry = PluginRegistry(PluginGroups.WEBHOOKS)
 
     registry.register_plugins()
 
@@ -122,7 +128,7 @@ def test_real_webhook_plugin_is_discovered_via_pluggy() -> None:
 
 
 def test_real_storage_plugin_and_config_are_discovered_via_pluggy() -> None:
-    registry = PluginRegistry(PluginGroups.STORAGE, StoragePlugin)
+    registry = PluginRegistry(PluginGroups.STORAGE)
 
     registry.register_plugins()
 
@@ -130,13 +136,13 @@ def test_real_storage_plugin_and_config_are_discovered_via_pluggy() -> None:
     assert plugin is not None
 
     config_registry = ConfigRegistry()
-    config_registry.discover()
+    config = config_registry.build_config()
 
-    assert config_registry.get("local-storage") is not None
+    assert "local_storage" in config.model_dump()
 
 
 def test_real_llm_plugin_and_config_are_discovered_via_pluggy() -> None:
-    registry = PluginRegistry(PluginGroups.LLM, BaseLLMProvider)
+    registry = PluginRegistry(PluginGroups.LLM)
 
     registry.register_plugins()
 
@@ -144,9 +150,9 @@ def test_real_llm_plugin_and_config_are_discovered_via_pluggy() -> None:
     assert plugin is not None
 
     config_registry = ConfigRegistry()
-    config_registry.discover()
+    config = config_registry.build_config()
 
-    assert config_registry.get("OllamaProvider") is not None
+    assert "OllamaProvider" in config.model_dump()
 
 
 def test_shared_plugin_manager_loads_each_group_once(monkeypatch) -> None:
@@ -166,16 +172,14 @@ def test_shared_plugin_manager_loads_each_group_once(monkeypatch) -> None:
 
     first_registry = PluginRegistry(
         PluginGroups.WEBHOOKS,
-        WayGatePluginBase,
         plugin_manager=plugin_manager,
     )
     second_registry = PluginRegistry(
         PluginGroups.WEBHOOKS,
-        WayGatePluginBase,
         plugin_manager=plugin_manager,
     )
 
     first_registry.register_plugins()
     second_registry.register_plugins()
 
-    assert loaded_groups == [PluginGroups.WEBHOOKS]
+    assert loaded_groups == list(PluginGroups.all_groups())

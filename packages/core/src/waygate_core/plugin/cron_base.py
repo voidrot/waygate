@@ -1,10 +1,17 @@
+from abc import abstractmethod
 from waygate_core.plugin.base import WayGatePluginBase
 
 
 class CronPlugin(WayGatePluginBase):
     """
     Base class for cron plugins.
+
+    Cron plugin instances are cached process-wide and invoked on a schedule.
+    Implement your plugin as idempotent and stateless where possible.
     """
+
+    plugin_group: str = "waygate.plugins.cron"
+    hook_name: str = "waygate_cron_plugin"
 
     @property
     def schedule(self) -> str:
@@ -16,6 +23,7 @@ class CronPlugin(WayGatePluginBase):
         """
         return "* * * * *"  # Default to running every minute
 
+    @abstractmethod
     async def run(self, payload: dict):
         """
         Handle an incoming cron event.

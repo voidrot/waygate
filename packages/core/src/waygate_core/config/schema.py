@@ -1,5 +1,4 @@
-from pydantic import RedisDsn, Field, AliasChoices, TypeAdapter
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import RedisDsn, Field, AliasChoices, TypeAdapter, BaseModel
 
 
 DEFAULT_REDIS_DSN: RedisDsn = TypeAdapter(RedisDsn).validate_python(
@@ -7,7 +6,7 @@ DEFAULT_REDIS_DSN: RedisDsn = TypeAdapter(RedisDsn).validate_python(
 )
 
 
-class CoreSettings(BaseSettings):
+class CoreSettings(BaseModel):
     """
     Core configuration settings for Waygate.
     """
@@ -22,13 +21,13 @@ class CoreSettings(BaseSettings):
         DEFAULT_REDIS_DSN, validation_alias=AliasChoices("redis_url")
     )
 
-    mqtt_host: str = Field(default="localhost")
-    mqtt_port: int = Field(default=1883)
-
-    mqtt_draft_topic: str = Field(default="waygate/drafts")
-
-    draft_queue_name: str = Field(default="draft_queue")
+    celery_broker_dsn: str = Field(
+        default="pyamqp://user:password@localhost:5672//",
+        description="The DSN for connecting to RabbitMQ, used for task queuing.",
+    )
+    celery_result_backend_dsn: str = Field(
+        default="db+postgresql+psycopg://postgres:postgres@localhost:5432/postgres",
+        description="The DSN for connecting to PostgreSQL, used for storing Celery task results.",
+    )
 
     storage_plugin_name: str = Field(default="local-storage")
-
-    model_config = SettingsConfigDict(env_prefix="waygate_")

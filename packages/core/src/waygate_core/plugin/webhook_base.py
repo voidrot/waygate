@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import abstractmethod
 from waygate_core.schema import RawDocument
 
 from collections.abc import Mapping
@@ -17,8 +18,15 @@ class WebhookVerificationError(ValueError):
 class WebhookPlugin(WayGatePluginBase):
     """
     Base class for webhook plugins.
+
+    Webhook plugins are instantiated once at startup and cached process-wide.
+    Implement webhook handlers as stateless where possible.
     """
 
+    plugin_group: str = "waygate.plugins.webhooks"
+    hook_name: str = "waygate_webhook_plugin"
+
+    @abstractmethod
     async def handle_webhook(self, payload: dict) -> list[RawDocument]:
         """
         Handle an incoming webhook payload.
@@ -30,6 +38,7 @@ class WebhookPlugin(WayGatePluginBase):
             "WebhookPlugin subclasses must implement handle_webhook"
         )
 
+    @abstractmethod
     async def verify_webhook_request(
         self, headers: Mapping[str, str], body: bytes
     ) -> None:
@@ -47,6 +56,7 @@ class WebhookPlugin(WayGatePluginBase):
             "WebhookPlugin subclasses must implement verify_webhook_request"
         )
 
+    @abstractmethod
     async def enrich_webhook_payload(
         self, payload: dict, headers: Mapping[str, str]
     ) -> dict:

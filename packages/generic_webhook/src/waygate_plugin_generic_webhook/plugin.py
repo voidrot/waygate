@@ -9,6 +9,19 @@ from waygate_core.plugin import WebhookPlugin, hookimpl
 from . import PLUGIN_NAME, __version__
 
 
+class GenericWebhookConfig(BaseModel):
+    """
+    Configuration for the Generic Webhook plugin.
+    """
+
+    # For demonstration purposes, this plugin doesn't have any configuration options.
+    # In a real implementation, you could add fields here to configure things like:
+    # - Allowed webhook sources
+    # - Authentication secrets for verifying webhook requests
+    # - Default topics or tags to apply to documents created from webhooks
+    pass
+
+
 class GenericWebhookProvider(WebhookPlugin):
     @staticmethod
     @hookimpl
@@ -30,6 +43,9 @@ class GenericWebhookProvider(WebhookPlugin):
     @property
     def openapi_payload_schema(self) -> type[BaseModel]:
         return GenericWebhookPayload
+
+    def __init__(self, config: GenericWebhookConfig | None = None):
+        self._config = config or GenericWebhookConfig()
 
     async def enrich_webhook_payload(
         self, payload: dict, headers: Mapping[str, str]

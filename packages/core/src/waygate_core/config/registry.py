@@ -1,61 +1,57 @@
-from typing import TypeVar, Generic
+from pydantic import Field, create_model
 from waygate_core.config.schema import CoreSettings
+from typing import Any
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from waygate_core.plugin.manager import WayGatePluginManager, shared_plugin_manager
 from waygate_core.plugin.registry import PluginGroups
 from waygate_core.logging import get_logger
-from pydantic_settings import BaseSettings
 
 logger = get_logger()
 
-PluginT = TypeVar("PluginT", bound=BaseSettings)
+
+class WaygateRootSettings(BaseSettings):
+    core: CoreSettings = Field(default_factory=CoreSettings)
+
+    model_config = SettingsConfigDict(
+        env_prefix="WAYGATE_",
+        env_nested_delimiter="__",
+        env_file=".env",
+        extra="ignore",
+    )
 
 
-class ConfigRegistry(Generic[PluginT]):
-    """
-    Registry for settings classes.
-    """
-
+class ConfigRegistry:
     def __init__(self, plugin_manager: WayGatePluginManager | None = None):
-        self._registry = {}
         self._plugin_manager = plugin_manager or shared_plugin_manager
-        self.register("core", CoreSettings)
+        self._config_instance: WaygateRootSettings | None = None
 
-    def discover(self) -> None:
-        """
-        Discover and register settings classes.
-        """
-        config_types = self._plugin_manager.get_plugin_configs(
+    def build_config(self) -> WaygateRootSettings:
+        if self._config_instance is not None:
+            return self._config_instance
+
+        fields: dict[str, Any] = {
+            "core": (CoreSettings, Field(default_factory=CoreSettings))
+        }
+
+        plugin_schemas = self._plugin_manager.get_plugin_configs(
             PluginGroups.all_groups()
         )
+        for namespace, schema_class in plugin_schemas.items():
+            # Normalize plugin name to a valid Python identifier so pydantic-settings
+            # can construct a valid env var name (e.g. "local-storage" -> "local_storage"
+            # maps to WAYGATE_LOCAL_STORAGE__*).
+            field_name = namespace.replace("-", "_")
+            fields[field_name] = (schema_class, Field(default_factory=schema_class))
 
-        for plugin_name, config_type in config_types.items():
-            if plugin_name in self._registry:
-                logger.warning(
-                    f"Name for for plugin {plugin_name} is already registered, skipping.",
-                    plugin_name=plugin_name,
-                )
-                continue
+        settings_model = create_model(
+            "WaygateRootSettings",
+            __base__=WaygateRootSettings,
+            **fields,
+        )
 
-            self.register(plugin_name, config_type)
-
-    def register(self, name: str, config: type[PluginT]) -> None:
-        """
-        Register a settings class.
-
-        Args:
-            name: The name to register the settings class under.
-            config: The settings class to register.
-        """
-        self._registry[name] = config()
-
-    def get(self, name) -> PluginT | None:
-        """
-        Get a registered settings class by name.
-
-        Args:
-            name: The name of the settings class to retrieve.
-
-        Returns:
-            The registered settings class, or None if not found.
-        """
-        return self._registry.get(name)
+        self._config_instance = settings_model()
+        logger.debug(
+            "Configuration loaded successfully",
+            config=self._config_instance.model_dump(),
+        )
+        return self._config_instance

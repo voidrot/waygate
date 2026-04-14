@@ -1,1 +1,0 @@
-def calculate_input_context_length()

@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import List
 from enum import StrEnum
 from waygate_core.plugin.base import WayGatePluginBase
@@ -22,8 +23,16 @@ class StorageNamespace(StrEnum):
 class StoragePlugin(WayGatePluginBase):
     """
     Base class for storage plugins.
+
+    Storage plugins are instantiated once at startup and cached process-wide.
+    Implement storage operations as thread-safe; the same plugin instance may be
+    called concurrently by multiple application components.
     """
 
+    plugin_group: str = "waygate.plugins.storage"
+    hook_name: str = "waygate_storage_plugin"
+
+    @abstractmethod
     def build_namespaced_path(
         self, namespace: StorageNamespace, document_path: str
     ) -> str:
@@ -40,6 +49,7 @@ class StoragePlugin(WayGatePluginBase):
             "Storage plugins must implement the build_namespaced_path method."
         )
 
+    @abstractmethod
     def write_document(self, document_path: str, content: str) -> str:
         """
         Write a document to storage.
@@ -65,6 +75,7 @@ class StoragePlugin(WayGatePluginBase):
             paths.append(self.write_document(document_path, content))
         return paths
 
+    @abstractmethod
     def read_document(self, document_path: str) -> str:
         """
         Read a document from storage.
@@ -95,6 +106,7 @@ class StoragePlugin(WayGatePluginBase):
             docs.append(self.read_document(document_path))
         return docs
 
+    @abstractmethod
     def list_documents(self, search_path: str, prefix: str = "") -> list[str]:
         """
         List documents in a given namespace with an optional prefix filter.
@@ -110,6 +122,7 @@ class StoragePlugin(WayGatePluginBase):
             "Storage plugins must implement the list_documents method."
         )
 
+    @abstractmethod
     def delete_document(self, document_path: str) -> None:
         """
         Delete a document from storage.

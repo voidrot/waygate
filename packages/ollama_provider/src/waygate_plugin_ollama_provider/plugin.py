@@ -1,14 +1,11 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, BaseModel
 from langchain_core.runnables import Runnable
 from waygate_core.plugin import BaseLLMProvider, PluginConfigRegistration, hookimpl
 from langchain_ollama import ChatOllama
 from . import PLUGIN_NAME, __version__
 
 
-class OllamaProviderConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="waygate_ollama_provider_")
-
+class OllamaProviderConfig(BaseModel):
     base_url: str = Field(
         default="http://localhost:11434",
         description="The base URL for the Ollama API.",
@@ -140,8 +137,8 @@ class OllamaProvider(BaseLLMProvider):
             config=OllamaProviderConfig,
         )
 
-    def __init__(self):
-        self._config = OllamaProviderConfig()
+    def __init__(self, config: OllamaProviderConfig | None = None):
+        self._config = config or OllamaProviderConfig()
 
     @property
     def name(self) -> str:

@@ -8,6 +8,17 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class BaseLLMProvider(WayGatePluginBase):
+    """
+    Abstract base for LLM provider plugins.
+
+    LLM provider instances are cached process-wide at startup. Implement your
+    provider as stateless where possible, or ensure thread-safe access to any
+    mutable state.
+    """
+
+    plugin_group: str = "waygate.plugins.llm"
+    hook_name: str = "waygate_llm_plugin"
+
     @abstractmethod
     def get_llm(self, model_name: str, workflow_type: str | None = None) -> Runnable:
         """
@@ -21,6 +32,7 @@ class BaseLLMProvider(WayGatePluginBase):
         """
         raise NotImplementedError("BaseLLMProvider subclasses must implement get_llm")
 
+    @abstractmethod
     def get_structured_llm(
         self, schema: Type[T], model_name: str, workflow_type: str | None = None
     ) -> Runnable:

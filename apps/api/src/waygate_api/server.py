@@ -1,8 +1,7 @@
-from waygate_api.clients import mqtt_client
+from waygate_core import get_app_context, init_app
 from contextlib import asynccontextmanager
 from typing import Any
 from waygate_api.routes.webhooks import webhook_router
-from waygate_api.config import webhook_registry, core_config
 from waygate_core.logging import configure_logging, get_logger
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -14,13 +13,9 @@ logger = get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting MQTT client...")
-    mqtt_client.connect(core_config.mqtt_host, core_config.mqtt_port)
-    mqtt_client.loop_start()
+    init_app()
+
     yield
-    logger.info("Stopping MQTT client...")
-    mqtt_client.loop_stop()
-    mqtt_client.disconnect()
 
 
 app = FastAPI(
@@ -48,7 +43,7 @@ def custom_openapi() -> dict[str, Any]:
     component_schemas: dict = schema.setdefault("components", {}).setdefault(
         "schemas", {}
     )
-    for plugin in webhook_registry.get_all().values():
+    for plugin in get_app_context().plugins.webhooks.values():
         payload_schema = plugin.openapi_payload_schema
         if payload_schema is None:
             continue

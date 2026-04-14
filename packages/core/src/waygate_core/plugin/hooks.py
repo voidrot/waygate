@@ -1,9 +1,9 @@
 from __future__ import annotations
+from pydantic import BaseModel
 
 from dataclasses import dataclass
 
 import pluggy
-from pydantic_settings import BaseSettings
 
 from waygate_core.plugin.base import WayGatePluginBase
 from waygate_core.plugin.cron_base import CronPlugin
@@ -20,7 +20,7 @@ hookimpl = pluggy.HookimplMarker(PROJECT_NAME)
 @dataclass(frozen=True)
 class PluginConfigRegistration:
     name: str
-    config: type[BaseSettings]
+    config: type[BaseModel]
 
 
 class WayGatePluginSpec:

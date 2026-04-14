@@ -1,10 +1,21 @@
-from pydantic_settings import BaseSettings
 from abc import ABC
 
 
 class WayGatePluginBase(ABC):
     """
     Base class for WayGate plugins.
+
+    **Plugin Lifecycle & Caching:**
+
+    Plugin instances are discovered and instantiated once during application startup,
+    then cached process-wide in the WayGatePluginManager. Instances are shared across
+    all consumers (API, Conductor, Scheduler) for the lifetime of the process.
+
+    **Thread Safety:**
+
+    Implement plugins as stateless where possible. If your plugin maintains mutable
+    instance state, ensure it is thread-safe, as multiple application components may
+    call your plugin methods concurrently.
     """
 
     @property
@@ -36,13 +47,3 @@ class WayGatePluginBase(ABC):
             str: The version of the plugin.
         """
         return "0.0.0"
-
-    @property
-    def config(self) -> BaseSettings | None:
-        """
-        The configuration for the plugin.
-
-        Returns:
-            BaseSettings: The plugin's configuration.
-        """
-        return None
