@@ -1,10 +1,10 @@
 from waygate_core.logging import get_logger
-from waygate_core.schema import GraphState
+from waygate_core.schema import DraftGraphState
 
 logger = get_logger()
 
 
-def human_review_node(state: GraphState) -> GraphState:
+def human_review_node(state: DraftGraphState) -> DraftGraphState:
     """
     Human review node for the compiler graph.
     """

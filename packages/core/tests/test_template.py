@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from waygate_core.files.template import (
     build_raw_document_frontmatter,
+    render_draft_document,
     render_raw_document,
 )
 from waygate_core.schema import RawDocument, RawDocumentFrontmatter
@@ -72,3 +73,16 @@ def test_render_raw_document_uses_provided_frontmatter_override() -> None:
     assert "- custom-topic" in rendered
     assert "- custom-tag" in rendered
     assert "payload" in rendered
+
+
+def test_render_draft_document_serializes_document_context() -> None:
+    rendered = render_draft_document(
+        context={"source_type": "manual", "topics": ["waygate"]},
+        content="draft source body",
+        doc_uri="raw/doc-1.md",
+    )
+
+    assert "<source_document uri='raw/doc-1.md'>" in rendered
+    assert '"source_type": "manual"' in rendered
+    assert '"topics": [' in rendered
+    assert "draft source body" in rendered

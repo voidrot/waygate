@@ -31,3 +31,16 @@ class CoreSettings(BaseModel):
     )
 
     storage_plugin_name: str = Field(default="local-storage")
+    llm_plugin_name: str = Field(default="OllamaProvider")
+    metadata_model_name: str = Field(
+        default="qwen3.5:9b",
+        validation_alias=AliasChoices("metadata_model_name", "metadata_model"),
+    )
+    draft_model_name: str = Field(
+        default="qwen3.5:9b",
+        validation_alias=AliasChoices("draft_model_name", "draft_model"),
+    )
+    review_model_name: str = Field(
+        default="hermes3:8b",
+        validation_alias=AliasChoices("review_model_name", "review_model"),
+    )

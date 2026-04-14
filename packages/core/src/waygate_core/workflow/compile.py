@@ -4,13 +4,13 @@ from waygate_core.nodes.review import review_node
 from waygate_core.nodes.metadata import metadata_node
 from waygate_core.nodes.draft import draft_node
 from waygate_core.logging import get_logger
-from waygate_core.schema import GraphState
+from waygate_core.schema import DraftGraphState
 from langgraph.graph import StateGraph, END
 
 logger = get_logger()
 
 
-def route_after_review(state: GraphState) -> str:
+def route_after_review(state: DraftGraphState) -> str:
     if state.status == "approved":
         logger.debug(
             "review approved, routing to publish",
@@ -41,9 +41,9 @@ def route_after_review(state: GraphState) -> str:
     return "draft"
 
 
-def compile_graph():
+def compile_graph() -> StateGraph[DraftGraphState]:
 
-    workflow = StateGraph(GraphState)
+    workflow = StateGraph(DraftGraphState)
 
     # set the entry point of the graph
     workflow.set_entry_point("metadata")
@@ -72,4 +72,4 @@ def compile_graph():
         },
     )
 
-    return workflow.compile()
+    return workflow

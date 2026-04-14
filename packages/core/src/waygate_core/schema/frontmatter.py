@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -9,5 +9,5 @@ class RawDocumentFrontmatter(BaseModel):
     source_hash: Optional[str] = None
     source_uri: Optional[str] = None
     timestamp: Optional[datetime] = None
-    topics: List[str] = []
-    tags: List[str] = []
+    topics: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)

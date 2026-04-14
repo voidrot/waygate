@@ -1,3 +1,5 @@
+import json
+
 import frontmatter
 from waygate_core.schema import RawDocumentFrontmatter
 from waygate_core.schema import RawDocument
@@ -49,4 +51,8 @@ def render_raw_document(
 
 def render_draft_document(context: dict, content: str, doc_uri: str) -> str:
     template = template_env.get_template("draft_source_text.j2")
-    return template.render(context=context, content=content, doc_uri=doc_uri)
+    return template.render(
+        document_context=json.dumps(context, indent=2, sort_keys=True, default=str),
+        content=content,
+        doc_uri=doc_uri,
+    )
