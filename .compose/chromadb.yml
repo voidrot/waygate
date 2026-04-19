@@ -1,0 +1,20 @@
+services:
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:${CHROMA_VERSION:-1.5.8}
+    ports:
+      - ${CHROMA_PORT:-8000}:8000
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=${CHROMA_PERSIST_DIRECTORY:-/chroma/chroma}
+      - ANONYMIZED_TELEMETRY=${CHROMA_TELEMETRY:-FALSE}
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "/bin/bash", "-c", "</dev/tcp/localhost/8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  chroma_data:

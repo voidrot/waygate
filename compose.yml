@@ -1,0 +1,63 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.compose
+    environment:
+      PORT: 8080
+    depends_on:
+      - db
+      - valkey
+      - chromadb
+    develop:
+      watch:
+        - path: apps/api
+          action: rebuild
+        - path: libs
+          action: rebuild
+        - path: plugins
+          action: rebuild
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=scheduler
+    env_file:
+      - .env.compose
+    environment: {}
+    depends_on:
+      - db
+      - valkey
+      - chromadb
+    develop:
+      watch:
+        - path: apps/scheduler
+          action: rebuild
+        - path: libs
+          action: rebuild
+        - path: plugins
+          action: rebuild
+
+  db:
+    extends:
+      file: .compose/postgresql.yml
+      service: db
+  valkey:
+    extends:
+      file: .compose/valkey.yml
+      service: valkey
+  chromadb:
+    extends:
+      file: .compose/chromadb.yml
+      service: chromadb
+volumes:
+  valkey_data:
+  postgres_data:
+  chroma_data:

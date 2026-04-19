@@ -1,0 +1,11 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/apps",
+    "${workspaceFolder}/libs",
+    "${workspaceFolder}/plugins"
+  ],
+  "chat.tools.terminal.autoApprove": {
+    "mise": true,
+    "pytest": true
+  },
+}

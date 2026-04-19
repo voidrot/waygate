@@ -1,0 +1,31 @@
+[tools]
+prek   = "latest"
+python = "3.14"
+ruff   = "latest"
+uv     = "latest"
+
+[env]
+_.file        = '.env'
+_.python.venv = { path = '.venv', create = false }
+
+[tasks."uv:sync"]
+run = "uv sync --all-groups --all-extras --all-packages"
+
+[tasks.test]
+run = "uv run pytest"
+
+[tasks."test:quick"]
+run = "uv run pytest -q"
+
+[tasks."ollama:pull"]
+run = [
+    "docker compose exec ollama ollama pull ${DRAFT_MODEL}",
+    "docker compose exec ollama ollama pull ${REVIEW_MODEL}",
+]
+depends = "docker:up"
+
+[tasks."format"]
+run = "uv run ruff format ."
+
+[tasks."lint"]
+run = "uv run ruff check . --fix"

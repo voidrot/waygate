@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "python",
+  "separate-pull-requests": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    "apps/api": {
+      "package-name": "waygate-api",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "apps/api/src/waygate_api/__init__.py"
+        }
+      ]
+    },
+    "apps/scheduler": {
+      "package-name": "waygate-scheduler",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "apps/scheduler/src/waygate_scheduler/__init__.py"
+        }
+      ]
+    },
+    "libs/core": {
+      "package-name": "waygate-core",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "libs/core/src/waygate_core/__init__.py"
+        }
+      ]
+    },
+    "plugins/local-storage": {
+      "package-name": "waygate-plugin-local-storage",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/local-storage/src/waygate_plugin_local_storage/__init__.py"
+        }
+      ]
+    },
+    "plugins/provider-ollama": {
+      "package-name": "waygate-plugin-provider-ollama",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/provider-ollama/src/waygate_plugin_provider_ollama/__init__.py"
+        }
+      ]
+    },
+    "plugins/webhook-generic": {
+      "package-name": "waygate-plugin-webhook-generic",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/webhook-generic/src/waygate_plugin_webhook_generic/__init__.py"
+        }
+      ]
+    }
+  }
+}

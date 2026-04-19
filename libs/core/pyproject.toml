@@ -1,0 +1,42 @@
+[project]
+name = "waygate-core"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+  { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+  "pluggy>=1.6.0",
+  "pydantic>=2.13.2",
+  "pydantic-settings>=2.13.1",
+  "rich>=15.0.0",
+  "structlog>=25.5.0",
+  "langchain-core>=1.2.28",
+  "langgraph>=1.1.6",
+  "langgraph-checkpoint-postgres>=3.0.5",
+  "langgraph-checkpoint-redis>=0.4.0",
+  "psycopg[binary,pool]>=3.3.3",
+  "sqlalchemy>=2.0.49",
+  "asyncpg>=0.31.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
+
+[build-system]
+requires      = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=waygate_core",
+  "--cov-report=term-missing",
+]
