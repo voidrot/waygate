@@ -23,6 +23,15 @@
         }
       ]
     },
+    "apps/draft-worker": {
+      "package-name": "waygate-draft-worker",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "apps/draft-worker/src/waygate_draft_worker/__init__.py"
+        }
+      ]
+    },
     "libs/core": {
       "package-name": "waygate-core",
       "extra-files": [
@@ -47,6 +56,24 @@
         {
           "type": "generic",
           "path": "plugins/local-storage/src/waygate_plugin_local_storage/__init__.py"
+        }
+      ]
+    },
+    "plugins/communication-http": {
+      "package-name": "waygate-plugin-communication-http",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/communication-http/src/waygate_plugin_communication_http/__init__.py"
+        }
+      ]
+    },
+    "plugins/communication-rq": {
+      "package-name": "waygate-plugin-communication-rq",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/communication-rq/src/waygate_plugin_communication_rq/__init__.py"
         }
       ]
     },
