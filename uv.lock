@@ -1740,6 +1740,7 @@ dependencies = [
     { name = "waygate-core" },
     { name = "waygate-plugin-communication-http" },
     { name = "waygate-plugin-communication-rq" },
+    { name = "waygate-plugin-webhook-generic" },
 ]
 
 [package.dev-dependencies]
@@ -1756,6 +1757,7 @@ requires-dist = [
     { name = "waygate-core", editable = "libs/core" },
     { name = "waygate-plugin-communication-http", editable = "plugins/communication-http" },
     { name = "waygate-plugin-communication-rq", editable = "plugins/communication-rq" },
+    { name = "waygate-plugin-webhook-generic", editable = "plugins/webhook-generic" },
 ]
 
 [package.metadata.requires-dev]
