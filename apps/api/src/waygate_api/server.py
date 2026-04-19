@@ -3,11 +3,12 @@ from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from contextlib import asynccontextmanager
 from typing import Any
+from waygate_core import bootstrap_app, get_app_context
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_app()
+    bootstrap_app()
 
     yield
 

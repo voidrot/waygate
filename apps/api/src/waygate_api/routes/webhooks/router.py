@@ -1,7 +1,8 @@
 from uuid import uuid7
 from waygate_core import get_app_context
 from waygate_api.clients import send_draft_message
-from waygate_core.files.template import render_raw_document
+from waygate_api.routes.webhooks.errors import map_dispatch_failure_to_http
+from waygate_core.files import render_raw_document
 from waygate_core.plugin.storage import StorageNamespace
 from waygate_core.logging import get_logger
 import json
@@ -50,7 +51,10 @@ def _make_handler(plugin: WebhookPlugin) -> Callable:
                         storage.write_document(path, render_raw_document(doc))
                     )
 
-                    send_draft_message(written_paths)
+                dispatch_result = await send_draft_message(written_paths)
+                if not dispatch_result.accepted:
+                    status_code, detail = map_dispatch_failure_to_http(dispatch_result)
+                    raise HTTPException(status_code=status_code, detail=detail)
 
                 logger.debug(
                     f"Plugin '{plugin.name}' wrote {len(written_paths)} documents to storage: {written_paths}"
@@ -64,6 +68,8 @@ def _make_handler(plugin: WebhookPlugin) -> Callable:
 
         except WebhookVerificationError as exc:
             raise HTTPException(status_code=401, detail=str(exc))
+        except HTTPException:
+            raise
         except json.JSONDecodeError as exc:
             raise HTTPException(
                 status_code=400, detail=f"Invalid JSON payload: {exc.msg}"
