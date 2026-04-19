@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from waygate_core.plugin.communication import CommunicationClientPlugin
 from waygate_core.plugin.llm import LLMProviderPlugin
 from waygate_core.plugin.cron import CronPlugin
 from waygate_core.plugin.storage import StoragePlugin
@@ -40,6 +41,12 @@ class WayGatePluginSpec:
         """Return an LLMProviderPlugin class or instance to be registered with the WayGate LLM manager."""
 
     @hookspec
+    def waygate_communication_client_plugin(
+        self,
+    ) -> type[CommunicationClientPlugin] | CommunicationClientPlugin | None:
+        """Return a CommunicationClientPlugin class or instance for worker communication."""
+
+    @hookspec
     def waygate_plugin_config(self) -> PluginConfigRegistration | None:
         """Return a PluginConfigRegistration to register plugin config with the core settings registry.
 
@@ -53,8 +60,9 @@ def resolve_plugin_hook_name(plugin_group: str) -> str:
     hook_names = {
         "waygate.plugins.webhooks": "waygate_webhook_plugin",
         "waygate.plugins.storage": "waygate_storage_plugin",
-        "waygate.plugins.llm": "waygate_llm_plugin",
+        "waygate.plugins.llm": "waygate_llm_provider_plugin",
         "waygate.plugins.cron": "waygate_cron_plugin",
+        "waygate.plugins.communication": "waygate_communication_client_plugin",
     }
     try:
         return hook_names[plugin_group]

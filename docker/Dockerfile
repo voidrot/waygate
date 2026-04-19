@@ -35,7 +35,10 @@ COPY pyproject.toml uv.lock ./
 # 4. Copy every workspace member's pyproject.toml (preserving directory structure).
 COPY apps/api/pyproject.toml        apps/api/
 COPY apps/scheduler/pyproject.toml  apps/scheduler/
+COPY apps/draft-worker/pyproject.toml apps/draft-worker/
 COPY libs/core/pyproject.toml       libs/core/
+COPY libs/workflows/pyproject.toml  libs/workflows/
+COPY plugins/communication-rq/pyproject.toml plugins/communication-rq/
 COPY plugins/local-storage/pyproject.toml   plugins/local-storage/
 COPY plugins/provider-ollama/pyproject.toml plugins/provider-ollama/
 

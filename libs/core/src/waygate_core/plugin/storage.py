@@ -1,5 +1,22 @@
+from enum import StrEnum
 from typing import List
 from abc import ABC, abstractmethod
+
+
+class StorageInvalidNamespaceError(ValueError):
+    """Raised when an invalid namespace is used for storage operations."""
+
+
+class StorageNamespace(StrEnum):
+    """Defines valid namespaces for storage operations."""
+
+    Raw = "raw"
+    Staging = "staging"
+    Review = "review"
+    Published = "published"
+    Metadata = "metadata"
+    Templates = "templates"
+    Agents = "agents"
 
 
 class StoragePlugin(ABC):
@@ -43,6 +60,23 @@ class StoragePlugin(ABC):
             str: The version of the plugin.
         """
         return "0.0.0"
+
+    @abstractmethod
+    def build_namespaced_path(
+        self, namespace: StorageNamespace, document_path: str
+    ) -> str:
+        """
+        Build a namespaced path for a document.
+
+        Args:
+            namespace (StorageNamespace): The namespace for the document.
+            document_path (str): The original document path.
+        Returns:
+            str: The namespaced document path.
+        """
+        raise NotImplementedError(
+            "Storage plugins must implement the build_namespaced_path method."
+        )
 
     @abstractmethod
     def write_document(self, document_path: str, content: str) -> str:

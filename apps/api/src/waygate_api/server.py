@@ -1,13 +1,15 @@
+from waygate_api.routes.webhooks.router import webhook_router
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from contextlib import asynccontextmanager
 from typing import Any
+from waygate_core import bootstrap_app, get_app_context
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_app()
+    bootstrap_app()
 
     yield
 
@@ -57,3 +59,5 @@ app.openapi = custom_openapi  # type: ignore[method-assign]  # ty:ignore[invalid
 
 
 FastAPIInstrumentor().instrument_app(app)
+
+app.include_router(webhook_router)

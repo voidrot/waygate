@@ -1,0 +1,43 @@
+[project]
+name = "waygate-workflows"
+version = "0.1.0"
+description = "Default workflows for Waygate. These can be used as-is or serve as examples for building your own custom workflows."
+readme = "README.md"
+authors = [
+  { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+  "asyncpg>=0.31.0",
+  "jinja2>=3.1.6",
+  "langchain-core>=1.3.0",
+  "langgraph>=1.1.8",
+  "langgraph-checkpoint-postgres>=3.0.5",
+  "langgraph-checkpoint-redis>=0.4.1",
+  "psycopg[binary,pool]>=3.3.3",
+  "pydantic>=2.13.2",
+  "sqlalchemy>=2.0.49",
+  "waygate-core",
+]
+
+[tool.uv.sources]
+waygate-core = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
+
+[build-system]
+requires      = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=waygate_workflows",
+  "--cov-report=term-missing",
+]

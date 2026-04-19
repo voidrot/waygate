@@ -7,7 +7,11 @@ authors = [
     { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
 ]
 requires-python = ">=3.14"
-dependencies = ["waygate-core"]
+dependencies = [
+    "langchain-ollama>=1.0.0",
+    "ollama>=0.6.1",
+    "waygate-core",
+]
 
 [tool.uv.sources]
 waygate-core = { workspace = true }
