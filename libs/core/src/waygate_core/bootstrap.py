@@ -73,6 +73,7 @@ def bootstrap_app() -> WaygateAppContext:
 
 
 def get_app_context() -> WaygateAppContext:
+    global _app_context
     if _app_context is None:
-        return bootstrap_app()
+        _app_context = bootstrap_app()
     return _app_context
