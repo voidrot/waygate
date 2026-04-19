@@ -120,11 +120,29 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
 
     match event_type:
         case WorkflowEvent.DRAFT_READY.value:
+            thread_id = _build_thread_id(message)
+            if not message.document_paths:
+                detail = "draft.ready requires at least one document path"
+                logger.error(
+                    "Rejecting draft.ready workflow trigger with no documents",
+                    source=message.source,
+                    request_key=thread_id,
+                    detail=detail,
+                )
+                return {
+                    "status": "failed",
+                    "error_kind": DispatchErrorKind.VALIDATION.value,
+                    "detail": detail,
+                    "request_key": thread_id,
+                    "event_type": event_type,
+                    "document_paths": message.document_paths,
+                    "metadata": message.metadata,
+                }
+
             logger.info(
                 "Processing draft.ready workflow trigger",
                 source=message.source,
             )
-            thread_id = _build_thread_id(message)
             try:
                 thread_id, result = _invoke_compile_workflow(message)
             except LLMConfigurationError as exc:

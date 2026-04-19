@@ -106,3 +106,35 @@ def test_process_workflow_trigger_returns_failed_config_result(monkeypatch) -> N
     assert result["document_paths"] == ["file://raw/source.md"]
     assert result["metadata"] == {"origin": "unit-test"}
     assert "Unsupported LLM options" in result["detail"]
+
+
+def test_process_workflow_trigger_rejects_empty_draft_ready(monkeypatch) -> None:
+    invoked = {"called": False}
+
+    def fail_if_called(message) -> tuple[str, dict[str, object]]:
+        invoked["called"] = True
+        raise AssertionError("compile workflow should not be invoked")
+
+    monkeypatch.setattr(
+        "waygate_workflows.router._invoke_compile_workflow",
+        fail_if_called,
+    )
+
+    result = process_workflow_trigger(
+        {
+            "event_type": "draft.ready",
+            "source": "test-suite",
+            "document_paths": [],
+            "idempotency_key": "draft-empty-123",
+            "metadata": {"origin": "unit-test"},
+        }
+    )
+
+    assert invoked["called"] is False
+    assert result["status"] == "failed"
+    assert result["error_kind"] == "validation"
+    assert result["request_key"] == "compile:draft-empty-123"
+    assert result["event_type"] == "draft.ready"
+    assert result["document_paths"] == []
+    assert result["metadata"] == {"origin": "unit-test"}
+    assert "at least one document path" in result["detail"]
