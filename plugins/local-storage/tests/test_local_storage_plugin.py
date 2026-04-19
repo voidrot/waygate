@@ -40,6 +40,7 @@ def test_build_namespaced_path_raises_for_invalid_namespace() -> None:
         ("raw/docs/one.md", "wiki/staging/docs/one.md"),
         ("/raw/docs/one.md", "wiki/staging/docs/one.md"),
         ("file://raw/docs/one.md", "wiki/staging/docs/one.md"),
+        ("wiki/raw/docs/one.md", "wiki/staging/docs/one.md"),
     ],
 )
 def test_build_namespaced_path_replaces_existing_namespace_prefix(
@@ -58,6 +59,23 @@ def test_write_and_read_document_round_trip(tmp_path) -> None:
     document_path = plugin.build_namespaced_path(StorageNamespace.Raw, "docs/one.md")
 
     uri = plugin.write_document(document_path, "hello world")
+
+    assert uri == "file://raw/docs/one.md"
+    assert plugin.read_document(uri) == "hello world"
+
+
+def test_write_document_accepts_namespaced_path_with_relative_base_path(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    plugin = LocalStoragePlugin(config=LocalStorageConfig(base_path="wiki"))
+    relative_document_path = plugin.build_namespaced_path(
+        StorageNamespace.Raw,
+        "docs/one.md",
+    )
+
+    uri = plugin.write_document(relative_document_path, "hello world")
 
     assert uri == "file://raw/docs/one.md"
     assert plugin.read_document(uri) == "hello world"

@@ -201,8 +201,15 @@ class LocalStoragePlugin(StoragePlugin):
         """
 
         clean_doc_path = self._strip_prefix(document_path)
+        candidate = Path(clean_doc_path)
+        if candidate.is_absolute():
+            return candidate
 
-        return Path(self.base_dir / clean_doc_path)
+        base_parts = Path(self._config.base_path).parts
+        if base_parts and candidate.parts[: len(base_parts)] == base_parts:
+            return candidate
+
+        return self.base_dir / candidate
 
     def _build_plugin_path(
         self, namespace: StorageNamespace, document_path: str
@@ -227,6 +234,10 @@ class LocalStoragePlugin(StoragePlugin):
         cleaned_document_path = self._strip_prefix(document_path).lstrip("/")
 
         path_parts = Path(cleaned_document_path).parts
+        base_parts = Path(self._config.base_path).parts
+        if base_parts and path_parts[: len(base_parts)] == base_parts:
+            path_parts = path_parts[len(base_parts) :]
+
         if path_parts and path_parts[0] in self.namespace_dirs:
             path_parts = path_parts[1:]
 

@@ -29,6 +29,8 @@ class OllamaProviderConfig(BaseModel):
 class OllamaProvider(LLMProviderPlugin):
     """Provide LLM and structured LLM runnables from Ollama."""
 
+    plugin_name = PLUGIN_NAME
+
     def __init__(self, config: OllamaProviderConfig | None = None) -> None:
         """Initialize the Ollama provider.
 
