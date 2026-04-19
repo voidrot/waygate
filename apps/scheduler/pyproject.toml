@@ -11,11 +11,13 @@ dependencies = [
     "apscheduler>=3.11.1",
     "waygate-core",
     "waygate-plugin-communication-http",
+    "waygate-plugin-communication-rq",
 ]
 
 [tool.uv.sources]
 waygate-core                      = { workspace = true }
 waygate-plugin-communication-http = { workspace = true }
+waygate-plugin-communication-rq   = { workspace = true }
 
 [project.scripts]
 waygate-scheduler = "waygate_scheduler:main"

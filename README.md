@@ -8,12 +8,15 @@ WayGate is a modular platform for building **Generation-Augmented Retrieval (GAR
 apps/
   api/          — FastAPI HTTP server; exposes webhook endpoints and the OpenAPI schema
   scheduler/    — Background job runner for cron-style workflows
+  draft-worker/ — RQ worker for queued draft workflow triggers
 libs/
   core/         — Shared framework: plugin system, config registry, bootstrap, logging
+  workflows/    — Shared workflow entrypoints executed by workers
 plugins/
   local-storage/    — StoragePlugin backed by the local filesystem
   provider-ollama/  — LLMProviderPlugin backed by a local Ollama server
   communication-http/ — CommunicationClientPlugin for HTTP worker dispatch
+  communication-rq/   — CommunicationClientPlugin for RQ worker dispatch
   webhook-generic/  — WebhookPlugin for generic HTTP webhook ingestion
 ```
 
@@ -49,9 +52,12 @@ Copy `env.example` to `.env` and set values appropriate for your environment bef
 | [`waygate-core`](libs/core/)                                       | Plugin system, config registry, bootstrap |
 | [`waygate-api`](apps/api/)                                         | FastAPI HTTP server                       |
 | [`waygate-scheduler`](apps/scheduler/)                             | Cron job runner                           |
+| [`waygate-draft-worker`](apps/draft-worker/)                       | RQ draft worker                           |
 | [`waygate-plugin-local-storage`](plugins/local-storage/)           | Filesystem storage plugin                 |
 | [`waygate-plugin-provider-ollama`](plugins/provider-ollama/)       | Ollama LLM provider plugin                |
 | [`waygate-plugin-communication-http`](plugins/communication-http/) | HTTP communication client plugin          |
+| [`waygate-plugin-communication-rq`](plugins/communication-rq/)     | RQ communication client plugin            |
+| [`waygate-workflows`](libs/workflows/)                             | Shared workflow entrypoints               |
 | [`waygate-plugin-webhook-generic`](plugins/webhook-generic/)       | Generic webhook ingestion plugin          |
 
 ## Writing a Plugin

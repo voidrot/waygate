@@ -1,38 +1,34 @@
 [project]
-name = "waygate-api"
+name = "waygate-draft-worker"
 version = "0.1.0"
-description = "WayGate API Server"
+description = "RQ worker for queued WayGate draft workflow triggers"
 readme = "README.md"
 authors = [
     { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi[standard]>=0.135.3",
-    "opentelemetry-instrumentation-fastapi>=0.62b0",
-    "pydantic>=2.12.5",
+    "redis>=6.0.0",
+    "rq>=2.8.0",
     "waygate-core",
-    "waygate-plugin-communication-http",
     "waygate-plugin-communication-rq",
+    "waygate-workflows",
 ]
 
 [dependency-groups]
 dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
 
+[tool.uv.sources]
+waygate-core                    = { workspace = true }
+waygate-plugin-communication-rq = { workspace = true }
+waygate-workflows               = { workspace = true }
+
 [project.scripts]
-waygate-api = "waygate_api:main"
+waygate-draft-worker = "waygate_draft_worker:main"
 
 [build-system]
 requires      = ["uv_build>=0.11.7,<0.12.0"]
 build-backend = "uv_build"
-
-[tool.uv.sources]
-waygate-core                      = { workspace = true }
-waygate-plugin-communication-http = { workspace = true }
-waygate-plugin-communication-rq   = { workspace = true }
-
-[tool.fastapi]
-entrypoint = "waygate_api.server:app"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -42,6 +38,6 @@ addopts = [
     "-ra",
     "--strict-config",
     "--strict-markers",
-    "--cov=waygate_api",
+    "--cov=waygate_draft_worker",
     "--cov-report=term-missing",
 ]

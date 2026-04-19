@@ -1,12 +1,11 @@
 # Worker Communication Contract
 
-This document defines the worker-facing request contract for communication client plugins.
+This document defines the producer-side workflow trigger payload used by
+communication client plugins. The payload is transport-agnostic: HTTP-based
+workers and RQ-based workers both consume the same `WorkflowTriggerMessage`
+shape.
 
-## Endpoint
-
-- Method: `POST`
-- Path: `/workflows/trigger`
-- Content-Type: `application/json`
+## Trigger payload
 
 ## Request body
 
@@ -30,9 +29,17 @@ This document defines the worker-facing request contract for communication clien
 - `idempotency_key`: optional deduplication key.
 - `metadata`: optional transport-agnostic key/value context.
 
-## Response body
+## HTTP transport
 
-A worker should return an acceptance response with a stable message identifier.
+The HTTP communication plugin submits the trigger payload to a worker endpoint.
+
+- Method: `POST`
+- Path: `/workflows/trigger`
+- Content-Type: `application/json`
+
+### Response body
+
+An HTTP worker should return an acceptance response with a stable message identifier.
 
 ```json
 {
@@ -40,6 +47,18 @@ A worker should return an acceptance response with a stable message identifier.
   "message_id": "worker-msg-123"
 }
 ```
+
+## RQ transport
+
+The RQ communication plugin enqueues the trigger payload as a job argument for an
+importable Python function.
+
+- Default job function: `waygate_workflows.draft.jobs.process_workflow_trigger`
+- Default draft queue: `draft`
+- Default cron queue: `cron`
+- Job ID: derived from `idempotency_key` when present and valid for RQ
+
+The plugin returns the RQ job ID as `transport_message_id` when enqueue succeeds.
 
 ## Local mock worker
 
