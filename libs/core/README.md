@@ -41,6 +41,9 @@ Core settings are nested under `WAYGATE_CORE__*`:
 | `WAYGATE_CORE__STORAGE_PLUGIN_NAME`       | `local-storage`            | Active storage plugin              |
 | `WAYGATE_CORE__LLM_PLUGIN_NAME`           | `OllamaProvider`           | Active LLM provider plugin         |
 | `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME` | `communication-http`       | Active communication client plugin |
+| `WAYGATE_CORE__TEMPLATE_PACKAGES`         | `waygate_core`             | Comma-separated template packages  |
+| `WAYGATE_CORE__RAW_DOC_TEMPLATE`          | `raw_document.j2`          | Raw document template name         |
+| `WAYGATE_CORE__DRAFT_DOC_TEMPLATE`        | `draft_source_text.j2`     | Draft document template name       |
 
 A `.env` file in the working directory is loaded automatically.
 
