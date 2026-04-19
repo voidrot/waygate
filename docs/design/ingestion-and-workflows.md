@@ -17,7 +17,8 @@ Current behavior:
 - validates payloads as `WorkflowTriggerMessage`
 - handles `draft.ready`
 - ignores unsupported event types such as `cron.tick`
-- returns structured `completed`, `human_review`, or `ignored` results
+- returns structured `completed`, `human_review`, `failed`, or `ignored`
+  results
 
 Thread ids remain stable:
 
@@ -188,6 +189,22 @@ review feedback, and aggregated metadata.
 }
 ```
 
+### LLM configuration failure
+
+```json
+{
+  "status": "failed",
+  "error_kind": "config",
+  "detail": "Unsupported LLM options for provider OllamaProvider",
+  "request_key": "compile:draft-config-123",
+  "event_type": "draft.ready",
+  "document_paths": ["file://raw/source.txt"],
+  "metadata": {
+    "origin": "unit-test"
+  }
+}
+```
+
 ### Unsupported event type
 
 ```json
@@ -208,5 +225,5 @@ These contracts remain stable in the current implementation:
 - `source_set_key` derivation behavior
 - review retry and human-review escalation semantics
 - human-review resume action shape
-- completed, human-review, and ignored router results
+- completed, human-review, failed/config, and ignored router results
 - raw, review, and published artifacts as the durable system of record

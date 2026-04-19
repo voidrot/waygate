@@ -141,10 +141,12 @@ entrypoint.
 - `draft.ready` runs the compile workflow.
 - `cron.tick` is still ignored by the default workflow router.
 
-The router returns one of three result shapes:
+The router returns one of four result shapes:
 
 - `completed` with `published_document_uri` and `published_document_id`
 - `human_review` with `human_review_record_uri` and interrupt payload
+- `failed` with `error_kind = config` and `detail` when LLM provider
+   configuration cannot satisfy a compile request
 - `ignored` for unsupported event types
 
 ## Storage boundaries
@@ -155,6 +157,125 @@ The workflow uses storage namespaces as its durable system-of-record boundary.
 - Human-review artifacts are written to the `review` namespace.
 - Published markdown is written to the `published` namespace.
 - Optional prompt guidance is read from the `agents` namespace.
+
+## LLM Workflow Profiles
+
+Workflow agents resolve models through the active provider plugin rather than
+constructing provider SDK clients directly. For Ollama-backed runs, keep the
+configuration layers separate:
+
+- `WAYGATE_CORE__LLM_PLUGIN_NAME=OllamaProvider`
+- `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://localhost:11434`
+- `WAYGATE_CORE__LLM_WORKFLOW_PROFILES='<json>'`
+
+The preferred per-role tuning shape for compile is the JSON object below.
+Legacy stage-model env vars such as `WAYGATE_CORE__METADATA_MODEL_NAME`,
+`WAYGATE_CORE__DRAFT_MODEL_NAME`, and `WAYGATE_CORE__REVIEW_MODEL_NAME`
+remain valid fallbacks.
+
+The runtime validates every resolved LLM request before agent or stage
+execution. In strict mode, unsupported common or provider-specific options
+raise `LLMConfigurationError` instead of being silently dropped. Structured
+output roles also fail fast when the active provider does not advertise
+structured-output support.
+
+```json
+{
+   "compile": {
+      "common_options": {
+         "temperature": 0.1
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 8192
+         }
+      },
+      "option_policy": "strict"
+   },
+   "compile.source-analysis.metadata": {
+      "model_name": "qwen3.5:9b",
+      "common_options": {
+         "temperature": 0.0
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 4096
+         }
+      }
+   },
+   "compile.source-analysis.summary": {
+      "model_name": "qwen3.5:9b",
+      "common_options": {
+         "temperature": 0.2
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 8192
+         }
+      }
+   },
+   "compile.source-analysis.findings": {
+      "model_name": "qwen3.5:9b",
+      "common_options": {
+         "temperature": 0.0
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 8192
+         }
+      }
+   },
+   "compile.source-analysis.continuity": {
+      "model_name": "qwen3.5:9b",
+      "common_options": {
+         "temperature": 0.0
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 8192
+         }
+      }
+   },
+   "compile.source-analysis.supervisor": {
+      "model_name": "qwen3.5:9b",
+      "common_options": {
+         "temperature": 0.1
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 8192
+         }
+      }
+   },
+   "compile.synthesis": {
+      "model_name": "qwen3.5:9b",
+      "common_options": {
+         "temperature": 0.4
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 16384,
+            "num_predict": 1200
+         }
+      }
+   },
+   "compile.review": {
+      "model_name": "hermes3:8b",
+      "common_options": {
+         "temperature": 0.0
+      },
+      "provider_options": {
+         "OllamaProvider": {
+            "num_ctx": 8192
+         }
+      }
+   }
+}
+```
+
+When a compile run fails one of these preflight checks, the worker router now
+returns a `failed` result with `error_kind = config` and the validation message
+in `detail` instead of attempting a partial workflow run.
 
 ## Related files
 
