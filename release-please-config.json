@@ -32,6 +32,15 @@
         }
       ]
     },
+    "libs/workflows": {
+      "package-name": "waygate-workflows",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "libs/workflows/src/waygate_workflows/__init__.py"
+        }
+      ]
+    },
     "plugins/local-storage": {
       "package-name": "waygate-plugin-local-storage",
       "extra-files": [

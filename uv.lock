@@ -11,6 +11,7 @@ members = [
     "waygate-plugin-provider-ollama",
     "waygate-plugin-webhook-generic",
     "waygate-scheduler",
+    "waygate-workflows",
 ]
 
 [[package]]
@@ -1731,6 +1732,49 @@ requires-dist = [{ name = "waygate-core", editable = "libs/core" }]
 name = "waygate-scheduler"
 version = "0.1.0"
 source = { editable = "apps/scheduler" }
+
+[[package]]
+name = "waygate-workflows"
+version = "0.1.0"
+source = { editable = "libs/workflows" }
+dependencies = [
+    { name = "asyncpg" },
+    { name = "jinja2" },
+    { name = "langchain-core" },
+    { name = "langgraph" },
+    { name = "langgraph-checkpoint-postgres" },
+    { name = "langgraph-checkpoint-redis" },
+    { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+    { name = "waygate-core" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asyncpg", specifier = ">=0.31.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "langchain-core", specifier = ">=1.3.0" },
+    { name = "langgraph", specifier = ">=1.1.8" },
+    { name = "langgraph-checkpoint-postgres", specifier = ">=3.0.5" },
+    { name = "langgraph-checkpoint-redis", specifier = ">=0.4.1" },
+    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.3" },
+    { name = "pydantic", specifier = ">=2.13.2" },
+    { name = "sqlalchemy", specifier = ">=2.0.49" },
+    { name = "waygate-core", editable = "libs/core" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+]
 
 [[package]]
 name = "websockets"
