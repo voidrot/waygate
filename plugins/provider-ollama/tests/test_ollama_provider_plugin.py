@@ -1,6 +1,3 @@
-import sys
-from types import SimpleNamespace
-
 from pydantic import BaseModel
 
 from waygate_core.plugin.llm import (
@@ -26,11 +23,9 @@ def _install_fake_langchain_ollama(monkeypatch, created):
         def with_structured_output(self, schema):
             return {"schema": schema.__name__, "model": created[-1][0]}
 
-    monkeypatch.setitem(
-        sys.modules,
-        "langchain_ollama",
-        SimpleNamespace(ChatOllama=FakeChatOllama),
-    )
+    from waygate_plugin_provider_ollama import plugin as plugin_module
+
+    monkeypatch.setattr(plugin_module, "ChatOllama", FakeChatOllama)
 
 
 def test_get_llm_maps_common_and_provider_options(monkeypatch) -> None:
