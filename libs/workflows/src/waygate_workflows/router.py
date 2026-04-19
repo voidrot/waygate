@@ -6,7 +6,11 @@ import json
 from langgraph.checkpoint.postgres import PostgresSaver
 
 from waygate_core.logging import get_logger
-from waygate_core.plugin import WorkflowTriggerMessage
+from waygate_core.plugin import (
+    DispatchErrorKind,
+    LLMConfigurationError,
+    WorkflowTriggerMessage,
+)
 
 from waygate_workflows.schema import DraftGraphState
 from waygate_workflows.schema import DraftWorkflowStatus
@@ -120,7 +124,25 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
                 "Processing draft.ready workflow trigger",
                 source=message.source,
             )
-            thread_id, result = _invoke_compile_workflow(message)
+            thread_id = _build_thread_id(message)
+            try:
+                thread_id, result = _invoke_compile_workflow(message)
+            except LLMConfigurationError as exc:
+                logger.error(
+                    "Compile workflow configuration failed",
+                    source=message.source,
+                    request_key=thread_id,
+                    detail=str(exc),
+                )
+                return {
+                    "status": "failed",
+                    "error_kind": DispatchErrorKind.CONFIG.value,
+                    "detail": str(exc),
+                    "request_key": thread_id,
+                    "event_type": event_type,
+                    "document_paths": message.document_paths,
+                    "metadata": message.metadata,
+                }
             if "__interrupt__" in result:
                 return {
                     "status": "human_review",

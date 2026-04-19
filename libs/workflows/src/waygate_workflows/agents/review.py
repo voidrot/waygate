@@ -25,7 +25,12 @@ def review_draft_with_specialist(
         Structured approval decision and normalized feedback.
     """
     review_agent = create_agent(
-        model=resolve_chat_model("review", review_model_name),
+        model=resolve_chat_model(
+            "compile",
+            review_model_name,
+            target_name="compile.review",
+            requires_structured_output=True,
+        ),
         tools=[],
         response_format=ToolStrategy(ReviewOutcomeModel),
         system_prompt=(

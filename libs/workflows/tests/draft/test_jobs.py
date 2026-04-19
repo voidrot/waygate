@@ -1,3 +1,4 @@
+from waygate_core.plugin import LLMConfigurationError
 from waygate_workflows.draft.jobs import process_workflow_trigger
 
 
@@ -75,3 +76,33 @@ def test_process_workflow_trigger_ignores_unknown_event_type() -> None:
 
     assert result["status"] == "ignored"
     assert result["event_type"] == "unknown.event"
+
+
+def test_process_workflow_trigger_returns_failed_config_result(monkeypatch) -> None:
+    def raise_config_error(message) -> tuple[str, dict[str, object]]:
+        raise LLMConfigurationError(
+            "Unsupported LLM options for provider OllamaProvider"
+        )
+
+    monkeypatch.setattr(
+        "waygate_workflows.router._invoke_compile_workflow",
+        raise_config_error,
+    )
+
+    result = process_workflow_trigger(
+        {
+            "event_type": "draft.ready",
+            "source": "test-suite",
+            "document_paths": ["file://raw/source.md"],
+            "idempotency_key": "draft-config-123",
+            "metadata": {"origin": "unit-test"},
+        }
+    )
+
+    assert result["status"] == "failed"
+    assert result["error_kind"] == "config"
+    assert result["request_key"] == "compile:draft-config-123"
+    assert result["event_type"] == "draft.ready"
+    assert result["document_paths"] == ["file://raw/source.md"]
+    assert result["metadata"] == {"origin": "unit-test"}
+    assert "Unsupported LLM options" in result["detail"]

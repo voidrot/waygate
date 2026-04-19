@@ -2,6 +2,7 @@ import pytest
 
 from waygate_core.plugin.llm import (
     LLMCommonOptions,
+    LLMConfigurationError,
     LLMInvocationRequest,
     LLMOptionPolicy,
     LLMProviderCapabilities,
@@ -26,7 +27,7 @@ def test_resolve_options_strict_rejects_unknown_options() -> None:
         option_policy=LLMOptionPolicy.STRICT,
     )
 
-    with pytest.raises(ValueError, match="Unsupported LLM options"):
+    with pytest.raises(LLMConfigurationError, match="Unsupported LLM options"):
         resolve_invocation_options(request, _capabilities())
 
 

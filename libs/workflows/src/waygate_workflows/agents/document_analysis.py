@@ -79,7 +79,12 @@ def analyze_document_with_supervisor(
     document_prompt = _build_document_prompt(document, prompt_context)
 
     metadata_agent = create_agent(
-        model=resolve_chat_model("metadata", metadata_model_name),
+        model=resolve_chat_model(
+            "compile",
+            metadata_model_name,
+            target_name="compile.source-analysis.metadata",
+            requires_structured_output=True,
+        ),
         tools=[],
         response_format=ToolStrategy(MetadataExtractionModel),
         system_prompt=(
@@ -89,7 +94,12 @@ def analyze_document_with_supervisor(
         ),
     )
     summary_agent = create_agent(
-        model=resolve_chat_model("draft", draft_model_name),
+        model=resolve_chat_model(
+            "compile",
+            draft_model_name,
+            target_name="compile.source-analysis.summary",
+            requires_structured_output=True,
+        ),
         tools=[],
         response_format=ToolStrategy(SummaryExtractionModel),
         system_prompt=(
@@ -99,7 +109,12 @@ def analyze_document_with_supervisor(
         ),
     )
     findings_agent = create_agent(
-        model=resolve_chat_model("draft", draft_model_name),
+        model=resolve_chat_model(
+            "compile",
+            draft_model_name,
+            target_name="compile.source-analysis.findings",
+            requires_structured_output=True,
+        ),
         tools=[],
         response_format=ToolStrategy(FindingsExtractionModel),
         system_prompt=(
@@ -109,7 +124,12 @@ def analyze_document_with_supervisor(
         ),
     )
     continuity_agent = create_agent(
-        model=resolve_chat_model("draft", draft_model_name),
+        model=resolve_chat_model(
+            "compile",
+            draft_model_name,
+            target_name="compile.source-analysis.continuity",
+            requires_structured_output=True,
+        ),
         tools=[],
         response_format=ToolStrategy(ContinuityExtractionModel),
         system_prompt=(
@@ -173,7 +193,12 @@ def analyze_document_with_supervisor(
 
     # The supervisor coordinates the specialist tools but does not bypass them.
     supervisor = create_agent(
-        model=resolve_chat_model("draft", draft_model_name),
+        model=resolve_chat_model(
+            "compile",
+            draft_model_name,
+            target_name="compile.source-analysis.supervisor",
+            requires_structured_output=True,
+        ),
         tools=[
             extract_document_metadata,
             summarize_document,

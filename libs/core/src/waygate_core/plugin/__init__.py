@@ -12,6 +12,7 @@ from .cron import CronPlugin
 from .hooks import PluginConfigRegistration, WayGatePluginSpec
 from .llm import (
     LLMCommonOptions,
+    LLMConfigurationError,
     LLMInvocationDiagnostics,
     LLMInvocationRequest,
     LLMOptionPolicy,
@@ -32,6 +33,7 @@ __all__ = [
     "CommunicationClientResolutionError",
     "DispatchErrorKind",
     "LLMCommonOptions",
+    "LLMConfigurationError",
     "LLMInvocationDiagnostics",
     "LLMInvocationRequest",
     "LLMOptionPolicy",

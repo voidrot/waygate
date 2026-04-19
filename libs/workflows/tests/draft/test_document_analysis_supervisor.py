@@ -16,6 +16,7 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
 ) -> None:
     create_agent_calls: list[dict[str, object]] = []
     invoked_payloads: list[tuple[str, str]] = []
+    resolved_models: list[tuple[str, str, str | None]] = []
     document = {
         "uri": "file://raw/one.md",
         "content": "Document one referencing Alpha",
@@ -133,9 +134,20 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
         "waygate_workflows.agents.document_analysis.create_agent",
         fake_create_agent,
     )
+
+    def fake_resolve_chat_model(
+        workflow_name: str,
+        fallback_model_name: str,
+        *,
+        target_name: str | None = None,
+        requires_structured_output: bool = False,
+    ) -> object:
+        resolved_models.append((workflow_name, fallback_model_name, target_name))
+        return object()
+
     monkeypatch.setattr(
         "waygate_workflows.agents.document_analysis.resolve_chat_model",
-        lambda workflow_name, fallback_model_name: object(),
+        fake_resolve_chat_model,
     )
 
     result = analyze_document_with_supervisor(
@@ -167,3 +179,10 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
     assert "Alpha" in invoked_payloads[2][1]
     assert "Alpha" in invoked_payloads[3][1]
     assert "Alpha" in invoked_payloads[4][1]
+    assert resolved_models == [
+        ("compile", "metadata-model", "compile.source-analysis.metadata"),
+        ("compile", "draft-model", "compile.source-analysis.summary"),
+        ("compile", "draft-model", "compile.source-analysis.findings"),
+        ("compile", "draft-model", "compile.source-analysis.continuity"),
+        ("compile", "draft-model", "compile.source-analysis.supervisor"),
+    ]

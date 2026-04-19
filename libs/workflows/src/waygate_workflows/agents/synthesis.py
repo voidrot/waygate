@@ -41,7 +41,11 @@ def synthesize_draft_with_specialist(
         Markdown draft text produced by the synthesis specialist.
     """
     synthesis_agent = create_agent(
-        model=resolve_chat_model("draft", draft_model_name),
+        model=resolve_chat_model(
+            "compile",
+            draft_model_name,
+            target_name="compile.synthesis",
+        ),
         tools=[],
         system_prompt=(
             "You are the synthesis specialist for the compile workflow. "

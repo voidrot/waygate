@@ -12,7 +12,7 @@ from pydantic import (
 )
 from typing import cast
 
-from waygate_core.plugin.llm import LLMCommonOptions
+from waygate_core.plugin.llm import LLMCommonOptions, LLMOptionPolicy
 
 
 DEFAULT_REDIS_DSN: RedisDsn = TypeAdapter(RedisDsn).validate_python(
@@ -26,6 +26,7 @@ class LLMWorkflowProfile(BaseModel):
     model_name: str | None = Field(default=None)
     common_options: LLMCommonOptions = Field(default_factory=LLMCommonOptions)
     provider_options: dict[str, dict[str, object]] = Field(default_factory=dict)
+    option_policy: LLMOptionPolicy = Field(default=LLMOptionPolicy.STRICT)
 
 
 class CoreSettings(BaseModel):

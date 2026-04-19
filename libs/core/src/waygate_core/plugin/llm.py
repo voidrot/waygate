@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 T = TypeVar("T", bound=BaseModel)
 
 
+class LLMConfigurationError(ValueError):
+    """Raised when LLM configuration cannot be satisfied by the active provider."""
+
+
 class LLMOptionPolicy(StrEnum):
     STRICT = "strict"
     PERMISSIVE = "permissive"
@@ -29,6 +33,7 @@ class LLMInvocationRequest(BaseModel):
     """Request context used to resolve a provider model invocation."""
 
     workflow_name: str
+    target_name: str | None = Field(default=None)
     model_name: str
     variables: dict[str, Any] = Field(default_factory=dict)
     common_options: LLMCommonOptions = Field(default_factory=LLMCommonOptions)
@@ -80,7 +85,7 @@ def resolve_invocation_options(
         The resolved option payload and diagnostics.
 
     Raises:
-        ValueError: If strict mode encounters unsupported options.
+        LLMConfigurationError: If strict mode encounters unsupported options.
     """
 
     common_options = request.common_options.model_dump(exclude_none=True)
@@ -100,7 +105,7 @@ def resolve_invocation_options(
     if request.option_policy is LLMOptionPolicy.STRICT and (
         unknown_common or unknown_provider
     ):
-        raise ValueError(
+        raise LLMConfigurationError(
             "Unsupported LLM options for provider "
             f"{capabilities.provider_name}: "
             f"common={unknown_common}, provider={unknown_provider}"
