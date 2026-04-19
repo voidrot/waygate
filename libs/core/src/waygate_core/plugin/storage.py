@@ -1,5 +1,22 @@
+from enum import StrEnum
 from typing import List
 from abc import ABC, abstractmethod
+
+
+class StorageInvalidNamespaceError(ValueError):
+    """Raised when an invalid namespace is used for storage operations."""
+
+
+class StorageNamespace(StrEnum):
+    """Defines valid namespaces for storage operations."""
+
+    Raw = "raw"
+    Staging = "staging"
+    Review = "review"
+    Published = "published"
+    Metadata = "metadata"
+    Templates = "templates"
+    Agents = "agents"
 
 
 class StoragePlugin(ABC):

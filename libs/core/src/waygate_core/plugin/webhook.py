@@ -4,6 +4,10 @@ from pydantic import BaseModel
 from abc import ABC, abstractmethod
 
 
+class WebhookVerificationError(ValueError):
+    """Raised when a webhook request fails authenticity or freshness checks."""
+
+
 class WebhookPlugin(ABC):
     """
     Base class for webhook plugins.

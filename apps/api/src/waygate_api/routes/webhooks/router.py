@@ -2,7 +2,7 @@ from uuid import uuid7
 from waygate_core import get_app_context
 from waygate_api.clients import send_draft_message
 from waygate_core.files.template import render_raw_document
-from waygate_core.plugin.storage_base import StorageNamespace
+from waygate_core.plugin.storage import StorageNamespace
 from waygate_core.logging import get_logger
 import json
 from collections.abc import Callable

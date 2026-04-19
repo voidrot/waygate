@@ -23,6 +23,9 @@ class WaygateAppContext:
     plugins: WaygatePluginsContext
 
 
+_app_context: WaygateAppContext | None = None
+
+
 def bootstrap_app() -> WaygateAppContext:
     """Initialize the Waygate application.
 
@@ -59,3 +62,9 @@ def bootstrap_app() -> WaygateAppContext:
             ),
         ),
     )
+
+
+def get_app_context() -> WaygateAppContext:
+    if _app_context is None:
+        return bootstrap_app()
+    return _app_context
