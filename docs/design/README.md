@@ -26,14 +26,14 @@ If you are new to the repo, start in this order:
 - `runtime-and-plugins.md`: How bootstrap, plugin discovery, configuration, and app context assembly work.
 - `ingestion-and-workflows.md`: How webhook ingestion, cron dispatch, the worker trigger contract, transport adapters, and the compile workflow fit together.
 - `data-models-and-storage.md`: Canonical document contracts, published frontmatter, storage namespaces, and URI/path rules.
-- `compile-supervisor-multi-agent.md`: Planned target architecture for migrating compile toward a supervisor-centered multi-agent workflow.
+- `compile-supervisor-multi-agent.md`: Current supervisor-centered multi-agent compile design, with remaining follow-up work called out explicitly.
 - `roadmap.md`: Consolidated future-facing design themes carried forward from the legacy docs, updated for the current repo.
 
 ## Scope Notes
 
 - These docs describe the repository at its current structure: `apps/api`, `apps/scheduler`, `apps/draft-worker`, `libs/core`, `libs/workflows`, and the plugins under `plugins/`.
-- `compile-supervisor-multi-agent.md` is a planned-extension document. It is intentionally not the source of truth for current compile behavior.
+- `compile-supervisor-multi-agent.md` now documents the implemented sequential supervisor workflow in `libs/workflows`. Read it together with `ingestion-and-workflows.md` for the current compile contract.
 - Older documents that described operator UIs, MCP services, retrieval SDK packages, or static-site pipelines are treated here as deferred roadmap material unless the implementation exists in this repo.
 - The original compile workflow proposal is archived at `docs/plans/compile-workflow-original-plan.md`. Use it as historical background only; the current implementation contract is documented in `docs/design/ingestion-and-workflows.md`.
-- The current migration handoff plan for the supervisor-centered compile workflow is archived at `docs/plans/compile-multi-agent-supervisor-migration-plan.md`.
+- The current migration handoff plan for the supervisor-centered compile workflow is archived at `docs/plans/compile-multi-agent-supervisor-migration-plan.md` and should now be read as historical design context plus follow-up guidance.
 - `docs/worker_communication_contract.md` remains useful background for transport expectations, but current workflow behavior should be read from the code in `libs/workflows` and the design docs in this folder.

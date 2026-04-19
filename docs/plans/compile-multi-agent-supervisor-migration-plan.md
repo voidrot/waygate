@@ -12,7 +12,13 @@ This is a planning document, not the source of truth for current behavior. For t
 
 ## Status
 
-Planned extension to current behavior. Nothing in this file should be read as already implemented unless it is separately documented in the current design docs or code.
+Historical migration plan with active follow-up guidance. The core mechanics described here are now implemented in `libs/workflows`, including sequential document analysis, supervisor-controlled source analysis, a durable-versus-transient context split, cross-document continuity carryforward, and optional storage-backed guidance loading.
+
+Remaining follow-up work is narrower:
+
+- run a real end-to-end compile against a configured provider stack
+- decide whether source analysis should split continuity into narrower specialist roles
+- keep the current design docs aligned with the runtime implementation as the workflow evolves
 
 ## Goals
 

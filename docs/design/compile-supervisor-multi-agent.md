@@ -2,124 +2,156 @@
 
 ## Purpose
 
-This document describes the planned target architecture for evolving WayGate's compile workflow into a supervisor-centered multi-agent workflow.
+This document explains the supervisor-centered compile design as implemented in
+this repository.
 
-This is a planned extension to current behavior. The current implementation baseline remains documented in [docs/design/ingestion-and-workflows.md](./ingestion-and-workflows.md).
+Unlike the older planned-extension version of this doc, the repository now
+contains a working implementation of the sequential supervisor workflow.
 
 ## Design Status
 
-Planned extension. Not currently implemented.
+Implemented in this repository.
 
-## Why This Change Exists
+Still pending before merge or release-quality signoff:
 
-The current compile workflow fans out per-document analysis and merges the results later. That works as a first baseline, but it creates a context boundary between documents.
-
-The target design changes that tradeoff. It prioritizes consistency across documents by processing them in a stable order so that each later analysis step can inherit prior discoveries.
-
-The main benefits are:
-
-- more consistent topic naming
-- more consistent tag assignment
-- shared glossary development across the source set
-- better handling of cross-document references
-- less need for each document pass to rediscover the same concepts from scratch
+- real end-to-end compile validation with a live configured LLM provider
+- any additional decomposition of source analysis beyond the current specialist
+  set
 
 ## Architectural Positioning
 
-The target design should combine two layers:
+The current compile design uses two layers:
 
-1. LangGraph as the outer orchestration layer for persistence, retries, interrupts, and deterministic side-effect boundaries.
-2. A LangChain supervisor with specialist subagents as the inner compile-control layer.
+1. LangGraph as the durable orchestration layer for persistence, retries,
+   interrupts, and deterministic side effects.
+2. A LangChain supervisor with specialist subagents for source analysis,
+   synthesis, and review.
 
-This means WayGate is not moving to a free-form agent loop. It is moving to a more structured agentic control plane inside the existing durable workflow boundary.
+This keeps compile inside a bounded workflow graph rather than moving to an
+unstructured agent loop.
 
 ## Pattern Selection
 
-| Pattern         | Use in WayGate compile | Why                                                            |
-| --------------- | ---------------------- | -------------------------------------------------------------- |
-| Subagents       | Primary                | Best fit for centralized compile control                       |
-| Custom workflow | Required               | Needed for persistence, interrupts, and terminal-state clarity |
-| Handoffs        | Secondary              | Useful for human review or operator remediation                |
-| Skills          | Optional later         | Useful for progressive disclosure of prompts or guidance       |
-| Router          | Optional later         | Useful only for narrow classification problems                 |
+| Pattern             | Use in the current repo      | Why                                                              |
+| ------------------- | ---------------------------- | ---------------------------------------------------------------- |
+| Subagents           | Primary for source analysis  | Centralized control with specialist delegation                   |
+| Custom workflow     | Required                     | Needed for checkpointing, review retries, and interrupts         |
+| Handoffs            | Secondary                    | Used for human-review resume boundaries                          |
+| Skills and guidance | Partially implemented        | Prompt guidance can now be loaded from the `agents` namespace    |
+| Router              | Not used for compile control | Compile needs ongoing orchestration, not one-shot classification |
 
-## Planned Compile Shape
+## Implemented Compile Shape
 
-The target compile flow should look like this:
+The current compile flow is:
 
-1. Normalize the request and parse all source documents.
-2. Build a stable `document_order`.
+1. Normalize request and parse all source documents.
+2. Build stable `document_order`.
 3. For each document in order:
-   1. Build a transient prompt context from durable workflow state plus the active document.
-   2. Call the source analysis specialist.
-   3. Update the durable compile context.
-4. When the source-analysis phase completes, run synthesis.
+   1. Reconstruct bounded prompt context from durable state and the active
+      document.
+   2. Run source analysis through the document-analysis supervisor.
+   3. Update durable compile context.
+   4. Resolve any newly satisfiable unresolved mentions.
+4. Run synthesis.
 5. Run review.
-6. Retry synthesis when review fails and the limit has not been reached.
+6. Retry synthesis when review fails and the limit is not reached.
 7. Escalate to human review on repeated failure.
-8. Publish when approved.
+8. Publish when approved or explicitly resumed to publish.
+
+## Specialist Roles
+
+The compile agent layout in this repository is:
+
+1. source normalization
+2. source analysis
+3. synthesis
+4. review
+5. publish
+6. human review
+
+Within source analysis, the current supervisor delegates to four specialist
+tools:
+
+1. metadata extraction
+2. narrative summary
+3. grounded findings
+4. continuity inspection
 
 ## Durable State Versus Prompt Context
 
-The compile context should be split into two layers.
+The current implementation enforces the durable-versus-transient split from the migration
+plan.
 
 ### Durable workflow state
 
-This is the checkpointed state that survives retries, restarts, and interrupts.
+Checkpointed state includes:
 
-It should contain:
-
-- current workflow fields that already matter for compile
-- the accumulated multi-document context
-- enough information to reconstruct bounded prompt context deterministically
+- parsed source documents
+- document order and cursor
+- accumulated metadata and summaries
+- prior document briefs
+- canonical topics and tags
+- glossary
+- entity registry
+- claim ledger
+- reference index
+- unresolved mentions
+- review and publish state
 
 ### Transient per-pass prompt context
 
-This is built for exactly one document-analysis call.
-
-It should contain:
+Each document-analysis call receives reconstructed prompt context containing:
 
 - the active document
-- the most relevant prior context
-- bounded guidance for consistent analysis
+- relevant prior briefs
+- relevant canonical topics and tags
+- relevant glossary entries and entities
+- relevant claims and reference keys
+- relevant unresolved mentions
+- optional storage-backed guidance instructions
 
-It should be discarded after the pass and rebuilt from durable state for the next pass.
+Prompt context is discarded after the pass and rebuilt from durable state for
+the next document.
 
-## Proposed Future Typed Schema
+## Guidance Extension Point
 
-The proposed future typed schema is captured in the planning document at [docs/plans/compile-multi-agent-supervisor-migration-plan.md](../plans/compile-multi-agent-supervisor-migration-plan.md).
+The repository now implements the optional later-stage guidance mechanism discussed
+in the original plan.
 
-That schema is design guidance only. It should not be treated as the current workflow schema.
+Source-analysis instructions can be extended from the `agents` namespace with:
+
+- `agents/compile/source-analysis/common.md`
+- `agents/compile/source-analysis/source-types/<source-type>.md`
+
+This keeps prompt packs aligned with the existing runtime boundary rather than
+introducing a separate unmanaged configuration path.
+
+## Continuity Resolution
+
+The current implementation goes beyond simple accumulation of continuity state.
+
+When a later document introduces a matching claim, term, entity, or reference
+key, older unresolved mentions can move from `open` to `resolved` in durable
+state. This gives the sequential compile loop a real cross-document continuity
+benefit instead of only carrying forward prompts.
 
 ## Runtime Boundary
 
-The supervisor and its specialists should continue to resolve runtime capabilities through the shared app context.
+The implementation continues to respect the existing app-context boundary:
 
-That means:
+- LLM providers come from the configured plugin runtime
+- storage comes from the configured storage plugin
+- workflow behavior depends on merged runtime settings
 
-- LLM providers still come from the configured plugin runtime
-- storage still comes from the configured storage plugin
-- configuration still comes from the merged WayGate settings model
+No provider-specific or storage-specific behavior is hardcoded into the compile
+control plane.
 
-This avoids hardcoding provider-specific assumptions into the planned agent layer.
+## Remaining Follow-Up
 
-## Migration Constraints
+The main migration mechanics are implemented in this repository.
 
-The target design must preserve these boundaries while orchestration evolves:
+Remaining follow-up work is narrower:
 
-- `WorkflowTriggerMessage` remains the producer-to-worker contract
-- thread id derivation remains stable
-- `source_set_key` derivation remains stable
-- publish outputs remain storage-backed and compatible with current consumers
-- human-review resume semantics remain explicit and bounded
-- raw, review, and published artifacts remain the durable system of record
-
-## Decision Summary
-
-The key design decisions are:
-
-1. Keep LangGraph as the durable outer workflow.
-2. Move compile control toward a supervisor-centered multi-agent model.
-3. Replace large per-document fan-out with ordered document analysis.
-4. Split compile context into durable workflow state and transient prompt context.
-5. Treat the proposed typed schema as planning guidance until implementation begins.
+- run a real compile end to end with the configured provider stack
+- decide whether source analysis should split continuity into finer specialist
+  roles
