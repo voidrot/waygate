@@ -150,7 +150,7 @@ class LocalStoragePlugin(StoragePlugin):
         except ValueError:
             relative_path = resolved_path.as_posix()
 
-        return f"file://{relative_path}"
+        return f"{self._config.file_prefix}{relative_path}"
 
     def _build_path(self, document_path: str) -> Path:
         """
@@ -181,6 +181,18 @@ class LocalStoragePlugin(StoragePlugin):
 
         return f"file://{namespace}/{document_path}"
 
+    def _normalize_namespaced_document_path(
+        self, document_path: str, namespace_dir: str
+    ) -> str:
+        cleaned_document_path = self._strip_prefix(document_path).lstrip("/")
+
+        path_parts = Path(cleaned_document_path).parts
+        if path_parts and path_parts[0] in self.namespace_dirs:
+            path_parts = path_parts[1:]
+
+        normalized_parts = (namespace_dir, *path_parts)
+        return str(Path(self._config.base_path, *normalized_parts)).replace("\\", "/")
+
     def build_namespaced_path(
         self, namespace: StorageNamespace, document_path: str
     ) -> str:
@@ -201,8 +213,7 @@ class LocalStoragePlugin(StoragePlugin):
                 f"Invalid storage namespace: {namespace}"
             ) from exc
 
-        cleaned_document_path = document_path.lstrip("/")
-        return f"{self._config.base_path}/{base_dir}/{cleaned_document_path}"
+        return self._normalize_namespaced_document_path(document_path, base_dir)
 
     def write_document(self, document_path: str, content: str) -> str:
         path = self._build_path(document_path)

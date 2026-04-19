@@ -34,6 +34,25 @@ def test_build_namespaced_path_raises_for_invalid_namespace() -> None:
         plugin.build_namespaced_path("bad-namespace", "doc.md")  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    ("document_path", "expected_path"),
+    [
+        ("raw/docs/one.md", "wiki/staging/docs/one.md"),
+        ("/raw/docs/one.md", "wiki/staging/docs/one.md"),
+        ("file://raw/docs/one.md", "wiki/staging/docs/one.md"),
+    ],
+)
+def test_build_namespaced_path_replaces_existing_namespace_prefix(
+    document_path: str,
+    expected_path: str,
+) -> None:
+    plugin = LocalStoragePlugin(config=LocalStorageConfig(base_path="wiki"))
+
+    result = plugin.build_namespaced_path(StorageNamespace.Staging, document_path)
+
+    assert result == expected_path
+
+
 def test_write_and_read_document_round_trip(tmp_path) -> None:
     plugin = LocalStoragePlugin(config=LocalStorageConfig(base_path=str(tmp_path)))
     document_path = plugin.build_namespaced_path(StorageNamespace.Raw, "docs/one.md")
