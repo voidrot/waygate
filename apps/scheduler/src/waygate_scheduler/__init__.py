@@ -1,3 +1,5 @@
+"""APScheduler entry point for WayGate cron workflows."""
+
 __VERSION__ = "0.1.0"  # x-release-please-version
 
 import asyncio
@@ -18,6 +20,15 @@ logger = get_logger(__name__)
 
 
 def _resolve_communication_client(app_context) -> CommunicationClientPlugin:
+    """Resolve the configured communication client from the app context.
+
+    Args:
+        app_context: The bootstrapped WayGate application context.
+
+    Returns:
+        The selected communication client plugin.
+    """
+
     return resolve_communication_client(
         app_context.plugins.communication,
         app_context.config.core.communication_plugin_name,
@@ -29,6 +40,13 @@ async def _run_cron_plugin(
     cron_plugin,
     client: CommunicationClientPlugin,
 ) -> None:
+    """Run one cron plugin and dispatch its workflow trigger.
+
+    Args:
+        cron_plugin: The cron plugin to execute.
+        client: The communication client used to submit the trigger message.
+    """
+
     try:
         await cron_plugin.run({"source": "waygate-scheduler", "mode": "scheduled"})
         dispatch_result = await client.submit_workflow_trigger(
@@ -52,6 +70,16 @@ def _build_cron_job(
     cron_plugin,
     client: CommunicationClientPlugin,
 ) -> Callable[[], Awaitable[None]]:
+    """Build an awaitable APScheduler job for a cron plugin.
+
+    Args:
+        cron_plugin: The cron plugin to wrap.
+        client: The communication client used to submit triggers.
+
+    Returns:
+        An async callable suitable for APScheduler.
+    """
+
     async def _job() -> None:
         await _run_cron_plugin(cron_plugin, client)
 
@@ -63,6 +91,14 @@ def _register_cron_jobs(
     app_context,
     client: CommunicationClientPlugin,
 ) -> None:
+    """Register one scheduler job per installed cron plugin.
+
+    Args:
+        scheduler: The APScheduler instance.
+        app_context: The bootstrapped WayGate application context.
+        client: The communication client used to submit triggers.
+    """
+
     for plugin_key, cron_plugin in app_context.plugins.cron.items():
         scheduler.add_job(
             _build_cron_job(cron_plugin, client),
@@ -80,6 +116,13 @@ def _register_cron_jobs(
 
 
 def _install_signal_handlers(loop, stop_event: asyncio.Event) -> None:
+    """Install shutdown signal handlers when the runtime supports them.
+
+    Args:
+        loop: The active event loop.
+        stop_event: Event used to stop the scheduler loop.
+    """
+
     def _request_shutdown(sig_name: str) -> None:
         logger.info(f"Received {sig_name}; shutting down scheduler")
         stop_event.set()
@@ -94,6 +137,8 @@ def _install_signal_handlers(loop, stop_event: asyncio.Event) -> None:
 
 
 async def _run_scheduler() -> None:
+    """Run the scheduler loop until a shutdown signal is received."""
+
     app_context = bootstrap_app()
 
     cron_plugin_count = len(app_context.plugins.cron)
@@ -122,4 +167,6 @@ async def _run_scheduler() -> None:
 
 
 def main() -> None:
+    """Start the WayGate scheduler process."""
+
     asyncio.run(_run_scheduler())

@@ -1,3 +1,5 @@
+"""Filesystem-backed storage for WayGate documents."""
+
 from datetime import datetime, UTC
 from waygate_plugin_local_storage import __VERSION__
 from pathlib import Path
@@ -13,9 +15,7 @@ PLUGIN_NAME = "local-storage"
 
 
 class LocalStorageConfig(BaseModel):
-    """
-    Configuration for the Local Storage plugin.
-    """
+    """Configuration for the local storage plugin."""
 
     file_prefix: str = "file://"
     base_path: str = Field(
@@ -59,9 +59,17 @@ class LocalStorageConfig(BaseModel):
 
 
 class LocalStoragePlugin(StoragePlugin):
+    """Store WayGate documents on the local filesystem."""
+
     plugin_name = PLUGIN_NAME
 
     def __init__(self, config: LocalStorageConfig | None = None) -> None:
+        """Initialize the local storage plugin.
+
+        Args:
+            config: Optional plugin configuration.
+        """
+
         self._config = config or LocalStorageConfig()
         self.base_dir = Path(self._config.base_path)
         self.raw_dir = self.base_dir / self._config.raw_dir
@@ -91,29 +99,58 @@ class LocalStoragePlugin(StoragePlugin):
     @staticmethod
     @hookimpl
     def waygate_storage_plugin() -> type["LocalStoragePlugin"]:
+        """Register the local storage plugin implementation.
+
+        Returns:
+            The plugin class to register with Pluggy.
+        """
+
         return LocalStoragePlugin
 
     @staticmethod
     @hookimpl
     def waygate_plugin_config() -> PluginConfigRegistration:
+        """Register the plugin configuration model.
+
+        Returns:
+            The plugin config registration metadata.
+        """
+
         return PluginConfigRegistration(name=PLUGIN_NAME, config=LocalStorageConfig)
 
     @property
     def name(self) -> str:
+        """Return the canonical plugin name.
+
+        Returns:
+            The plugin name used for registration and lookups.
+        """
+
         return PLUGIN_NAME
 
     @property
     def description(self) -> str:
+        """Return a short human-readable description.
+
+        Returns:
+            A short description of the storage backend.
+        """
+
         return "A simple local storage plugin for WayGate."
 
     @property
     def version(self) -> str:
+        """Return the plugin version.
+
+        Returns:
+            The package version string.
+        """
+
         return __VERSION__
 
     def _setup_storage(self) -> None:
-        """
-        Set up the necessary directories for local storage.
-        """
+        """Create the namespace directories required by the plugin."""
+
         for directory in [
             self.raw_dir,
             self.staging_dir,
@@ -129,14 +166,15 @@ class LocalStoragePlugin(StoragePlugin):
                 directory.mkdir(parents=True, exist_ok=True)
 
     def _strip_prefix(self, uri: str) -> str:
-        """
-        Strip the file prefix from a URI if it exists.
+        """Strip the configured file prefix from a URI.
 
         Args:
-            uri (str): The URI to strip the prefix from.
+            uri: The URI to normalize.
+
         Returns:
-            str: The absolute URI without the file prefix.
+            The URI without the file prefix.
         """
+
         if uri.startswith(self._config.file_prefix):
             return uri[len(self._config.file_prefix) :]
         return uri
@@ -153,13 +191,13 @@ class LocalStoragePlugin(StoragePlugin):
         return f"{self._config.file_prefix}{relative_path}"
 
     def _build_path(self, document_path: str) -> Path:
-        """
-        Build a file system path based on the document path.
+        """Build a filesystem path from a document path.
 
         Args:
-            document_path (str): The relative path for the document within the namespace.
+            document_path: The relative path for the document within the namespace.
+
         Returns:
-            Path: The full file system path for the document.
+            The full filesystem path for the document.
         """
 
         clean_doc_path = self._strip_prefix(document_path)
@@ -169,14 +207,14 @@ class LocalStoragePlugin(StoragePlugin):
     def _build_plugin_path(
         self, namespace: StorageNamespace, document_path: str
     ) -> str:
-        """
-        Build a file system path for soft-deleted documents based on the namespace and document path.
+        """Build a plugin-relative path for a namespaced document.
 
         Args:
-            namespace (StorageNamespace): The namespace for the document (e.g. "raw", "staging").
-            document_path (str): The relative path for the document within the namespace.
+            namespace: The storage namespace for the document.
+            document_path: The relative path within the namespace.
+
         Returns:
-            str: The full soft path to the document.
+            The plugin-relative URI for the document.
         """
 
         return f"file://{namespace}/{document_path}"
@@ -184,6 +222,8 @@ class LocalStoragePlugin(StoragePlugin):
     def _normalize_namespaced_document_path(
         self, document_path: str, namespace_dir: str
     ) -> str:
+        """Normalize a document path into the configured namespace directory."""
+
         cleaned_document_path = self._strip_prefix(document_path).lstrip("/")
 
         path_parts = Path(cleaned_document_path).parts
@@ -196,6 +236,19 @@ class LocalStoragePlugin(StoragePlugin):
     def build_namespaced_path(
         self, namespace: StorageNamespace, document_path: str
     ) -> str:
+        """Build a namespaced storage path for a document.
+
+        Args:
+            namespace: The target storage namespace.
+            document_path: The document path to normalize.
+
+        Returns:
+            The normalized path under the configured namespace directory.
+
+        Raises:
+            StorageInvalidNamespaceError: If the namespace is unknown.
+        """
+
         namespace_dirs = {
             StorageNamespace.Raw: self._config.raw_dir,
             StorageNamespace.Staging: self._config.staging_dir,
@@ -216,16 +269,30 @@ class LocalStoragePlugin(StoragePlugin):
         return self._normalize_namespaced_document_path(document_path, base_dir)
 
     def write_document(self, document_path: str, content: str) -> str:
+        """Write a document and return its storage URI."""
+
         path = self._build_path(document_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
         return self._build_storage_uri(path)
 
     def read_document(self, document_path: str) -> str:
+        """Read a document from storage."""
+
         path = self._build_path(document_path)
         return path.read_text()
 
     def list_documents(self, search_path: str, prefix: str = "") -> list[str]:
+        """List documents under a search path.
+
+        Args:
+            search_path: Base path to search.
+            prefix: Optional URI prefix filter.
+
+        Returns:
+            Sorted storage URIs matching the search.
+        """
+
         root = self._build_path(search_path)
 
         if not root.exists():
@@ -249,12 +316,15 @@ class LocalStoragePlugin(StoragePlugin):
         return sorted(matches)
 
     def delete_document(self, document_path: str) -> None:
+        """Delete a document, optionally preserving versioned copies."""
+
         path = self._build_path(document_path)
         if not path.exists() or not path.is_file():
             return
 
         if self.keep_versioned:
             timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
+            # Versioned copies preserve the original content before removal.
             versioned_target = (
                 self.versioned_dir / f"{self._strip_prefix(document_path)}.{timestamp}"
             )
@@ -262,6 +332,7 @@ class LocalStoragePlugin(StoragePlugin):
             versioned_target.write_text(path.read_text())
 
         if self.soft_delete:
+            # Soft delete keeps the document under the deleted namespace.
             deleted_target = self.deleted_dir / self._strip_prefix(document_path)
             deleted_target.parent.mkdir(parents=True, exist_ok=True)
             path.replace(deleted_target)

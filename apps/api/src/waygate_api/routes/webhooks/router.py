@@ -1,3 +1,5 @@
+"""Dynamic webhook routing for the WayGate API app."""
+
 from uuid import uuid7
 from waygate_core import get_app_context
 from waygate_api.clients import send_draft_message
@@ -23,9 +25,25 @@ storage = app_context.plugins.storage[app_context.config.core.storage_plugin_nam
 
 
 def _make_handler(plugin: WebhookPlugin) -> Callable:
-    """Return a FastAPI route handler closure bound to *plugin*."""
+    """Build a FastAPI route handler for a webhook plugin.
+
+    Args:
+        plugin: The webhook plugin to bind to the route handler.
+
+    Returns:
+        An async FastAPI route handler closure.
+    """
 
     async def handle_webhook(request: Request):
+        """Handle a webhook request for the bound plugin.
+
+        Args:
+            request: The incoming FastAPI request.
+
+        Returns:
+            A JSON-compatible success payload.
+        """
+
         raw_body = await request.body()
         headers = dict(request.headers)
 
@@ -90,16 +108,18 @@ def _make_handler(plugin: WebhookPlugin) -> Callable:
 
 
 def _build_openapi_extra(plugin: WebhookPlugin) -> dict | None:
-    """Build the ``openapi_extra`` requestBody for a plugin.
+    """Build the OpenAPI request-body schema for a webhook plugin.
 
-    Pydantic's ``model_json_schema`` emits nested-model definitions in a
-    top-level ``$defs`` block with refs like ``#/$defs/Foo``.  Those refs are
-    not valid at the OpenAPI document level; the resolver expects them in
-    ``#/components/schemas/``.  We therefore generate the schema with the
-    correct ``ref_template`` so every ``$ref`` already points at
-    ``components/schemas``, and strip the (now-redundant) ``$defs`` block.
-    The custom ``openapi()`` hook in ``server.py`` is responsible for merging
-    those definitions into ``components/schemas`` when the spec is assembled.
+    Pydantic emits nested-model definitions in ``$defs`` by default. The API
+    server later hoists those definitions into ``components/schemas`` so the
+    generated OpenAPI document resolves correctly in Swagger UI and ReDoc.
+
+    Args:
+        plugin: The webhook plugin whose payload schema should be exported.
+
+    Returns:
+        The ``openapi_extra`` mapping for the plugin route, or ``None`` when the
+        plugin does not declare a payload schema.
     """
     payload_schema = plugin.openapi_payload_schema
     if payload_schema is None:

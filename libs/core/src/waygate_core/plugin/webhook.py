@@ -1,3 +1,5 @@
+"""Webhook plugin contract used by the API ingress layer."""
+
 from waygate_core.schema.document import RawDocument
 from typing import Mapping
 from pydantic import BaseModel
@@ -9,8 +11,7 @@ class WebhookVerificationError(ValueError):
 
 
 class WebhookPlugin(ABC):
-    """
-    Base class for webhook plugins.
+    """Base class for webhook plugins.
 
     Webhook plugins are instantiated once at startup and cached process-wide.
     Implement webhook handlers as stateless where possible.
@@ -21,41 +22,40 @@ class WebhookPlugin(ABC):
 
     @property
     def name(self) -> str:
-        """
-        The name of the plugin.
+        """Return the plugin name.
 
         Returns:
-            str: The name of the plugin.
+            The plugin name.
         """
         return self.__class__.__name__
 
     @property
     def description(self) -> str:
-        """
-        A brief description of the plugin.
+        """Return a brief plugin description.
 
         Returns:
-            str: A description of the plugin.
+            The plugin description.
         """
         return "No description provided."
 
     @property
     def version(self) -> str:
-        """
-        The version of the plugin.
+        """Return the plugin version.
 
         Returns:
-            str: The version of the plugin.
+            The plugin version.
         """
         return "0.0.0"
 
     @abstractmethod
     async def handle_webhook(self, payload: dict) -> list[RawDocument]:
-        """
-        Handle an incoming webhook payload.
+        """Handle an incoming webhook payload.
 
         Args:
-            payload (dict): The webhook payload to process.
+            payload: The webhook payload to process.
+
+        Returns:
+            A list of raw documents produced from the payload.
         """
         raise NotImplementedError(
             "WebhookPlugin subclasses must implement handle_webhook"
@@ -65,15 +65,15 @@ class WebhookPlugin(ABC):
     async def verify_webhook_request(
         self, headers: Mapping[str, str], body: bytes
     ) -> None:
-        """
-        Optionally verify the incoming webhook request (e.g. check signatures).
+        """Verify the incoming webhook request.
 
         Args:
-            headers (Mapping[str, str]): The headers of the incoming request.
-            body (Any): The raw body of the incoming request.
+            headers: The incoming request headers.
+            body: The raw request body.
 
-        Returns:
-            bool: True if the request is valid, False otherwise.
+        Raises:
+            NotImplementedError: This abstract method must be implemented by
+                subclasses.
         """
         raise NotImplementedError(
             "WebhookPlugin subclasses must implement verify_webhook_request"
@@ -83,15 +83,14 @@ class WebhookPlugin(ABC):
     async def enrich_webhook_payload(
         self, payload: dict, headers: Mapping[str, str]
     ) -> dict:
-        """
-        Optionally enrich the incoming webhook payload with additional data.
+        """Enrich the incoming webhook payload.
 
         Args:
-            payload (dict): The original webhook payload.
-            headers (Mapping[str, str]): The headers of the incoming request.
+            payload: The original webhook payload.
+            headers: The incoming request headers.
 
         Returns:
-            dict: The enriched payload to be passed to handle_webhook.
+            The enriched payload passed to ``handle_webhook``.
         """
         return payload
 
@@ -99,15 +98,29 @@ class WebhookPlugin(ABC):
 
     @property
     def openapi_summary(self) -> str:
-        """Short summary shown as the route title in /docs. Defaults to the plugin name."""
+        """Return the short OpenAPI summary.
+
+        Returns:
+            The route title shown in ``/docs``.
+        """
         return self.name
 
     @property
     def openapi_payload_schema(self) -> type[BaseModel] | None:
-        """Return a Pydantic model *class* describing the expected JSON body, or None to leave the body untyped."""
+        """Return the expected payload schema.
+
+        Returns:
+            A Pydantic model class describing the JSON body, or ``None`` when
+            the body should remain untyped.
+        """
         return None
 
     @property
     def openapi_response_schema(self) -> type[BaseModel] | None:
-        """Return a Pydantic model *class* describing the success response body, or None to use the default."""
+        """Return the success response schema.
+
+        Returns:
+            A Pydantic model class describing the success response body, or
+            ``None`` when the default response should be used.
+        """
         return None

@@ -1,3 +1,5 @@
+"""HTTP transport for WayGate workflow trigger messages."""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,6 +18,8 @@ PLUGIN_NAME = "communication-http"
 
 
 class CommunicationHttpConfig(BaseModel):
+    """Configuration for the HTTP communication transport."""
+
     endpoint: str = Field(default="http://localhost:8090/workflows/trigger")
     timeout_seconds: float = Field(default=5.0)
     max_retries: int = Field(default=2, ge=0)
@@ -25,23 +29,49 @@ class CommunicationHttpConfig(BaseModel):
 
 
 class CommunicationHttpPlugin(CommunicationClientPlugin):
+    """Submit workflow triggers to a worker endpoint over HTTP."""
+
     plugin_name = PLUGIN_NAME
 
     def __init__(self, config: CommunicationHttpConfig | None = None) -> None:
+        """Initialize the HTTP transport plugin.
+
+        Args:
+            config: Optional plugin configuration.
+        """
+
         self._config = config or CommunicationHttpConfig()
 
     @property
     def name(self) -> str:
+        """Return the canonical plugin name.
+
+        Returns:
+            The plugin name used for registration and lookups.
+        """
+
         return PLUGIN_NAME
 
     @staticmethod
     @hookimpl
     def waygate_communication_client_plugin() -> type["CommunicationHttpPlugin"]:
+        """Register the HTTP communication client implementation.
+
+        Returns:
+            The plugin class to register with Pluggy.
+        """
+
         return CommunicationHttpPlugin
 
     @staticmethod
     @hookimpl
     def waygate_plugin_config() -> PluginConfigRegistration:
+        """Register the plugin configuration model.
+
+        Returns:
+            The plugin config registration metadata.
+        """
+
         return PluginConfigRegistration(
             name=PLUGIN_NAME,
             config=CommunicationHttpConfig,
@@ -51,6 +81,15 @@ class CommunicationHttpPlugin(CommunicationClientPlugin):
         self,
         message: WorkflowTriggerMessage,
     ) -> WorkflowDispatchResult:
+        """Submit a workflow trigger message over HTTP.
+
+        Args:
+            message: The trigger message to submit.
+
+        Returns:
+            The dispatch result describing the transport outcome.
+        """
+
         if not self._config.endpoint.strip():
             return WorkflowDispatchResult(
                 accepted=False,
@@ -72,6 +111,7 @@ class CommunicationHttpPlugin(CommunicationClientPlugin):
         attempts = self._config.max_retries + 1
         for attempt in range(attempts):
             try:
+                # Create a short-lived client per attempt so retries stay bounded.
                 async with httpx.AsyncClient(
                     timeout=self._config.timeout_seconds
                 ) as client:
@@ -121,6 +161,8 @@ class CommunicationHttpPlugin(CommunicationClientPlugin):
 
         payload = response.json() if response.content else {}
         message_id = payload.get("message_id") if isinstance(payload, dict) else None
+
+        # The worker response only needs to expose an identifier for tracing.
 
         return WorkflowDispatchResult(
             accepted=True,

@@ -1,12 +1,17 @@
+"""Logging configuration for the WayGate process."""
+
 import logging
 
 import structlog
 
 
 def get_log_level():
+    """Get the log level from ``LOG_LEVEL``.
+
+    Returns:
+        The numeric logging level, defaulting to ``logging.INFO``.
     """
-    Get the log level from the environment variable LOG_LEVEL, defaulting to INFO.
-    """
+
     import os
 
     log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -14,6 +19,8 @@ def get_log_level():
 
 
 def configure_logging():
+    """Install the default structlog configuration used by WayGate."""
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

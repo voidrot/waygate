@@ -1,12 +1,16 @@
+"""Core configuration models used by the WayGate settings registry."""
+
+import json
+
 from pydantic import (
-    RedisDsn,
-    Field,
     AliasChoices,
-    TypeAdapter,
     BaseModel,
+    Field,
+    RedisDsn,
+    TypeAdapter,
     field_validator,
 )
-import json
+from typing import cast
 
 from waygate_core.plugin.llm import LLMCommonOptions
 
@@ -17,15 +21,15 @@ DEFAULT_REDIS_DSN: RedisDsn = TypeAdapter(RedisDsn).validate_python(
 
 
 class LLMWorkflowProfile(BaseModel):
+    """Per-workflow model and option defaults for LLM invocations."""
+
     model_name: str | None = Field(default=None)
     common_options: LLMCommonOptions = Field(default_factory=LLMCommonOptions)
     provider_options: dict[str, dict[str, object]] = Field(default_factory=dict)
 
 
 class CoreSettings(BaseModel):
-    """
-    Core configuration settings for Waygate.
-    """
+    """Core configuration settings for WayGate."""
 
     pg_user: str = Field(default="postgres")
     pg_password: str = Field(default="postgres")
@@ -69,6 +73,15 @@ class CoreSettings(BaseModel):
     @field_validator("template_packages", mode="before")
     @classmethod
     def _parse_template_packages(cls, value: object) -> list[str]:
+        """Normalize template package values into a list.
+
+        Args:
+            value: The raw template package setting value.
+
+        Returns:
+            A non-empty list of package names.
+        """
+
         if value is None:
             return ["waygate_core"]
         if isinstance(value, str):
@@ -85,6 +98,19 @@ class CoreSettings(BaseModel):
         cls,
         value: object,
     ) -> dict[str, LLMWorkflowProfile]:
+        """Parse workflow profile overrides from JSON or a mapping.
+
+        Args:
+            value: The raw workflow profile setting value.
+
+        Returns:
+            A mapping of workflow names to profile objects.
+
+        Raises:
+            ValueError: If the value cannot be interpreted as a mapping or JSON
+                object.
+        """
+
         if value is None:
             return {}
         if isinstance(value, str):
@@ -93,7 +119,7 @@ class CoreSettings(BaseModel):
             parsed = json.loads(value)
             if not isinstance(parsed, dict):
                 raise ValueError("llm_workflow_profiles must be a JSON object")
-            return parsed
+            return cast(dict[str, LLMWorkflowProfile], parsed)
         if isinstance(value, dict):
-            return value
+            return cast(dict[str, LLMWorkflowProfile], value)
         raise ValueError("llm_workflow_profiles must be a mapping or JSON string")

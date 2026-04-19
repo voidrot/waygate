@@ -1,3 +1,5 @@
+"""Shared raw-document data models used by storage, webhooks, and workflows."""
+
 from uuid import uuid7
 from waygate_core.schema.visibility import Visibility
 from datetime import datetime
@@ -6,11 +8,15 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class SourceMetadataBase(BaseModel):
+    """Base shape for source-specific metadata stored with a raw document."""
+
     model_config = ConfigDict(extra="allow")
     kind: str
 
 
 class RawDocument(BaseModel):
+    """Canonical raw artifact produced by ingress plugins."""
+
     source_type: str
     source_id: Optional[str] = None
     source_uri: Optional[str] = None
@@ -30,6 +36,8 @@ class RawDocument(BaseModel):
 
 
 class RawDocumentFrontmatter(BaseModel):
+    """Frontmatter subset serialized into rendered raw-document files."""
+
     source_type: str
     source_id: Optional[str] = None
     source_hash: Optional[str] = None

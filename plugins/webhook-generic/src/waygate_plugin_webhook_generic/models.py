@@ -26,6 +26,8 @@ class GenericWebhookPayloadMetadata(BaseModel):
 
 
 class GenericWebhookPayloadDocument(BaseModel):
+    """Document entry embedded in a generic webhook payload."""
+
     document_type: str = Field(..., description="Type of document in the payload.")
     document_name: str | None = Field(
         default=None,

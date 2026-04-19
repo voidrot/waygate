@@ -1,3 +1,5 @@
+"""Communication client contracts and workflow-trigger transport DTOs."""
+
 from abc import ABC, abstractmethod
 from enum import StrEnum
 from typing import Mapping
@@ -25,6 +27,8 @@ class WorkflowDispatchResult(BaseModel):
 
 
 class DispatchErrorKind(StrEnum):
+    """Classification for transport submission failures."""
+
     VALIDATION = "validation"
     CONFIG = "config"
     TRANSIENT = "transient"
@@ -43,8 +47,18 @@ def resolve_communication_client(
 ) -> "CommunicationClientPlugin":
     """Resolve a communication client by configured plugin name.
 
-    When allow_fallback is False, missing or unknown configured names fail fast
-    with a clear error message.
+    Args:
+        clients: Mapping of available client names to plugin instances.
+        configured_name: The preferred configured client name.
+        allow_fallback: Whether to fall back to the first installed client when
+            the configured name is unavailable.
+
+    Returns:
+        The selected communication client plugin.
+
+    Raises:
+        CommunicationClientResolutionError: If no configured client can be
+            resolved.
     """
 
     if not clients:
@@ -94,7 +108,14 @@ class CommunicationClientPlugin(ABC):
         self,
         message: WorkflowTriggerMessage,
     ) -> WorkflowDispatchResult:
-        """Submit a fire-and-forget workflow trigger request."""
+        """Submit a fire-and-forget workflow trigger request.
+
+        Args:
+            message: The trigger message to submit.
+
+        Returns:
+            The submission result from the underlying transport.
+        """
         raise NotImplementedError(
             "CommunicationClientPlugin subclasses must implement submit_workflow_trigger"
         )

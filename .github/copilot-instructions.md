@@ -48,3 +48,9 @@ chore(release): release waygate-core 0.2.0
 ```
 
 Agents generating commits or commit message suggestions must follow this convention. Do not use free-form commit messages.
+
+## Planning and Design
+
+This repository uses markdown files under `docs/design/` to capture current design decisions and future roadmap themes. These documents are the source of truth for how the system works and where it's going. When implementing new features or making changes, refer to these design docs to ensure alignment with the overall architecture and roadmap. Update the design docs as needed when making significant changes or adding new features that impact the system's design.
+
+This repository uses markdown files under `docs/plans/` to capture historical planning documents that informed the current design but are not themselves the source of truth for current behavior. These documents are useful for background and context, but should not be treated as defining current contracts or implementations. When in doubt, refer to the code and the `docs/design/` docs for the current state of the system. When creating a plan always write the plan to a new file under `docs/plans/` rather than editing the existing design docs, to preserve a clear record of how the design evolved over time.

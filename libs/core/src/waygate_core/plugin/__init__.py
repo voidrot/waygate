@@ -1,3 +1,5 @@
+"""Public plugin contracts, DTOs, and registry helpers for WayGate."""
+
 from .communication import (
     CommunicationClientPlugin,
     CommunicationClientResolutionError,

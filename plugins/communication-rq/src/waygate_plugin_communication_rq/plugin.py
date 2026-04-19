@@ -1,3 +1,5 @@
+"""RQ transport for WayGate workflow trigger messages."""
+
 from __future__ import annotations
 
 import os
@@ -23,6 +25,8 @@ _RQ_JOB_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_-]+")
 
 
 class CommunicationRQConfig(BaseModel):
+    """Configuration for the RQ communication transport."""
+
     redis_url: str | None = Field(default=None)
     draft_queue_name: str = Field(default="draft")
     cron_queue_name: str = Field(default="cron")
@@ -38,29 +42,64 @@ class CommunicationRQConfig(BaseModel):
 
 
 class CommunicationRQPlugin(CommunicationClientPlugin):
+    """Enqueue workflow trigger messages into Redis-backed RQ queues."""
+
     plugin_name = PLUGIN_NAME
 
     def __init__(self, config: CommunicationRQConfig | None = None) -> None:
+        """Initialize the RQ transport plugin.
+
+        Args:
+            config: Optional plugin configuration.
+        """
+
         self._config = config or CommunicationRQConfig()
 
     @property
     def name(self) -> str:
+        """Return the canonical plugin name.
+
+        Returns:
+            The plugin name used for registration and lookups.
+        """
+
         return PLUGIN_NAME
 
     @staticmethod
     @hookimpl
     def waygate_communication_client_plugin() -> type["CommunicationRQPlugin"]:
+        """Register the RQ communication client implementation.
+
+        Returns:
+            The plugin class to register with Pluggy.
+        """
+
         return CommunicationRQPlugin
 
     @staticmethod
     @hookimpl
     def waygate_plugin_config() -> PluginConfigRegistration:
+        """Register the plugin configuration model.
+
+        Returns:
+            The plugin config registration metadata.
+        """
+
         return PluginConfigRegistration(name=PLUGIN_NAME, config=CommunicationRQConfig)
 
     async def submit_workflow_trigger(
         self,
         message: WorkflowTriggerMessage,
     ) -> WorkflowDispatchResult:
+        """Submit a workflow trigger message to an RQ queue.
+
+        Args:
+            message: The trigger message to submit.
+
+        Returns:
+            The dispatch result describing the transport outcome.
+        """
+
         if message.event_type == "draft.ready" and not message.document_paths:
             return WorkflowDispatchResult(
                 accepted=False,
@@ -81,6 +120,7 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         try:
             connection = Redis.from_url(self._resolve_redis_url())
             queue = Queue(queue_name, connection=connection)
+            # Keep the enqueue kwargs explicit so the job contract is easy to scan.
             enqueue_kwargs: dict[str, object] = {
                 "job_timeout": self._config.job_timeout,
                 "result_ttl": self._config.result_ttl,
@@ -125,6 +165,15 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         )
 
     def _resolve_queue_name(self, event_type: str) -> str | None:
+        """Resolve the queue name for a workflow event type.
+
+        Args:
+            event_type: The workflow event type.
+
+        Returns:
+            The configured queue name, or ``None`` when the event is unsupported.
+        """
+
         if event_type == "draft.ready":
             return self._config.draft_queue_name
         if event_type == "cron.tick":
@@ -132,6 +181,12 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         return None
 
     def _resolve_redis_url(self) -> str:
+        """Resolve the Redis URL from config and environment fallbacks.
+
+        Returns:
+            The Redis connection URL to use.
+        """
+
         if self._config.redis_url:
             return self._config.redis_url
 
@@ -147,6 +202,12 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         return _DEFAULT_REDIS_URL
 
     def _build_retry(self) -> Retry | None:
+        """Build an RQ retry policy from the plugin configuration.
+
+        Returns:
+            A configured ``Retry`` object, or ``None`` when retries are disabled.
+        """
+
         if self._config.retry_max <= 0:
             return None
 
@@ -154,6 +215,15 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         return Retry(max=self._config.retry_max, interval=intervals)
 
     def _build_job_id(self, message: WorkflowTriggerMessage) -> str | None:
+        """Build a stable job id from the workflow trigger message.
+
+        Args:
+            message: The workflow trigger message.
+
+        Returns:
+            A sanitized job id, or ``None`` when no idempotency key is present.
+        """
+
         if not message.idempotency_key:
             return None
 

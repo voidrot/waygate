@@ -1,3 +1,9 @@
+"""Application bootstrap and frozen runtime context objects for WayGate.
+
+The bootstrap path configures logging, loads plugins, builds merged settings,
+and memoizes the resulting process-wide application context.
+"""
+
 from dataclasses import dataclass
 from typing import cast
 
@@ -12,6 +18,8 @@ from waygate_core.plugin.webhook import WebhookPlugin
 
 @dataclass(frozen=True)
 class WaygatePluginsContext:
+    """Concrete plugin instances grouped by runtime category."""
+
     storage: dict[str, StoragePlugin]
     webhooks: dict[str, WebhookPlugin]
     llm: dict[str, LLMProviderPlugin]
@@ -21,6 +29,8 @@ class WaygatePluginsContext:
 
 @dataclass(frozen=True)
 class WaygateAppContext:
+    """Resolved configuration and instantiated plugins for the current process."""
+
     config: WaygateRootSettings
     plugins: WaygatePluginsContext
 
@@ -29,12 +39,13 @@ _app_context: WaygateAppContext | None = None
 
 
 def bootstrap_app() -> WaygateAppContext:
-    """Initialize the Waygate application.
+    """Initialize the WayGate application.
 
-    Three phases:
-    1. Configure logging.
-    2. Load all plugins via entry points, then discover their config schemas.
-    3. Build the merged settings object and instantiate plugins with their configs.
+    The bootstrap process configures logging, loads plugins, builds merged
+    settings, and instantiates the grouped plugin runtime.
+
+    Returns:
+        The frozen application context for the current process.
     """
     from waygate_core.config.registry import ConfigRegistry
     from waygate_core.plugin.registry import shared_plugin_manager
@@ -73,6 +84,15 @@ def bootstrap_app() -> WaygateAppContext:
 
 
 def get_app_context() -> WaygateAppContext:
+    """Return the cached application context.
+
+    If the context has not been initialized yet, this function bootstraps the
+    process first and then returns the cached value.
+
+    Returns:
+        The process-wide application context.
+    """
+
     global _app_context
     if _app_context is None:
         _app_context = bootstrap_app()

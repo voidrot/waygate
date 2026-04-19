@@ -1,3 +1,5 @@
+"""LLM provider contracts and request-option resolution helpers."""
+
 from enum import StrEnum
 from typing import Any, Type, TypeVar
 from abc import ABC, abstractmethod
@@ -13,6 +15,8 @@ class LLMOptionPolicy(StrEnum):
 
 
 class LLMCommonOptions(BaseModel):
+    """Common provider-agnostic LLM options shared across workflows."""
+
     temperature: float | None = Field(default=None)
     top_p: float | None = Field(default=None)
     top_k: int | None = Field(default=None)
@@ -22,6 +26,8 @@ class LLMCommonOptions(BaseModel):
 
 
 class LLMInvocationRequest(BaseModel):
+    """Request context used to resolve a provider model invocation."""
+
     workflow_name: str
     model_name: str
     variables: dict[str, Any] = Field(default_factory=dict)
@@ -31,12 +37,16 @@ class LLMInvocationRequest(BaseModel):
 
 
 class LLMInvocationDiagnostics(BaseModel):
+    """Warnings and dropped-option details returned by option resolution."""
+
     dropped_common_options: list[str] = Field(default_factory=list)
     dropped_provider_options: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
 class LLMResolvedOptions(BaseModel):
+    """Normalized option payload passed to provider implementations."""
+
     common_options: dict[str, Any] = Field(default_factory=dict)
     provider_options: dict[str, Any] = Field(default_factory=dict)
     diagnostics: LLMInvocationDiagnostics = Field(
@@ -45,6 +55,8 @@ class LLMResolvedOptions(BaseModel):
 
 
 class LLMProviderCapabilities(BaseModel):
+    """Advertises which option names a provider accepts."""
+
     provider_name: str
     supports_structured_output: bool = Field(default=True)
     supported_common_options: set[str] = Field(default_factory=set)
@@ -55,6 +67,22 @@ def resolve_invocation_options(
     request: LLMInvocationRequest,
     capabilities: LLMProviderCapabilities,
 ) -> LLMResolvedOptions:
+    """Filter request options to the subset supported by a provider.
+
+    Strict mode fails fast on unsupported options. Permissive mode drops them
+    and records diagnostics so callers can surface the mismatch.
+
+    Args:
+        request: The invocation request to normalize.
+        capabilities: The provider capability metadata.
+
+    Returns:
+        The resolved option payload and diagnostics.
+
+    Raises:
+        ValueError: If strict mode encounters unsupported options.
+    """
+
     common_options = request.common_options.model_dump(exclude_none=True)
     provider_scoped_options = request.provider_options.get(
         capabilities.provider_name, {}
@@ -106,8 +134,7 @@ def resolve_invocation_options(
 
 
 class LLMProviderPlugin(ABC):
-    """
-    Abstract base for LLM provider plugins.
+    """Abstract base for LLM provider plugins.
 
     LLM provider instances are cached process-wide at startup. Implement your
     provider as stateless where possible, or ensure thread-safe access to any
@@ -119,51 +146,51 @@ class LLMProviderPlugin(ABC):
 
     @property
     def name(self) -> str:
-        """
-        The name of the plugin.
+        """Return the plugin name.
 
         Returns:
-            str: The name of the plugin.
+            The plugin name.
         """
         return self.__class__.__name__
 
     @property
     def description(self) -> str:
-        """
-        A brief description of the plugin.
+        """Return a brief plugin description.
 
         Returns:
-            str: A description of the plugin.
+            The plugin description.
         """
         return "No description provided."
 
     @property
     def version(self) -> str:
-        """
-        The version of the plugin.
+        """Return the plugin version.
 
         Returns:
-            str: The version of the plugin.
+            The plugin version.
         """
         return "0.0.0"
 
     @abstractmethod
     def get_capabilities(self) -> LLMProviderCapabilities:
-        """Return provider capability metadata used for request validation."""
+        """Return provider capability metadata.
+
+        Returns:
+            The provider capability metadata used for request validation.
+        """
         raise NotImplementedError(
             "LLMProviderPlugin subclasses must implement get_capabilities"
         )
 
     @abstractmethod
     def get_llm(self, request: LLMInvocationRequest) -> Runnable:
-        """
-        Retrieve an LLM instance by name.
+        """Retrieve an LLM instance for the given request.
 
         Args:
-            request (LLMInvocationRequest): Invocation context, variables, and options.
+            request: The invocation context, variables, and options.
 
         Returns:
-            An instance of the requested LLM model.
+            A runnable for the requested model.
         """
         raise NotImplementedError("BaseLLMProvider subclasses must implement get_llm")
 
@@ -173,15 +200,14 @@ class LLMProviderPlugin(ABC):
         schema: Type[T],
         request: LLMInvocationRequest,
     ) -> Runnable:
-        """
-        Retrieve a structured LLM instance that outputs data conforming to the provided schema.
+        """Retrieve a structured LLM instance.
 
         Args:
-            schema (Type[T]): A Pydantic model class that defines the expected output structure.
-            request (LLMInvocationRequest): Invocation context, variables, and options.
+            schema: The Pydantic model class describing the output structure.
+            request: The invocation context, variables, and options.
 
         Returns:
-            StructuredLLM[T]: An instance of StructuredLLM that will output data conforming to the provided schema.
+            A runnable that produces output conforming to ``schema``.
         """
         raise NotImplementedError(
             "BaseLLMProvider subclasses must implement get_structured_llm"

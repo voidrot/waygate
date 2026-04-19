@@ -1,3 +1,5 @@
+"""RQ worker entry point for WayGate draft workflow triggers."""
+
 from __future__ import annotations
 
 from redis import Redis
@@ -12,6 +14,18 @@ logger = get_logger(__name__)
 
 
 def _resolve_runtime(app_context) -> tuple[str, str]:
+    """Resolve the worker Redis URL and queue name from the app context.
+
+    Args:
+        app_context: The bootstrapped WayGate application context.
+
+    Returns:
+        A ``(redis_url, queue_name)`` tuple.
+
+    Raises:
+        RuntimeError: If ``communication-rq`` settings are unavailable.
+    """
+
     rq_config = getattr(app_context.config, "communication_rq", None)
     if rq_config is None:
         raise RuntimeError(
@@ -23,6 +37,8 @@ def _resolve_runtime(app_context) -> tuple[str, str]:
 
 
 def main() -> None:
+    """Start the draft worker process."""
+
     app_context = bootstrap_app()
     redis_url, queue_name = _resolve_runtime(app_context)
 

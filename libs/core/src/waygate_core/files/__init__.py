@@ -1,3 +1,5 @@
+"""Document template rendering helpers used by the compile workflow."""
+
 from .template import (
     render_raw_document,
     build_raw_document_frontmatter,
