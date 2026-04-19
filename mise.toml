@@ -17,10 +17,16 @@ run = "uv run pytest"
 [tasks."test:quick"]
 run = "uv run pytest -q"
 
+[tasks."docker:up"]
+run = "docker compose up -d"
+
+[tasks."docker:down"]
+run = "docker compose down"
+
 [tasks."ollama:pull"]
 run = [
-    "docker compose exec ollama ollama pull ${DRAFT_MODEL}",
-    "docker compose exec ollama ollama pull ${REVIEW_MODEL}",
+  "docker compose exec ollama ollama pull ${DRAFT_MODEL}",
+  "docker compose exec ollama ollama pull ${REVIEW_MODEL}",
 ]
 depends = "docker:up"
 

@@ -1,10 +1,28 @@
+"""Storage plugin contracts and namespace helpers."""
+
+from enum import StrEnum
 from typing import List
 from abc import ABC, abstractmethod
 
 
+class StorageInvalidNamespaceError(ValueError):
+    """Raised when an invalid namespace is used for storage operations."""
+
+
+class StorageNamespace(StrEnum):
+    """Defines valid namespaces for storage operations."""
+
+    Raw = "raw"
+    Staging = "staging"
+    Review = "review"
+    Published = "published"
+    Metadata = "metadata"
+    Templates = "templates"
+    Agents = "agents"
+
+
 class StoragePlugin(ABC):
-    """
-    Base class for storage plugins.
+    """Base class for storage plugins.
 
     Storage plugins are instantiated once at startup and cached process-wide.
     Implement storage operations as thread-safe; the same plugin instance may be
@@ -16,54 +34,71 @@ class StoragePlugin(ABC):
 
     @property
     def name(self) -> str:
-        """
-        The name of the plugin.
+        """Return the plugin name.
 
         Returns:
-            str: The name of the plugin.
+            The plugin name.
         """
         return self.__class__.__name__
 
     @property
     def description(self) -> str:
-        """
-        A brief description of the plugin.
+        """Return a brief plugin description.
 
         Returns:
-            str: A description of the plugin.
+            The plugin description.
         """
         return "No description provided."
 
     @property
     def version(self) -> str:
-        """
-        The version of the plugin.
+        """Return the plugin version.
 
         Returns:
-            str: The version of the plugin.
+            The plugin version.
         """
         return "0.0.0"
 
     @abstractmethod
-    def write_document(self, document_path: str, content: str) -> str:
-        """
-        Write a document to storage.
+    def build_namespaced_path(
+        self, namespace: StorageNamespace, document_path: str
+    ) -> str:
+        """Build a namespaced path for a document.
 
         Args:
-            namespace (StorageNamespace): The namespace for the document.
-            document_path (str): The path where the document should be stored.
-            content (str): The content of the document.
+            namespace: The storage namespace.
+            document_path: The original document path.
+
+        Returns:
+            The namespaced document path.
+        """
+        raise NotImplementedError(
+            "Storage plugins must implement the build_namespaced_path method."
+        )
+
+    @abstractmethod
+    def write_document(self, document_path: str, content: str) -> str:
+        """Write a document to storage.
+
+        Args:
+            document_path: The path where the document should be stored.
+            content: The content of the document.
+
+        Returns:
+            The stored document URI.
         """
         raise NotImplementedError(
             "Storage plugins must implement the write_document method."
         )
 
     def write_documents(self, documents: List[tuple[str, str]]) -> List[str]:
-        """
-        Write multiple documents to storage.
+        """Write multiple documents to storage.
 
         Args:
-            documents (List[tuple[str, str]]): A list of tuples containing the document path and content for each document to write.
+            documents: A list of ``(document_path, content)`` tuples.
+
+        Returns:
+            A list of stored document URIs.
         """
         paths = []
         for document_path, content in documents:
@@ -72,46 +107,43 @@ class StoragePlugin(ABC):
 
     @abstractmethod
     def read_document(self, document_path: str) -> str:
-        """
-        Read a document from storage.
+        """Read a document from storage.
 
         Args:
-            document_path (str): The path where the document is stored.
+            document_path: The path where the document is stored.
 
         Returns:
-            RawDocument: The content of the document.
+            The document content.
         """
         raise NotImplementedError(
             "Storage plugins must implement the read_document method."
         )
 
     def read_documents(self, documents: List[str]) -> List[str]:
-        """
-        Read multiple documents from storage.
+        """Read multiple documents from storage.
 
         Args:
-            documents (List[tuple[StorageNamespace, str]]): A list of tuples containing the namespace and document path for each document to read.
+            documents: A list of document paths to read.
 
         Returns:
-            List[RawDocument]: A list of RawDocument instances containing the content of each document.
+            A list of document contents.
         """
         docs = []
         for document_path in documents:
-            # TODO: we should probably return a tuple with the document path and content, or a custom object that includes metadata about the document along with the content, instead of just returning the raw content, but for now we'll just return the raw content
+            # The current contract keeps the return shape simple for callers.
             docs.append(self.read_document(document_path))
         return docs
 
     @abstractmethod
     def list_documents(self, search_path: str, prefix: str = "") -> list[str]:
-        """
-        List documents in a given namespace with an optional prefix filter.
+        """List documents under a search path.
 
         Args:
-            namespace (StorageNamespace): The namespace to list documents from.
-            prefix (str, optional): A prefix to filter document paths. Defaults to "".
+            search_path: The namespace or root path to search.
+            prefix: Optional prefix filter.
 
         Returns:
-            list[str]: A list of document paths matching the criteria.
+            A list of matching document paths.
         """
         raise NotImplementedError(
             "Storage plugins must implement the list_documents method."
@@ -119,22 +151,20 @@ class StoragePlugin(ABC):
 
     @abstractmethod
     def delete_document(self, document_path: str) -> None:
-        """
-        Delete a document from storage.
+        """Delete a document from storage.
 
         Args:
-            document_path (str): The path where the document is stored.
+            document_path: The path where the document is stored.
         """
         raise NotImplementedError(
             "Storage plugins must implement the delete_document method."
         )
 
     def delete_documents(self, documents: List[str]) -> None:
-        """
-        Delete multiple documents from storage.
+        """Delete multiple documents from storage.
 
         Args:
-            documents (List[tuple[StorageNamespace, str]]): A list of tuples containing the namespace and document path for each document to delete.
+            documents: A list of document paths to delete.
         """
         for document_path in documents:
             self.delete_document(document_path)

@@ -5,6 +5,7 @@ FastAPI HTTP server for WayGate. Exposes webhook ingestion endpoints and serves 
 ## Responsibilities
 
 - Receives inbound webhook requests and routes them to the registered `WebhookPlugin` for the matched route.
+- Persists produced raw documents and submits draft-ready trigger messages through the configured communication client plugin.
 - Merges each webhook plugin's payload schema into the OpenAPI spec at startup so that `$ref` definitions resolve correctly in Swagger UI and ReDoc.
 - Bootstraps the WayGate application context (config + plugins) on startup via `waygate-core`.
 - Instruments the application with OpenTelemetry via `opentelemetry-instrumentation-fastapi`.
@@ -15,10 +16,10 @@ FastAPI HTTP server for WayGate. Exposes webhook ingestion endpoints and serves 
 uv run waygate-api
 ```
 
-| Variable | Default | Description |
-|---|---|---|
-| `HOST` | `0.0.0.0` | Bind address |
-| `PORT` | `8080` | Bind port |
+| Variable | Default   | Description  |
+| -------- | --------- | ------------ |
+| `HOST`   | `0.0.0.0` | Bind address |
+| `PORT`   | `8080`    | Bind port    |
 
 All `WAYGATE_*` environment variables are also read — see [`waygate-core`](../../libs/core/) for the full reference.
 

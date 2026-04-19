@@ -1,3 +1,5 @@
+"""Structured logging helpers for WayGate."""
+
 from .helpers import get_logger
 from .config import configure_logging
 

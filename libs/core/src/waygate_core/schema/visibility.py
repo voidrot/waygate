@@ -1,3 +1,5 @@
+"""Document visibility values shared across the core data model."""
+
 from enum import StrEnum
 
 

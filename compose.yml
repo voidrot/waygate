@@ -15,6 +15,8 @@ services:
       - db
       - valkey
       - chromadb
+    volumes:
+      - wiki_data:/data/wiki
     develop:
       watch:
         - path: apps/api
@@ -36,6 +38,8 @@ services:
       - db
       - valkey
       - chromadb
+    volumes:
+      - wiki_data:/data/wiki
     develop:
       watch:
         - path: apps/scheduler
@@ -44,20 +48,62 @@ services:
           action: rebuild
         - path: plugins
           action: rebuild
-
+  draft-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=draft-worker
+    env_file:
+      - .env.compose
+    environment: {}
+    depends_on:
+      - db
+      - valkey
+      - chromadb
+    volumes:
+      - wiki_data:/data/wiki
+    develop:
+      watch:
+        - path: apps/draft-worker
+          action: rebuild
+        - path: libs
+          action: rebuild
+        - path: plugins
+          action: rebuild
   db:
+    env_file:
+      - .env.compose
     extends:
       file: .compose/postgresql.yml
       service: db
   valkey:
+    env_file:
+      - .env.compose
     extends:
       file: .compose/valkey.yml
       service: valkey
   chromadb:
+    env_file:
+      - .env.compose
     extends:
       file: .compose/chromadb.yml
       service: chromadb
+  ollama:
+    extends:
+      file: .compose/ollama.yml
+      service: ollama
+    env_file:
+      - .env.compose
+    restart: unless-stopped
 volumes:
   valkey_data:
   postgres_data:
   chroma_data:
+  wiki_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${WIKI_DATA_DIR:-./wiki}
+  ollama_data:

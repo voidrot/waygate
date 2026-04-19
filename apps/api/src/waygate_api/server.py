@@ -1,13 +1,19 @@
+"""FastAPI application assembly for the WayGate API app."""
+
+from waygate_api.routes.webhooks.router import webhook_router
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from contextlib import asynccontextmanager
 from typing import Any
+from waygate_core import get_app_context
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_app()
+    """Bootstrap shared runtime state before the app starts serving requests."""
+
+    get_app_context()
 
     yield
 
@@ -21,6 +27,8 @@ app = FastAPI(
 
 
 def custom_openapi() -> dict[str, Any]:
+    """Build the OpenAPI schema with webhook payload definitions merged in."""
+
     if app.openapi_schema:
         return app.openapi_schema
 
@@ -57,3 +65,5 @@ app.openapi = custom_openapi  # type: ignore[method-assign]  # ty:ignore[invalid
 
 
 FastAPIInstrumentor().instrument_app(app)
+
+app.include_router(webhook_router)

@@ -4,11 +4,11 @@ Core framework library for WayGate. Provides the plugin system, configuration re
 
 ## Responsibilities
 
-- **Plugin registry** — discovers and loads plugins from setuptools entry points across four groups: `waygate.plugins.storage`, `waygate.plugins.webhooks`, `waygate.plugins.llm`, `waygate.plugins.cron`.
+- **Plugin registry** — discovers and loads plugins from setuptools entry points across five groups: `waygate.plugins.storage`, `waygate.plugins.webhooks`, `waygate.plugins.llm`, `waygate.plugins.cron`, `waygate.plugins.communication`.
 - **Config registry** — collects per-plugin Pydantic config schemas via the `waygate_plugin_config` hook and merges them into a single root settings object backed by `pydantic-settings`. All values are read from environment variables under the `WAYGATE_` prefix.
 - **Bootstrap** — `bootstrap_app()` is the single entry point for application startup. It runs logging setup, plugin loading, config building, and plugin instantiation in order, returning a frozen `WaygateAppContext`.
 - **Hook specs** — defines the pluggy hookspec class (`WayGatePluginSpec`) and exports `hookimpl` for use by plugin packages.
-- **Plugin base classes** — abstract base classes for `StoragePlugin`, `WebhookPlugin`, `LLMProviderPlugin`, and `CronPlugin`.
+- **Plugin base classes** — abstract base classes for `StoragePlugin`, `WebhookPlugin`, `LLMProviderPlugin`, `CronPlugin`, and `CommunicationClientPlugin`.
 
 ## Usage
 
@@ -30,16 +30,57 @@ llm = ctx.plugins.llm["OllamaProvider"]
 
 Core settings are nested under `WAYGATE_CORE__*`:
 
-| Variable | Default | Description |
-|---|---|---|
-| `WAYGATE_CORE__PG_HOST` | `localhost` | Postgres host |
-| `WAYGATE_CORE__PG_PORT` | `5432` | Postgres port |
-| `WAYGATE_CORE__PG_USER` | `postgres` | Postgres user |
-| `WAYGATE_CORE__PG_PASSWORD` | `postgres` | Postgres password |
-| `WAYGATE_CORE__PG_DB` | `postgres` | Postgres database |
-| `WAYGATE_CORE__REDIS_DSN` | `redis://localhost:6379/0` | Redis DSN |
-| `WAYGATE_CORE__STORAGE_PLUGIN_NAME` | `local-storage` | Active storage plugin |
-| `WAYGATE_CORE__LLM_PLUGIN_NAME` | `OllamaProvider` | Active LLM provider plugin |
+| Variable                                  | Default                    | Description                        |
+| ----------------------------------------- | -------------------------- | ---------------------------------- |
+| `WAYGATE_CORE__PG_HOST`                   | `localhost`                | Postgres host                      |
+| `WAYGATE_CORE__PG_PORT`                   | `5432`                     | Postgres port                      |
+| `WAYGATE_CORE__PG_USER`                   | `postgres`                 | Postgres user                      |
+| `WAYGATE_CORE__PG_PASSWORD`               | `postgres`                 | Postgres password                  |
+| `WAYGATE_CORE__PG_DB`                     | `postgres`                 | Postgres database                  |
+| `WAYGATE_CORE__REDIS_DSN`                 | `redis://localhost:6379/0` | Redis DSN                          |
+| `WAYGATE_CORE__STORAGE_PLUGIN_NAME`       | `local-storage`            | Active storage plugin              |
+| `WAYGATE_CORE__LLM_PLUGIN_NAME`           | `OllamaProvider`           | Active LLM provider plugin         |
+| `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME` | `communication-http`       | Active communication client plugin |
+| `WAYGATE_CORE__TEMPLATE_PACKAGES`         | `waygate_core`             | Comma-separated template packages  |
+| `WAYGATE_CORE__RAW_DOC_TEMPLATE`          | `raw_document.j2`          | Raw document template name         |
+| `WAYGATE_CORE__DRAFT_DOC_TEMPLATE`        | `draft_source_text.j2`     | Draft document template name       |
+| `WAYGATE_CORE__METADATA_MODEL_NAME`       | `qwen3.5:9b`               | Model used for metadata extraction |
+| `WAYGATE_CORE__DRAFT_MODEL_NAME`          | `qwen3.5:9b`               | Model used for draft generation    |
+| `WAYGATE_CORE__REVIEW_MODEL_NAME`         | `hermes3:8b`               | Model used for review              |
+
+`WAYGATE_CORE__LLM_WORKFLOW_PROFILES` (default `{}`) accepts a JSON object keyed by workflow name for model and option defaults.
+
+The following aliases are also accepted for backward compatibility:
+
+- `WAYGATE_CORE__REDIS_URL` -> `WAYGATE_CORE__REDIS_DSN`
+- `WAYGATE_CORE__RAW_DOCUMENT_TEMPLATE` -> `WAYGATE_CORE__RAW_DOC_TEMPLATE`
+- `WAYGATE_CORE__DRAFT_DOCUMENT_TEMPLATE` -> `WAYGATE_CORE__DRAFT_DOC_TEMPLATE`
+- `WAYGATE_CORE__METADATA_MODEL` -> `WAYGATE_CORE__METADATA_MODEL_NAME`
+- `WAYGATE_CORE__DRAFT_MODEL` -> `WAYGATE_CORE__DRAFT_MODEL_NAME`
+- `WAYGATE_CORE__REVIEW_MODEL` -> `WAYGATE_CORE__REVIEW_MODEL_NAME`
+
+Logging is configured with:
+
+- `LOG_LEVEL` (default: `INFO`) sets the minimum structlog level.
+
+Example workflow profile payload for `WAYGATE_CORE__LLM_WORKFLOW_PROFILES`:
+
+```json
+{
+    "draft": {
+        "model_name": "qwen3.5:9b",
+        "common_options": {
+            "temperature": 0.2,
+            "max_tokens": 256
+        },
+        "provider_options": {
+            "OllamaProvider": {
+                "num_ctx": 4096
+            }
+        }
+    }
+}
+```
 
 A `.env` file in the working directory is loaded automatically.
 

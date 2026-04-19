@@ -14,6 +14,7 @@ PLUGIN_GROUPS = (
     "waygate.plugins.storage",
     "waygate.plugins.llm",
     "waygate.plugins.cron",
+    "waygate.plugins.communication",
 )
 
 _GROUP_HOOK_ATTR: dict[str, str] = {
@@ -21,38 +22,48 @@ _GROUP_HOOK_ATTR: dict[str, str] = {
     "waygate.plugins.storage": "waygate_storage_plugin",
     "waygate.plugins.llm": "waygate_llm_provider_plugin",
     "waygate.plugins.cron": "waygate_cron_plugin",
+    "waygate.plugins.communication": "waygate_communication_client_plugin",
 }
 
 
 def normalize_plugin_name(name: str) -> str:
-    """Normalize a plugin name to a valid Python identifier.
+    """Normalize a plugin name for use in settings and lookups.
 
-    Example: "local-storage" -> "local_storage", "OllamaProvider" -> "ollamaprovider"
+    Args:
+        name: The plugin name to normalize.
+
+    Returns:
+        The normalized plugin name.
     """
+
     return re.sub(r"[^a-z0-9]", "_", name.lower())
 
 
 class WayGatePluginManager:
-    """Wraps pluggy to manage plugin loading, config discovery, and instantiation."""
+    """Manage plugin loading, config discovery, and instantiation via Pluggy."""
 
     def __init__(self) -> None:
+        """Initialize the shared plugin manager."""
+
         self._pm = pluggy.PluginManager(PROJECT_NAME)
         self._pm.add_hookspecs(WayGatePluginSpec)
         self._loaded: set[str] = set()
 
     def load_all(self) -> None:
-        """Load all plugin groups via setuptools entry points."""
+        """Load all supported plugin groups from setuptools entry points."""
+
         for group in PLUGIN_GROUPS:
             if group not in self._loaded:
                 self._pm.load_setuptools_entrypoints(group)
                 self._loaded.add(group)
 
     def get_plugin_configs(self) -> dict[str, type[BaseModel]]:
-        """Collect all PluginConfigRegistration objects from installed plugins.
+        """Collect configuration models from installed plugins.
 
-        Returns a mapping of plugin name -> config class.
-        Only plugins that implement waygate_plugin_config are included.
+        Returns:
+            A mapping of plugin name to config model class.
         """
+
         configs: dict[str, type[BaseModel]] = {}
         for registration in self._pm.hook.waygate_plugin_config():
             if registration and isinstance(registration, PluginConfigRegistration):
@@ -60,12 +71,16 @@ class WayGatePluginManager:
         return configs
 
     def get_plugins(self, group: str, settings: object) -> dict[str, object]:
-        """Instantiate all plugins for a group, injecting config where registered.
+        """Instantiate plugins for a group and inject resolved config objects.
 
-        Plugins that define a `plugin_name` class attribute matching a registered
-        PluginConfigRegistration.name will have their config instance read from
-        settings and passed as the first constructor argument.
+        Args:
+            group: The plugin group to load.
+            settings: The merged WayGate settings object.
+
+        Returns:
+            A mapping of plugin instance name to instantiated plugin.
         """
+
         hook_attr = _GROUP_HOOK_ATTR[group]
         hook = getattr(self._pm.hook, hook_attr)
 
@@ -75,6 +90,7 @@ class WayGatePluginManager:
             normalized = normalize_plugin_name(name)
             config_instance = getattr(settings, normalized, None)
             if config_instance is not None:
+                # Match the normalized config field name rather than the raw hook name.
                 config_map[normalized] = config_instance
 
         plugins: dict[str, object] = {}

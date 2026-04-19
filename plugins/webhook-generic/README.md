@@ -14,11 +14,54 @@ The plugin is discovered automatically via its entry point. No code changes are 
 
 - **Payload verification** — passes through without validation by default. Override `verify_webhook_request` in a subclass to add signature checking.
 - **Payload enrichment** — returns the payload unchanged by default. Override `enrich_webhook_payload` to add or transform fields before document creation.
-- **Document creation** — `handle_webhook` must be implemented by concrete subclasses; the base implementation raises `NotImplementedError`.
+- **Payload validation** — validates incoming webhook JSON against a structured payload schema before conversion.
+- **Document creation** — maps each payload document to a `RawDocument` and returns the list to the API route for storage and dispatch.
+
+## Payload Contract
+
+The plugin expects JSON with this shape:
+
+```json
+{
+  "metadata": {
+    "event": "document.created",
+    "source": "github",
+    "topics": ["engineering"],
+    "tags": ["release"],
+    "originated_at": "2026-04-18T10:30:45.123456Z"
+  },
+  "documents": [
+    {
+      "document_type": "markdown",
+      "document_name": "release-notes.md",
+      "document_path": "docs/release-notes.md",
+      "document_hash": "sha256:abc123",
+      "content": "# Notes",
+      "metadata": {
+        "topics": ["docs"],
+        "tags": ["public"]
+      }
+    }
+  ]
+}
+```
+
+Field behavior:
+
+- `metadata.originated_at` is optional. If omitted, the plugin uses the current UTC timestamp.
+- `metadata.originated_at` must be ISO-8601 and include a timezone offset.
+- `topics` and `tags` from payload metadata and document metadata are merged with stable first-seen ordering and deduplicated.
+- `documents[].metadata.topics` and `documents[].metadata.tags` must be arrays of strings when provided.
 
 ## Configuration
 
 This plugin has no configuration of its own. Its presence is registered under `WAYGATE_GENERIC_WEBHOOK__*` but no fields are currently defined.
+
+## Security Note
+
+By default, webhook request verification is intentionally permissive for local development and integration testing.
+
+For production use, implement request verification in a subclass by overriding `verify_webhook_request` (for example, HMAC signature checks and replay windows).
 
 ## Entry Point
 

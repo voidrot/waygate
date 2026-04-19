@@ -1,9 +1,10 @@
+"""Cron plugin contract for scheduled workflow triggers."""
+
 from abc import ABC, abstractmethod
 
 
 class CronPlugin(ABC):
-    """
-    Base class for cron plugins.
+    """Base class for cron plugins.
 
     Cron plugin instances are cached process-wide and invoked on a schedule.
     Implement your plugin as idempotent and stateless where possible.
