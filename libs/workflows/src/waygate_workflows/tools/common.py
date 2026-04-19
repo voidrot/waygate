@@ -2,6 +2,14 @@ from __future__ import annotations
 
 
 def normalize_string_list(values: object) -> list[str]:
+    """Normalize arbitrary input into a deduplicated list of non-empty strings.
+
+    Args:
+        values: Scalar value, list-like value, or ``None``.
+
+    Returns:
+        Deduplicated string values in first-seen order.
+    """
     if values is None:
         return []
 

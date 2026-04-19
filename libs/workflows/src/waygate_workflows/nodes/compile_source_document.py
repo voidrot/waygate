@@ -21,6 +21,15 @@ from waygate_workflows.tools.guidance import load_agent_guidance_instructions
 def _supporting_source_uris(
     document_uri: str, document_source_uri: str | None
 ) -> list[str]:
+    """Build the supporting source URI set for one analyzed document.
+
+    Args:
+        document_uri: Storage URI of the active document.
+        document_source_uri: Optional upstream source URI from frontmatter.
+
+    Returns:
+        Deduplicated URI list used for durable provenance tracking.
+    """
     return normalize_string_list([document_source_uri, document_uri])
 
 
@@ -31,6 +40,17 @@ def _upsert_named_entries(
     name_key: str,
     supporting_source_uris: list[str],
 ) -> list[dict[str, object]]:
+    """Upsert canonical named entries such as topics, tags, or glossary terms.
+
+    Args:
+        existing_entries: Existing durable entries.
+        values: New names to merge into the durable set.
+        name_key: Field name holding the canonical value.
+        supporting_source_uris: Provenance URIs for the current document.
+
+    Returns:
+        Updated durable entry list.
+    """
     entries_by_key = {
         normalize_key(str(entry[name_key])): dict(entry) for entry in existing_entries
     }
@@ -59,6 +79,17 @@ def _upsert_entities(
     kind: str,
     supporting_source_uris: list[str],
 ) -> list[EntityRegistryEntry]:
+    """Upsert canonical entity registry entries for one entity kind.
+
+    Args:
+        existing_entries: Existing durable entity registry.
+        values: New canonical names discovered in the active document.
+        kind: Entity kind label.
+        supporting_source_uris: Provenance URIs for the current document.
+
+    Returns:
+        Updated durable entity registry.
+    """
     entries_by_key = {
         (str(entry["kind"]), normalize_key(entry["canonical_name"])): dict(entry)
         for entry in existing_entries
@@ -90,6 +121,18 @@ def _upsert_claims(
     related_entities: list[str],
     related_terms: list[str],
 ) -> list[ClaimLedgerEntry]:
+    """Upsert grounded claims into the durable claim ledger.
+
+    Args:
+        existing_entries: Existing claim ledger entries.
+        values: Claims extracted from the active document.
+        supporting_source_uris: Provenance URIs for the current document.
+        related_entities: Referenced entities connected to each claim.
+        related_terms: Defined terms connected to each claim.
+
+    Returns:
+        Updated durable claim ledger.
+    """
     entries_by_key = {
         normalize_key(entry["text"]): dict(entry) for entry in existing_entries
     }
@@ -126,6 +169,17 @@ def _build_reference_index(
     claim_ledger: list[ClaimLedgerEntry],
     prior_document_briefs: list[ProcessedDocumentBrief],
 ) -> list[ReferenceIndexEntry]:
+    """Build the durable reference index from accumulated compile context.
+
+    Args:
+        glossary: Accumulated glossary entries.
+        entity_registry: Accumulated entity registry.
+        claim_ledger: Accumulated claim ledger.
+        prior_document_briefs: Prior processed document briefs.
+
+    Returns:
+        Reference index entries used for later continuity resolution.
+    """
     processed_uris = [brief["uri"] for brief in prior_document_briefs]
     index: list[ReferenceIndexEntry] = []
     for entry in glossary:
@@ -167,6 +221,16 @@ def _merge_unresolved_mentions(
     *,
     source_uri: str,
 ) -> list[dict[str, object]]:
+    """Merge unresolved mentions from the current analysis pass.
+
+    Args:
+        existing_entries: Existing unresolved mention entries.
+        mentions: Newly detected unresolved mentions.
+        source_uri: Source URI associated with the active document.
+
+    Returns:
+        Updated unresolved mention list.
+    """
     merged = {
         (normalize_key(str(entry["raw_text"])), str(entry["source_uri"])): dict(entry)
         for entry in existing_entries
@@ -194,10 +258,28 @@ def _supporting_uris_overlap(
     candidate_uris: list[str],
     supporting_source_uris: list[str],
 ) -> bool:
+    """Check whether two provenance URI sets overlap.
+
+    Args:
+        candidate_uris: Candidate provenance URIs.
+        supporting_source_uris: Active document provenance URIs.
+
+    Returns:
+        ``True`` when the sets intersect.
+    """
     return bool(set(candidate_uris).intersection(supporting_source_uris))
 
 
 def _mention_matches_candidate(raw_text: str, candidate: str) -> bool:
+    """Determine whether an unresolved mention is satisfied by a candidate.
+
+    Args:
+        raw_text: Raw unresolved mention text.
+        candidate: Candidate term, entity, claim, or reference string.
+
+    Returns:
+        ``True`` when the candidate plausibly resolves the mention.
+    """
     mention_key = normalize_key(raw_text)
     candidate_key = normalize_key(candidate)
     if not mention_key or not candidate_key:
@@ -219,6 +301,18 @@ def _build_resolution_candidates(
     reference_index: list[ReferenceIndexEntry],
     supporting_source_uris: list[str],
 ) -> list[str]:
+    """Collect candidate strings that may resolve prior unresolved mentions.
+
+    Args:
+        glossary: Accumulated glossary entries.
+        entity_registry: Accumulated entity registry.
+        claim_ledger: Accumulated claim ledger.
+        reference_index: Accumulated reference index.
+        supporting_source_uris: Provenance URIs for the active document.
+
+    Returns:
+        Deduplicated candidate strings associated with the active document.
+    """
     candidates: list[str] = []
     for entry in glossary:
         if _supporting_uris_overlap(
@@ -248,6 +342,16 @@ def _resolve_unresolved_mentions(
     *,
     resolution_candidates: list[str],
 ) -> list[dict[str, object]]:
+    """Resolve open unresolved mentions against the current candidate set.
+
+    Args:
+        entries: Existing unresolved mention entries.
+        resolution_candidates: Candidate strings associated with the current
+            document.
+
+    Returns:
+        Updated unresolved mention list with resolved statuses applied.
+    """
     resolved_entries: list[dict[str, object]] = []
     for entry in entries:
         current = dict(entry)
@@ -261,6 +365,14 @@ def _resolve_unresolved_mentions(
 
 
 def _normalized_document_text(document: dict[str, object]) -> str:
+    """Collapse key document fields into one normalized comparison string.
+
+    Args:
+        document: Active document mapping.
+
+    Returns:
+        Normalized searchable text used by prompt-context selection helpers.
+    """
     parts = [
         document.get("uri"),
         document.get("content"),
@@ -276,6 +388,17 @@ def _entry_matches_document(
     document_text: str,
     fallback_terms: set[str],
 ) -> bool:
+    """Check whether any candidate term is relevant to the active document.
+
+    Args:
+        candidates: Candidate strings to test.
+        document_text: Normalized searchable document text.
+        fallback_terms: Terms derived from recent context when direct matching is
+            insufficient.
+
+    Returns:
+        ``True`` when the active document or fallback context matches.
+    """
     for candidate in candidates:
         normalized = normalize_key(candidate)
         if not normalized:
@@ -291,6 +414,16 @@ def _select_recent_prior_briefs(
     *,
     limit: int,
 ) -> list[ProcessedDocumentBrief]:
+    """Select prior briefs that are most relevant to the active document.
+
+    Args:
+        state: Current draft workflow state.
+        document_text: Normalized searchable document text.
+        limit: Maximum number of briefs to return.
+
+    Returns:
+        Relevant recent briefs, with a recency fallback when none match.
+    """
     relevant: list[ProcessedDocumentBrief] = []
     for brief in state["prior_document_briefs"]:
         candidates = [
@@ -316,6 +449,15 @@ def _fallback_terms_from_context(
     prior_briefs: list[ProcessedDocumentBrief],
     unresolved_mentions: list[dict[str, object]],
 ) -> set[str]:
+    """Derive fallback search terms from the current rolling context.
+
+    Args:
+        prior_briefs: Relevant recent document briefs.
+        unresolved_mentions: Relevant unresolved mentions.
+
+    Returns:
+        Normalized context terms used as a secondary relevance signal.
+    """
     terms: set[str] = set()
     for brief in prior_briefs:
         terms.update(normalize_key(value) for value in brief["defined_terms"])
@@ -336,6 +478,18 @@ def _select_named_subset(
     fallback_terms: set[str],
     limit: int,
 ) -> list[dict[str, object]]:
+    """Select relevant canonical entries for prompt-context reconstruction.
+
+    Args:
+        entries: Canonical entry mappings.
+        primary_key: Field holding the canonical entry name.
+        document_text: Normalized searchable document text.
+        fallback_terms: Context-derived secondary relevance terms.
+        limit: Maximum number of entries to return.
+
+    Returns:
+        Relevant canonical entries for the active pass.
+    """
     relevant = [
         entry
         for entry in entries
@@ -358,6 +512,17 @@ def _select_claim_subset(
     fallback_terms: set[str],
     limit: int,
 ) -> list[ClaimLedgerEntry]:
+    """Select relevant claims for prompt-context reconstruction.
+
+    Args:
+        claims: Durable claim ledger entries.
+        document_text: Normalized searchable document text.
+        fallback_terms: Context-derived secondary relevance terms.
+        limit: Maximum number of claims to return.
+
+    Returns:
+        Relevant claim ledger entries for the active pass.
+    """
     relevant = [
         claim
         for claim in claims
@@ -382,6 +547,18 @@ def _select_reference_subset(
     claim_subset: list[ClaimLedgerEntry],
     limit: int,
 ) -> list[ReferenceIndexEntry]:
+    """Select relevant references for prompt-context reconstruction.
+
+    Args:
+        references: Durable reference index entries.
+        document_text: Normalized searchable document text.
+        fallback_terms: Context-derived secondary relevance terms.
+        claim_subset: Already-selected claim subset for the active pass.
+        limit: Maximum number of references to return.
+
+    Returns:
+        Relevant reference index entries for the active pass.
+    """
     claim_ids = {claim["claim_id"] for claim in claim_subset}
     relevant = [
         entry
@@ -403,6 +580,17 @@ def _select_unresolved_mentions(
     fallback_terms: set[str],
     limit: int,
 ) -> list[dict[str, object]]:
+    """Select unresolved mentions relevant to the active document.
+
+    Args:
+        entries: Durable unresolved mention entries.
+        document_text: Normalized searchable document text.
+        fallback_terms: Context-derived secondary relevance terms.
+        limit: Maximum number of mentions to return.
+
+    Returns:
+        Relevant open unresolved mentions, with an open-entry fallback.
+    """
     relevant = [
         entry
         for entry in entries
@@ -423,6 +611,15 @@ def build_document_analysis_prompt_context(
     state: DraftGraphState,
     document: dict[str, object],
 ) -> DocumentAnalysisPromptContext:
+    """Reconstruct bounded prompt context for one source-analysis pass.
+
+    Args:
+        state: Current durable draft workflow state.
+        document: Active document mapping.
+
+    Returns:
+        Prompt context slice tailored to the active document.
+    """
     document_text = _normalized_document_text(document)
     prior_briefs_subset = _select_recent_prior_briefs(state, document_text, limit=5)
     unresolved_mentions_subset = _select_unresolved_mentions(
@@ -476,6 +673,8 @@ def build_document_analysis_prompt_context(
         claim_subset=claim_subset,
         limit=20,
     )
+    # Optional guidance is layered in last so storage-backed prompt packs can
+    # refine the generic consistency rules without altering durable state.
     guidance_instructions = load_agent_guidance_instructions(
         workflow_name="compile",
         role_name="source-analysis",
@@ -504,10 +703,24 @@ def build_document_analysis_prompt_context(
 
 
 def compile_source_document(state: DraftGraphState) -> dict[str, object]:
+    """Analyze the active source document and merge results into durable state.
+
+    Args:
+        state: Current durable draft workflow state.
+
+    Returns:
+        Partial state update containing the next active document and the merged
+        durable compile context.
+
+    Raises:
+        ValueError: If the workflow is missing an active document.
+    """
     document = state.get("active_document")
     if document is None:
         raise ValueError("Compile worker requires an active source document")
 
+    # Prompt context is rebuilt from durable state each pass so retries and
+    # resumes do not depend on transient in-memory data.
     prompt_context = build_document_analysis_prompt_context(state, document)
     core_settings = get_app_context().config.core
     analysis = analyze_source_document(
@@ -549,6 +762,8 @@ def compile_source_document(state: DraftGraphState) -> dict[str, object]:
         ]
     )
 
+    # These reducers turn one document's analysis into the evolving durable
+    # compile context used by later documents, synthesis, and review.
     canonical_topics = _upsert_named_entries(
         state["canonical_topics"],
         metadata["topics"],
@@ -619,6 +834,8 @@ def compile_source_document(state: DraftGraphState) -> dict[str, object]:
         analysis.continuity.unresolved_mentions,
         source_uri=str(document.get("source_uri") or document["uri"]),
     )
+    # Later documents can resolve earlier open mentions when they introduce a
+    # matching term, entity, claim, or reference key.
     resolution_candidates = _build_resolution_candidates(
         glossary=glossary,
         entity_registry=entity_registry,
@@ -662,6 +879,15 @@ def compile_source_document(state: DraftGraphState) -> dict[str, object]:
 
 
 def route_compile_source_document(state: DraftGraphState) -> str:
+    """Choose whether to continue source analysis or advance to synthesis.
+
+    Args:
+        state: Current draft workflow state after one analysis pass.
+
+    Returns:
+        ``compile_source_document`` while more source documents remain,
+        otherwise ``synthesis``.
+    """
     if state.get("active_document") is None:
         return "synthesis"
     return "compile_source_document"

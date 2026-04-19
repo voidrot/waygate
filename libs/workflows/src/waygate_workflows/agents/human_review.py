@@ -7,6 +7,14 @@ from waygate_workflows.schema import DraftGraphState
 
 
 def build_human_review_record(state: DraftGraphState) -> str:
+    """Build the persisted human-review artifact for an interrupted draft.
+
+    Args:
+        state: Draft workflow state at the human-review boundary.
+
+    Returns:
+        JSON record written to review storage for operator handling.
+    """
     record = {
         "source_set_key": state["source_set_key"],
         "raw_documents": state["raw_documents"],

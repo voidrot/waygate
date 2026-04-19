@@ -8,6 +8,17 @@ from waygate_workflows.utils import resolve_storage
 
 
 def publish_draft(state: DraftGraphState) -> dict[str, object]:
+    """Write the published markdown artifact to storage.
+
+    Args:
+        state: Draft workflow state at the publish boundary.
+
+    Returns:
+        Partial state update containing the published artifact identity.
+
+    Raises:
+        ValueError: If the source-set key is missing.
+    """
     source_set_key = state.get("source_set_key")
     if not source_set_key:
         raise ValueError("Publish requires a source_set_key")

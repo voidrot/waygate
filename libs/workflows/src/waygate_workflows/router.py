@@ -19,6 +19,15 @@ logger = get_logger(__name__)
 
 
 def _build_thread_id(message: WorkflowTriggerMessage) -> str:
+    """Build a stable LangGraph thread id for a workflow trigger.
+
+    Args:
+        message: Validated workflow trigger payload.
+
+    Returns:
+        Deterministic thread id derived from the idempotency key when present,
+        otherwise from the sorted document path set.
+    """
     if message.idempotency_key:
         return f"compile:{message.idempotency_key}"
 
@@ -28,6 +37,14 @@ def _build_thread_id(message: WorkflowTriggerMessage) -> str:
 
 
 def _build_initial_state(message: WorkflowTriggerMessage) -> DraftGraphState:
+    """Construct the initial compile graph state from a trigger message.
+
+    Args:
+        message: Validated workflow trigger payload.
+
+    Returns:
+        Fresh graph state ready for the compile workflow entrypoint.
+    """
     return {
         "workflow_type": WorkflowType.DRAFT,
         "event_type": WorkflowEvent.DRAFT_READY,
@@ -64,6 +81,14 @@ def _build_initial_state(message: WorkflowTriggerMessage) -> DraftGraphState:
 def _invoke_compile_workflow(
     message: WorkflowTriggerMessage,
 ) -> tuple[str, dict[str, object]]:
+    """Run the compile workflow for one trigger message.
+
+    Args:
+        message: Validated workflow trigger payload.
+
+    Returns:
+        Tuple of the workflow thread id and the final workflow state snapshot.
+    """
     thread_id = _build_thread_id(message)
     config = {"configurable": {"thread_id": thread_id}}
     with PostgresSaver.from_conn_string(build_postgres_connection_string()) as saver:
@@ -74,7 +99,15 @@ def _invoke_compile_workflow(
 
 
 def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
-    """Process a workflow trigger payload from a worker runtime."""
+    """Process a workflow trigger payload from a worker runtime.
+
+    Args:
+        payload: Raw trigger payload as a mapping or serialized JSON string.
+
+    Returns:
+        Transport-friendly result describing completion, human review, or an
+        ignored event.
+    """
     logger.info("Received workflow trigger", payload=payload)
 
     raw_payload = json.loads(payload) if isinstance(payload, str) else payload

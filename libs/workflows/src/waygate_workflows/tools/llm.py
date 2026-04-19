@@ -12,6 +12,14 @@ TModel = TypeVar("TModel", bound=BaseModel)
 
 
 def resolve_llm_provider() -> tuple[object, object]:
+    """Resolve the configured LLM provider plugin and core settings.
+
+    Returns:
+        Tuple of the active LLM provider instance and core settings object.
+
+    Raises:
+        RuntimeError: If the configured provider name is unavailable.
+    """
     app_context = get_app_context()
     provider_name = app_context.config.core.llm_plugin_name
     provider = app_context.plugins.llm.get(provider_name)
@@ -27,6 +35,16 @@ def build_llm_request(
     workflow_name: str,
     fallback_model_name: str,
 ) -> LLMInvocationRequest:
+    """Build an invocation request for one workflow stage.
+
+    Args:
+        workflow_name: Logical workflow or stage name.
+        fallback_model_name: Default model to use when the workflow profile does
+            not override it.
+
+    Returns:
+        Provider-agnostic invocation request with resolved profile settings.
+    """
     _, core_settings = resolve_llm_provider()
     profile = core_settings.llm_workflow_profiles.get(workflow_name)
     common_options = profile.common_options if profile else LLMCommonOptions()
@@ -50,6 +68,18 @@ def invoke_structured_stage(
     system_prompt: str,
     user_prompt: str,
 ) -> TModel:
+    """Invoke a structured LLM stage and coerce the response into a schema.
+
+    Args:
+        schema: Pydantic model expected from the provider.
+        workflow_name: Logical workflow or stage name.
+        fallback_model_name: Default model name when no profile override exists.
+        system_prompt: Instruction prompt for the stage.
+        user_prompt: User payload for the stage.
+
+    Returns:
+        Structured model instance returned by the provider.
+    """
     provider, _ = resolve_llm_provider()
     runnable = provider.get_structured_llm(
         schema,
@@ -73,6 +103,17 @@ def invoke_text_stage(
     system_prompt: str,
     user_prompt: str,
 ) -> str:
+    """Invoke a text-generating LLM stage.
+
+    Args:
+        workflow_name: Logical workflow or stage name.
+        fallback_model_name: Default model name when no profile override exists.
+        system_prompt: Instruction prompt for the stage.
+        user_prompt: User payload for the stage.
+
+    Returns:
+        Final text content extracted from the provider response.
+    """
     provider, _ = resolve_llm_provider()
     runnable = provider.get_llm(build_llm_request(workflow_name, fallback_model_name))
     result = runnable.invoke(

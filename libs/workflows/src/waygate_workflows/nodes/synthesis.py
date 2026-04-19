@@ -7,6 +7,14 @@ from waygate_workflows.schema import DraftGraphState, DraftWorkflowStatus
 
 
 def synthesize_draft(state: DraftGraphState) -> dict[str, object]:
+    """Run the synthesis specialist and advance the workflow into review.
+
+    Args:
+        state: Current draft workflow state.
+
+    Returns:
+        Partial state update with the synthesized draft and review status.
+    """
     core_settings = get_app_context().config.core
     draft = synthesize_draft_with_specialist(
         state,

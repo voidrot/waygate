@@ -9,6 +9,14 @@ from typing_extensions import TypedDict
 
 
 def _dedupe_strings(values: list[str]) -> list[str]:
+    """Remove empty and duplicate strings while preserving order.
+
+    Args:
+        values: Raw string values that may contain duplicates or whitespace.
+
+    Returns:
+        Deduplicated string values in first-seen order.
+    """
     seen: set[str] = set()
     deduped: list[str] = []
     for value in values:
@@ -21,20 +29,40 @@ def _dedupe_strings(values: list[str]) -> list[str]:
 
 
 def normalize_key(value: str) -> str:
+    """Normalize free-form text for case-insensitive key comparisons.
+
+    Args:
+        value: Arbitrary text value.
+
+    Returns:
+        Lowercased, whitespace-normalized comparison key.
+    """
     return " ".join(value.strip().lower().split())
 
 
 def claim_id_for_text(text: str) -> str:
+    """Build a stable short claim id from claim text.
+
+    Args:
+        text: Claim text extracted from source analysis.
+
+    Returns:
+        Short deterministic identifier derived from normalized claim text.
+    """
     normalized = normalize_key(text)
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:12]
 
 
 class WorkflowType(StrEnum):
+    """High-level workflow families supported by the worker runtime."""
+
     DRAFT = "draft"
     REVIEW = "review"
 
 
 class WorkflowEvent(StrEnum):
+    """Workflow trigger and lifecycle event names."""
+
     DRAFT_READY = "draft.ready"
     DRAFT_IN_PROGRESS = "draft.in_progress"
     DRAFT_COMPLETED = "draft.completed"
@@ -44,6 +72,8 @@ class WorkflowEvent(StrEnum):
 
 
 class DraftWorkflowStatus(StrEnum):
+    """Draft compile statuses persisted in workflow state."""
+
     READY = "ready"
     COMPILING = "compiling"
     REVIEW = "review"
@@ -54,11 +84,15 @@ class DraftWorkflowStatus(StrEnum):
 
 
 class ScratchpadState(TypedDict):
+    """Legacy scratchpad fields retained for downstream compatibility."""
+
     terms: list[str]
     claims: list[str]
 
 
 class SourceDocumentState(TypedDict):
+    """Normalized raw document content and frontmatter used by compile."""
+
     uri: str
     content: str
     source_hash: str | None
@@ -68,6 +102,8 @@ class SourceDocumentState(TypedDict):
 
 
 class OrderedDocumentRef(TypedDict):
+    """Lightweight durable reference for document ordering state."""
+
     uri: str
     source_hash: str | None
     source_uri: str | None
@@ -76,6 +112,8 @@ class OrderedDocumentRef(TypedDict):
 
 
 class DocumentMetadataState(TypedDict):
+    """Metadata extracted for one source document."""
+
     uri: str
     tags: list[str]
     topics: list[str]
@@ -85,6 +123,8 @@ class DocumentMetadataState(TypedDict):
 
 
 class DocumentSummaryState(TypedDict):
+    """Narrative summary and grounded findings for one source document."""
+
     uri: str
     summary: str
     key_claims: list[str]
@@ -92,6 +132,8 @@ class DocumentSummaryState(TypedDict):
 
 
 class ProcessedDocumentBrief(TypedDict):
+    """Condensed durable brief retained after each source-analysis pass."""
+
     uri: str
     summary: str
     key_claims: list[str]
@@ -103,18 +145,24 @@ class ProcessedDocumentBrief(TypedDict):
 
 
 class CanonicalTopicEntry(TypedDict):
+    """Canonicalized topic entry accumulated across documents."""
+
     name: str
     aliases: list[str]
     supporting_source_uris: list[str]
 
 
 class CanonicalTagEntry(TypedDict):
+    """Canonicalized tag entry accumulated across documents."""
+
     name: str
     aliases: list[str]
     supporting_source_uris: list[str]
 
 
 class GlossaryEntry(TypedDict):
+    """Glossary term discovered during sequential source analysis."""
+
     term: str
     aliases: list[str]
     definition_hint: str | None
@@ -122,6 +170,8 @@ class GlossaryEntry(TypedDict):
 
 
 class EntityRegistryEntry(TypedDict):
+    """Canonical entity registry entry for a person, organization, or project."""
+
     kind: Literal["person", "organization", "project"]
     canonical_name: str
     aliases: list[str]
@@ -129,6 +179,8 @@ class EntityRegistryEntry(TypedDict):
 
 
 class ClaimLedgerEntry(TypedDict):
+    """Grounded claim retained for later synthesis and continuity resolution."""
+
     claim_id: str
     text: str
     supporting_source_uris: list[str]
@@ -137,6 +189,8 @@ class ClaimLedgerEntry(TypedDict):
 
 
 class ReferenceIndexEntry(TypedDict):
+    """Reference lookup entry used to reconnect later documents to prior context."""
+
     key: str
     kind: Literal["term", "entity", "claim"]
     source_uris: list[str]
@@ -145,6 +199,8 @@ class ReferenceIndexEntry(TypedDict):
 
 
 class UnresolvedMentionEntry(TypedDict):
+    """Durable record of a mention that may be resolved by later documents."""
+
     raw_text: str
     kind_hint: str | None
     source_uri: str
@@ -152,6 +208,8 @@ class UnresolvedMentionEntry(TypedDict):
 
 
 class DocumentAnalysisPromptContext(TypedDict):
+    """Bounded prompt context reconstructed for one analysis pass."""
+
     active_document: SourceDocumentState
     active_document_position: int
     canonical_topics_subset: list[CanonicalTopicEntry]
@@ -166,11 +224,15 @@ class DocumentAnalysisPromptContext(TypedDict):
 
 
 class ReviewOutcomeState(TypedDict):
+    """Review decision persisted in graph state."""
+
     approved: bool
     feedback: list[str]
 
 
 class MetadataExtractionModel(BaseModel):
+    """Structured metadata extracted for one source document."""
+
     tags: list[str] = Field(default_factory=list)
     topics: list[str] = Field(default_factory=list)
     people: list[str] = Field(default_factory=list)
@@ -179,27 +241,37 @@ class MetadataExtractionModel(BaseModel):
 
 
 class SummaryExtractionModel(BaseModel):
+    """Structured narrative summary for one source document."""
+
     summary: str
     key_claims: list[str] = Field(default_factory=list)
     defined_terms: list[str] = Field(default_factory=list)
 
 
 class FindingsExtractionModel(BaseModel):
+    """Structured grounded claims and defined terms for one source document."""
+
     key_claims: list[str] = Field(default_factory=list)
     defined_terms: list[str] = Field(default_factory=list)
 
 
 class ContinuityMentionModel(BaseModel):
+    """One unresolved mention emitted by the continuity specialist."""
+
     raw_text: str
     kind_hint: str | None = None
 
 
 class ContinuityExtractionModel(BaseModel):
+    """Structured continuity output for one source document."""
+
     referenced_entities: list[str] = Field(default_factory=list)
     unresolved_mentions: list[ContinuityMentionModel] = Field(default_factory=list)
 
 
 class DocumentAnalysisResultModel(BaseModel):
+    """Combined output returned by the source-analysis supervisor."""
+
     uri: str
     metadata: MetadataExtractionModel
     summary: SummaryExtractionModel
@@ -210,11 +282,15 @@ class DocumentAnalysisResultModel(BaseModel):
 
 
 class ReviewOutcomeModel(BaseModel):
+    """Structured review outcome returned by the review specialist."""
+
     approved: bool
     feedback: list[str] = Field(default_factory=list)
 
 
 class DraftGraphState(TypedDict):
+    """Complete LangGraph state for the draft compile workflow."""
+
     workflow_type: WorkflowType
     event_type: WorkflowEvent
     source: str

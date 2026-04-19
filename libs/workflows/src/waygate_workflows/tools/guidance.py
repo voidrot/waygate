@@ -8,11 +8,27 @@ from waygate_workflows.utils import resolve_storage
 
 
 def _normalize_source_type_slug(source_type: str) -> str:
+    """Normalize a source type into the storage slug used for guidance docs.
+
+    Args:
+        source_type: Source-type label discovered from raw document metadata.
+
+    Returns:
+        Lowercase hyphenated slug safe for storage path construction.
+    """
     slug = re.sub(r"[^a-z0-9]+", "-", source_type.strip().lower())
     return slug.strip("-")
 
 
 def _read_optional_guidance(document_path: str) -> str | None:
+    """Read optional agent guidance text from storage.
+
+    Args:
+        document_path: Relative path under the ``agents`` storage namespace.
+
+    Returns:
+        Trimmed guidance text when present, otherwise ``None``.
+    """
     try:
         storage = resolve_storage()
     except Exception:
@@ -35,6 +51,17 @@ def load_agent_guidance_instructions(
     role_name: str,
     source_type: str | None = None,
 ) -> list[str]:
+    """Load guidance snippets for a workflow role.
+
+    Args:
+        workflow_name: Workflow identifier such as ``compile``.
+        role_name: Agent role identifier such as ``source-analysis``.
+        source_type: Optional source-type discriminator for specialized
+            guidance.
+
+    Returns:
+        Ordered list of guidance snippets to append to prompt instructions.
+    """
     instructions: list[str] = []
 
     common_guidance = _read_optional_guidance(f"{workflow_name}/{role_name}/common.md")

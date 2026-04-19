@@ -11,6 +11,19 @@ from waygate_workflows.utils import resolve_storage
 
 
 def human_review_gate(state: DraftGraphState) -> dict[str, object]:
+    """Persist a human-review record and interrupt the workflow.
+
+    Args:
+        state: Draft workflow state at the human-review boundary.
+
+    Returns:
+        Partial state update containing the persisted review artifact and the
+        chosen resume action.
+
+    Raises:
+        ValueError: If the source-set key is missing or the resume payload is
+            invalid.
+    """
     source_set_key = state.get("source_set_key")
     if not source_set_key:
         raise ValueError("Human review requires a source_set_key")
@@ -21,6 +34,7 @@ def human_review_gate(state: DraftGraphState) -> dict[str, object]:
         f"{source_set_key}.json",
     )
     review_uri = storage.write_document(review_path, build_human_review_record(state))
+    # LangGraph returns the resume payload here when a human resumes the run.
     decision = interrupt(
         {
             "type": "compile_human_review",
@@ -55,6 +69,15 @@ def human_review_gate(state: DraftGraphState) -> dict[str, object]:
 
 
 def route_human_review(state: DraftGraphState) -> str:
+    """Choose the next node after a human-review resume decision.
+
+    Args:
+        state: Current draft workflow state after the human-review interrupt.
+
+    Returns:
+        ``publish`` when the operator approves publication, otherwise
+        ``synthesis`` to revise the draft.
+    """
     if state.get("human_review_action") == "resume_to_publish":
         return "publish"
     return "synthesis"

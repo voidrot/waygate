@@ -6,6 +6,15 @@ from waygate_workflows.schema import DraftWorkflowStatus
 
 
 def normalize_compile_request(state: DraftGraphState) -> dict[str, object]:
+    """Normalize raw trigger input into the initial compile loop state.
+
+    Args:
+        state: Draft workflow state at graph entry.
+
+    Returns:
+        Partial state update containing parsed documents, ordering metadata, and
+        the first active document.
+    """
     source_documents, document_order, source_set_key = normalize_source_documents(
         state["raw_documents"]
     )

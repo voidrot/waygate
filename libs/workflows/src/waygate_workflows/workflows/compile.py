@@ -18,7 +18,15 @@ from waygate_workflows.schema import DraftGraphState
 
 
 def compile_workflow(checkpointer: BaseCheckpointSaver | None = None):
-    """Compile the workflow definition into a LangGraph workflow."""
+    """Compile the draft workflow graph.
+
+    Args:
+        checkpointer: Optional LangGraph checkpointer used for durable state,
+            interrupts, and resume support.
+
+    Returns:
+        Compiled LangGraph workflow for the draft compile pipeline.
+    """
     workflow = StateGraph(cast(Any, DraftGraphState))
     workflow.add_node("normalize_request", normalize_compile_request)
     workflow.add_node("compile_source_document", compile_source_document)
@@ -27,6 +35,8 @@ def compile_workflow(checkpointer: BaseCheckpointSaver | None = None):
     workflow.add_node("publish", publish_draft)
     workflow.add_node("human_review", human_review_gate)
 
+    # The graph runs one source-analysis pass per active document until the
+    # route function advances to synthesis.
     workflow.add_edge(START, "normalize_request")
     workflow.add_edge("normalize_request", "compile_source_document")
     workflow.add_conditional_edges(

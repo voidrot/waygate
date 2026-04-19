@@ -13,6 +13,17 @@ def analyze_source_document(
     metadata_model_name: str,
     draft_model_name: str,
 ) -> DocumentAnalysisResultModel:
+    """Run the configured source-analysis implementation for one document.
+
+    Args:
+        document: Active source document.
+        prompt_context: Reconstructed bounded prompt context for the pass.
+        metadata_model_name: Configured metadata model name.
+        draft_model_name: Configured draft model name.
+
+    Returns:
+        Structured document-analysis result.
+    """
     return analyze_document_with_supervisor(
         document,
         prompt_context,

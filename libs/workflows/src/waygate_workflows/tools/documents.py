@@ -10,6 +10,14 @@ from waygate_workflows.schema import SourceDocumentState
 
 
 def normalize_frontmatter_value(value: object) -> str | None:
+    """Normalize frontmatter values for storage in workflow state.
+
+    Args:
+        value: Raw frontmatter value from a parsed markdown document.
+
+    Returns:
+        String form of the value, or ``None`` when the value is empty.
+    """
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -19,6 +27,15 @@ def normalize_frontmatter_value(value: object) -> str | None:
 
 
 def parse_source_document(document_uri: str, raw_content: str) -> SourceDocumentState:
+    """Parse stored markdown into the normalized source-document state shape.
+
+    Args:
+        document_uri: Storage URI for the raw document.
+        raw_content: Markdown document contents including optional frontmatter.
+
+    Returns:
+        Parsed document state used by the compile workflow.
+    """
     post = frontmatter.loads(raw_content)
     metadata = post.metadata
     return {
@@ -32,6 +49,14 @@ def parse_source_document(document_uri: str, raw_content: str) -> SourceDocument
 
 
 def to_ordered_document_ref(document: SourceDocumentState) -> OrderedDocumentRef:
+    """Project a full source document into the lighter ordering reference.
+
+    Args:
+        document: Parsed source document state.
+
+    Returns:
+        Ordered document reference persisted in durable workflow state.
+    """
     return {
         "uri": document["uri"],
         "source_hash": document.get("source_hash"),
@@ -42,6 +67,18 @@ def to_ordered_document_ref(document: SourceDocumentState) -> OrderedDocumentRef
 
 
 def derive_source_set_key(documents: list[SourceDocumentState]) -> str:
+    """Derive the stable source-set identity for a compile run.
+
+    Args:
+        documents: Parsed source documents in the current compile request.
+
+    Returns:
+        Stable ``hash-*`` or ``uri-*`` identifier for the full source set.
+
+    Raises:
+        ValueError: If the source set is empty or lacks complete hash/URI
+            coverage.
+    """
     if not documents:
         raise ValueError("Compile workflow requires at least one source document")
 

@@ -10,6 +10,14 @@ from waygate_workflows.schema import DraftGraphState
 
 
 def _build_synthesis_prompt(state: DraftGraphState) -> str:
+    """Build the synthesis prompt from durable compile state.
+
+    Args:
+        state: Current draft workflow state.
+
+    Returns:
+        Prompt payload for the synthesis specialist.
+    """
     return (
         f"Source set key: {state['source_set_key']}\n"
         f"Summaries:\n{json.dumps(state['document_summaries'], indent=2, sort_keys=True)}\n\n"
@@ -23,6 +31,15 @@ def synthesize_draft_with_specialist(
     *,
     draft_model_name: str,
 ) -> str:
+    """Synthesize the final draft from accumulated source-analysis state.
+
+    Args:
+        state: Current draft workflow state.
+        draft_model_name: Configured draft model name.
+
+    Returns:
+        Markdown draft text produced by the synthesis specialist.
+    """
     synthesis_agent = create_agent(
         model=resolve_chat_model("draft", draft_model_name),
         tools=[],

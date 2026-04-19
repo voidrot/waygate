@@ -5,6 +5,8 @@ from enum import StrEnum
 
 
 class CompileAgentRole(StrEnum):
+    """Named roles used by the compile workflow's agent layout."""
+
     SOURCE_NORMALIZATION = "source_normalization"
     SOURCE_ANALYSIS = "source_analysis"
     SYNTHESIS = "synthesis"
@@ -15,6 +17,8 @@ class CompileAgentRole(StrEnum):
 
 @dataclass(frozen=True)
 class CompileAgentLayoutEntry:
+    """One compile-role description entry used for documentation and planning."""
+
     role: CompileAgentRole
     description: str
     execution_boundary: str

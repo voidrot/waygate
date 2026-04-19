@@ -11,6 +11,15 @@ from waygate_workflows.utils import resolve_storage
 def normalize_source_documents(
     raw_document_uris: list[str],
 ) -> tuple[list[SourceDocumentState], list[OrderedDocumentRef], str]:
+    """Read and normalize all raw source documents for a compile request.
+
+    Args:
+        raw_document_uris: Storage URIs received from the workflow trigger.
+
+    Returns:
+        Tuple of parsed source documents, durable ordering references, and the
+        derived source-set key.
+    """
     storage = resolve_storage()
     source_documents = [
         parse_source_document(document_uri, storage.read_document(document_uri))

@@ -20,6 +20,15 @@ def _build_document_prompt(
     document: SourceDocumentState,
     prompt_context: DocumentAnalysisPromptContext,
 ) -> str:
+    """Build the shared user prompt for document-analysis specialists.
+
+    Args:
+        document: Active source document.
+        prompt_context: Reconstructed bounded prompt context for the pass.
+
+    Returns:
+        Prompt payload combining the rolling context and document body.
+    """
     return (
         f"Prompt context:\n{json.dumps(prompt_context, indent=2, sort_keys=True)}\n\n"
         f"Document URI: {document['uri']}\n"
@@ -35,6 +44,15 @@ def _coerce_model(
     | type[DocumentAnalysisResultModel],
     value: object,
 ):
+    """Coerce provider output into the expected structured response model.
+
+    Args:
+        schema: Expected Pydantic model type.
+        value: Raw provider output.
+
+    Returns:
+        Parsed model instance.
+    """
     if isinstance(value, schema):
         return value
     return schema.model_validate(value)
@@ -47,6 +65,17 @@ def analyze_document_with_supervisor(
     metadata_model_name: str,
     draft_model_name: str,
 ) -> DocumentAnalysisResultModel:
+    """Analyze one source document with a supervisor and specialist subagents.
+
+    Args:
+        document: Active source document.
+        prompt_context: Reconstructed bounded prompt context for the pass.
+        metadata_model_name: Configured metadata model name.
+        draft_model_name: Configured general draft model name.
+
+    Returns:
+        Combined structured analysis result for the active document.
+    """
     document_prompt = _build_document_prompt(document, prompt_context)
 
     metadata_agent = create_agent(
@@ -142,6 +171,7 @@ def analyze_document_with_supervisor(
         )
         return structured.model_dump_json()
 
+    # The supervisor coordinates the specialist tools but does not bypass them.
     supervisor = create_agent(
         model=resolve_chat_model("draft", draft_model_name),
         tools=[

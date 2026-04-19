@@ -15,6 +15,15 @@ def review_draft_with_specialist(
     *,
     review_model_name: str,
 ) -> ReviewOutcomeModel:
+    """Review the synthesized draft against the parsed source documents.
+
+    Args:
+        state: Current draft workflow state.
+        review_model_name: Configured review model name.
+
+    Returns:
+        Structured approval decision and normalized feedback.
+    """
     review_agent = create_agent(
         model=resolve_chat_model("review", review_model_name),
         tools=[],

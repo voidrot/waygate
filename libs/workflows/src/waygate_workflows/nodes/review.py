@@ -10,6 +10,15 @@ MAX_REVISIONS = 3
 
 
 def review_draft(state: DraftGraphState) -> dict[str, object]:
+    """Run the review specialist and update approval state.
+
+    Args:
+        state: Current draft workflow state.
+
+    Returns:
+        Partial state update containing review outcome, feedback, revision count,
+        and the resulting workflow status.
+    """
     core_settings = get_app_context().config.core
     result = review_draft_with_specialist(
         state,
@@ -33,6 +42,15 @@ def review_draft(state: DraftGraphState) -> dict[str, object]:
 
 
 def route_review(state: DraftGraphState) -> str:
+    """Choose the next node after review.
+
+    Args:
+        state: Current draft workflow state after review.
+
+    Returns:
+        ``publish`` for approval, ``human_review`` after exhausting retries, or
+        ``synthesis`` to retry draft generation.
+    """
     outcome = state.get("review_outcome")
     if outcome and outcome["approved"]:
         return "publish"
