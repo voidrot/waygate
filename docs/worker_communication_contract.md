@@ -13,7 +13,7 @@ shape.
 {
   "event_type": "draft.ready",
   "source": "waygate-api.webhooks",
-  "document_paths": ["raw/abc123.txt"],
+  "document_paths": ["file://raw/01HXYZ-source.txt"],
   "idempotency_key": "optional-string",
   "metadata": {
     "key": "value"
@@ -25,7 +25,7 @@ shape.
 
 - `event_type`: trigger category (for example `draft.ready` or `cron.tick`).
 - `source`: producer identifier, used for auditability.
-- `document_paths`: storage paths relevant to the trigger.
+- `document_paths`: storage-backed document URIs relevant to the trigger.
 - `idempotency_key`: optional deduplication key.
 - `metadata`: optional transport-agnostic key/value context.
 
