@@ -62,6 +62,23 @@ class StoragePlugin(ABC):
         return "0.0.0"
 
     @abstractmethod
+    def build_namespaced_path(
+        self, namespace: StorageNamespace, document_path: str
+    ) -> str:
+        """
+        Build a namespaced path for a document.
+
+        Args:
+            namespace (StorageNamespace): The namespace for the document.
+            document_path (str): The original document path.
+        Returns:
+            str: The namespaced document path.
+        """
+        raise NotImplementedError(
+            "Storage plugins must implement the build_namespaced_path method."
+        )
+
+    @abstractmethod
     def write_document(self, document_path: str, content: str) -> str:
         """
         Write a document to storage.

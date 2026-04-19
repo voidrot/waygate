@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from waygate_core.config.registry import WaygateRootSettings
+from waygate_core.plugin.communication import CommunicationClientPlugin
 from waygate_core.logging import configure_logging
 from waygate_core.plugin.cron import CronPlugin
 from waygate_core.plugin.llm import LLMProviderPlugin
@@ -15,6 +16,7 @@ class WaygatePluginsContext:
     webhooks: dict[str, WebhookPlugin]
     llm: dict[str, LLMProviderPlugin]
     cron: dict[str, CronPlugin]
+    communication: dict[str, CommunicationClientPlugin]
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,12 @@ def bootstrap_app() -> WaygateAppContext:
             cron=cast(
                 dict[str, CronPlugin],
                 shared_plugin_manager.get_plugins("waygate.plugins.cron", config),
+            ),
+            communication=cast(
+                dict[str, CommunicationClientPlugin],
+                shared_plugin_manager.get_plugins(
+                    "waygate.plugins.communication", config
+                ),
             ),
         ),
     )

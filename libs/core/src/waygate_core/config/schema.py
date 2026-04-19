@@ -23,6 +23,7 @@ class CoreSettings(BaseModel):
 
     storage_plugin_name: str = Field(default="local-storage")
     llm_plugin_name: str = Field(default="OllamaProvider")
+    communication_plugin_name: str = Field(default="communication-http")
     metadata_model_name: str = Field(
         default="qwen3.5:9b",
         validation_alias=AliasChoices("metadata_model_name", "metadata_model"),

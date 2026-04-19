@@ -14,6 +14,7 @@ PLUGIN_GROUPS = (
     "waygate.plugins.storage",
     "waygate.plugins.llm",
     "waygate.plugins.cron",
+    "waygate.plugins.communication",
 )
 
 _GROUP_HOOK_ATTR: dict[str, str] = {
@@ -21,6 +22,7 @@ _GROUP_HOOK_ATTR: dict[str, str] = {
     "waygate.plugins.storage": "waygate_storage_plugin",
     "waygate.plugins.llm": "waygate_llm_provider_plugin",
     "waygate.plugins.cron": "waygate_cron_plugin",
+    "waygate.plugins.communication": "waygate_communication_client_plugin",
 }
 
 
