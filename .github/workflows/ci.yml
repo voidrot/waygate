@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        run: python -m pip install --upgrade pip uv
+
+      - name: Sync workspace dependencies
+        run: uv sync --all-packages --dev
+
+      - name: Run lint
+        run: uv run ruff check .
+
+      - name: Run tests (split by package to avoid module-name collisions)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for suite in apps/*/tests libs/*/tests packages/*/tests plugins/*/tests; do
+            if [[ -d "$suite" ]]; then
+              echo "Running pytest for $suite"
+              uv run pytest "$suite"
+            fi
+          done
