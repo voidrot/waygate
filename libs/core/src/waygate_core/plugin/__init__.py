@@ -8,7 +8,16 @@ from .communication import (
 )
 from .cron import CronPlugin
 from .hooks import PluginConfigRegistration, WayGatePluginSpec
-from .llm import LLMProviderPlugin
+from .llm import (
+    LLMCommonOptions,
+    LLMInvocationDiagnostics,
+    LLMInvocationRequest,
+    LLMOptionPolicy,
+    LLMProviderCapabilities,
+    LLMProviderPlugin,
+    LLMResolvedOptions,
+    resolve_invocation_options,
+)
 from .registry import (
     WayGatePluginManager,
 )
@@ -20,7 +29,13 @@ __all__ = [
     "CommunicationClientPlugin",
     "CommunicationClientResolutionError",
     "DispatchErrorKind",
+    "LLMCommonOptions",
+    "LLMInvocationDiagnostics",
+    "LLMInvocationRequest",
+    "LLMOptionPolicy",
+    "LLMProviderCapabilities",
     "LLMProviderPlugin",
+    "LLMResolvedOptions",
     "StoragePlugin",
     "WorkflowDispatchResult",
     "WorkflowTriggerMessage",
@@ -32,4 +47,5 @@ __all__ = [
     "WebhookVerificationError",
     "StorageNamespace",
     "StorageInvalidNamespaceError",
+    "resolve_invocation_options",
 ]

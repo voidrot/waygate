@@ -6,11 +6,20 @@ from pydantic import (
     BaseModel,
     field_validator,
 )
+import json
+
+from waygate_core.plugin.llm import LLMCommonOptions
 
 
 DEFAULT_REDIS_DSN: RedisDsn = TypeAdapter(RedisDsn).validate_python(
     "redis://localhost:6379/0"
 )
+
+
+class LLMWorkflowProfile(BaseModel):
+    model_name: str | None = Field(default=None)
+    common_options: LLMCommonOptions = Field(default_factory=LLMCommonOptions)
+    provider_options: dict[str, dict[str, object]] = Field(default_factory=dict)
 
 
 class CoreSettings(BaseModel):
@@ -55,6 +64,7 @@ class CoreSettings(BaseModel):
         default="hermes3:8b",
         validation_alias=AliasChoices("review_model_name", "review_model"),
     )
+    llm_workflow_profiles: dict[str, LLMWorkflowProfile] = Field(default_factory=dict)
 
     @field_validator("template_packages", mode="before")
     @classmethod
@@ -68,3 +78,22 @@ class CoreSettings(BaseModel):
             parsed = [str(item).strip() for item in value if str(item).strip()]
             return parsed or ["waygate_core"]
         return ["waygate_core"]
+
+    @field_validator("llm_workflow_profiles", mode="before")
+    @classmethod
+    def _parse_llm_workflow_profiles(
+        cls,
+        value: object,
+    ) -> dict[str, LLMWorkflowProfile]:
+        if value is None:
+            return {}
+        if isinstance(value, str):
+            if not value.strip():
+                return {}
+            parsed = json.loads(value)
+            if not isinstance(parsed, dict):
+                raise ValueError("llm_workflow_profiles must be a JSON object")
+            return parsed
+        if isinstance(value, dict):
+            return value
+        raise ValueError("llm_workflow_profiles must be a mapping or JSON string")

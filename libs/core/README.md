@@ -48,6 +48,8 @@ Core settings are nested under `WAYGATE_CORE__*`:
 | `WAYGATE_CORE__DRAFT_MODEL_NAME`          | `qwen3.5:9b`               | Model used for draft generation    |
 | `WAYGATE_CORE__REVIEW_MODEL_NAME`         | `hermes3:8b`               | Model used for review              |
 
+`WAYGATE_CORE__LLM_WORKFLOW_PROFILES` (default `{}`) accepts a JSON object keyed by workflow name for model and option defaults.
+
 The following aliases are also accepted for backward compatibility:
 
 - `WAYGATE_CORE__REDIS_URL` -> `WAYGATE_CORE__REDIS_DSN`
@@ -60,6 +62,25 @@ The following aliases are also accepted for backward compatibility:
 Logging is configured with:
 
 - `LOG_LEVEL` (default: `INFO`) sets the minimum structlog level.
+
+Example workflow profile payload for `WAYGATE_CORE__LLM_WORKFLOW_PROFILES`:
+
+```json
+{
+    "draft": {
+        "model_name": "qwen3.5:9b",
+        "common_options": {
+            "temperature": 0.2,
+            "max_tokens": 256
+        },
+        "provider_options": {
+            "OllamaProvider": {
+                "num_ctx": 4096
+            }
+        }
+    }
+}
+```
 
 A `.env` file in the working directory is loaded automatically.
 
