@@ -47,6 +47,11 @@ def bootstrap_app() -> WaygateAppContext:
     Returns:
         The frozen application context for the current process.
     """
+    global _app_context
+
+    if _app_context is not None:
+        return _app_context
+
     from waygate_core.config.registry import ConfigRegistry
     from waygate_core.plugin.registry import shared_plugin_manager
 
@@ -54,7 +59,7 @@ def bootstrap_app() -> WaygateAppContext:
     shared_plugin_manager.load_all()
     config = ConfigRegistry(shared_plugin_manager).build_config()
 
-    return WaygateAppContext(
+    _app_context = WaygateAppContext(
         config=config,
         plugins=WaygatePluginsContext(
             storage=cast(
@@ -81,6 +86,7 @@ def bootstrap_app() -> WaygateAppContext:
             ),
         ),
     )
+    return _app_context
 
 
 def get_app_context() -> WaygateAppContext:
