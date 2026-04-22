@@ -12,6 +12,8 @@ dependencies = [
     "rq>=2.8.0",
     "waygate-core",
     "waygate-plugin-communication-rq",
+    "waygate-plugin-local-storage",
+    "waygate-plugin-provider-ollama",
     "waygate-workflows",
 ]
 
@@ -21,6 +23,8 @@ dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
 [tool.uv.sources]
 waygate-core                    = { workspace = true }
 waygate-plugin-communication-rq = { workspace = true }
+waygate-plugin-local-storage    = { workspace = true }
+waygate-plugin-provider-ollama  = { workspace = true }
 waygate-workflows               = { workspace = true }
 
 [project.scripts]

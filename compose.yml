@@ -58,9 +58,12 @@ services:
       - .env.compose
     environment: {}
     depends_on:
-      - db
-      - valkey
-      - chromadb
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     volumes:
       - wiki_data:/data/wiki
     develop:

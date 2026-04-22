@@ -38,9 +38,11 @@ COPY apps/scheduler/pyproject.toml  apps/scheduler/
 COPY apps/draft-worker/pyproject.toml apps/draft-worker/
 COPY libs/core/pyproject.toml       libs/core/
 COPY libs/workflows/pyproject.toml  libs/workflows/
+COPY plugins/communication-http/pyproject.toml plugins/communication-http/
 COPY plugins/communication-rq/pyproject.toml plugins/communication-rq/
 COPY plugins/local-storage/pyproject.toml   plugins/local-storage/
 COPY plugins/provider-ollama/pyproject.toml plugins/provider-ollama/
+COPY plugins/webhook-generic/pyproject.toml plugins/webhook-generic/
 
 # 5. Install only the third-party PyPI dependencies for the target app.
 # --no-install-workspace: skips local workspace packages (source not copied yet).
