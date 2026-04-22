@@ -3,8 +3,8 @@ from __future__ import annotations
 from waygate_core.plugin import StorageNamespace
 
 from waygate_workflows.agents.publish import render_publish_artifact
+from waygate_workflows.runtime.storage import resolve_storage
 from waygate_workflows.schema import DraftGraphState, DraftWorkflowStatus
-from waygate_workflows.utils import resolve_storage
 
 
 def publish_draft(state: DraftGraphState) -> dict[str, object]:

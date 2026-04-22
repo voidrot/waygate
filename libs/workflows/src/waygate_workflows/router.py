@@ -16,7 +16,7 @@ from waygate_workflows.schema import DraftGraphState
 from waygate_workflows.schema import DraftWorkflowStatus
 from waygate_workflows.schema import WorkflowEvent
 from waygate_workflows.schema import WorkflowType
-from waygate_workflows.tools.checkpoint import build_postgres_connection_string
+from waygate_workflows.runtime.checkpoint import build_postgres_connection_string
 from waygate_workflows.workflows.compile import compile_workflow
 
 logger = get_logger(__name__)

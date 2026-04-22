@@ -4,9 +4,8 @@ import json
 
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
-from langchain_core.tools import tool
 
-from waygate_workflows.agents.common import resolve_chat_model
+from waygate_workflows.runtime.llm import resolve_chat_model
 from waygate_workflows.schema import ContinuityExtractionModel
 from waygate_workflows.schema import DocumentAnalysisPromptContext
 from waygate_workflows.schema import DocumentAnalysisResultModel
@@ -14,6 +13,7 @@ from waygate_workflows.schema import FindingsExtractionModel
 from waygate_workflows.schema import MetadataExtractionModel
 from waygate_workflows.schema import SourceDocumentState
 from waygate_workflows.schema import SummaryExtractionModel
+from waygate_workflows.tools import build_source_analysis_tools
 
 
 def _build_document_prompt(
@@ -139,58 +139,6 @@ def analyze_document_with_supervisor(
         ),
     )
 
-    @tool
-    def extract_document_metadata() -> str:
-        """Use the metadata specialist to extract grounded tags, topics, people, organizations, and projects for the active document."""
-
-        result = metadata_agent.invoke(
-            {"messages": [{"role": "user", "content": document_prompt}]}
-        )
-        structured = _coerce_model(
-            MetadataExtractionModel,
-            result["structured_response"],
-        )
-        return structured.model_dump_json()
-
-    @tool
-    def summarize_document() -> str:
-        """Use the summary specialist to extract a grounded narrative summary for the active document."""
-
-        result = summary_agent.invoke(
-            {"messages": [{"role": "user", "content": document_prompt}]}
-        )
-        structured = _coerce_model(
-            SummaryExtractionModel,
-            result["structured_response"],
-        )
-        return structured.model_dump_json()
-
-    @tool
-    def extract_grounded_findings() -> str:
-        """Use the findings specialist to extract grounded claims and defined terms for the active document."""
-
-        result = findings_agent.invoke(
-            {"messages": [{"role": "user", "content": document_prompt}]}
-        )
-        structured = _coerce_model(
-            FindingsExtractionModel,
-            result["structured_response"],
-        )
-        return structured.model_dump_json()
-
-    @tool
-    def inspect_document_continuity() -> str:
-        """Use the continuity specialist to identify prior-context references and unresolved mentions for the active document."""
-
-        result = continuity_agent.invoke(
-            {"messages": [{"role": "user", "content": document_prompt}]}
-        )
-        structured = _coerce_model(
-            ContinuityExtractionModel,
-            result["structured_response"],
-        )
-        return structured.model_dump_json()
-
     # The supervisor coordinates the specialist tools but does not bypass them.
     supervisor = create_agent(
         model=resolve_chat_model(
@@ -199,12 +147,13 @@ def analyze_document_with_supervisor(
             target_name="compile.source-analysis.supervisor",
             requires_structured_output=True,
         ),
-        tools=[
-            extract_document_metadata,
-            summarize_document,
-            extract_grounded_findings,
-            inspect_document_continuity,
-        ],
+        tools=build_source_analysis_tools(
+            document_prompt=document_prompt,
+            metadata_agent=metadata_agent,
+            summary_agent=summary_agent,
+            findings_agent=findings_agent,
+            continuity_agent=continuity_agent,
+        ),
         response_format=ToolStrategy(DocumentAnalysisResultModel),
         system_prompt=(
             "You are the document-analysis supervisor for the compile workflow. "

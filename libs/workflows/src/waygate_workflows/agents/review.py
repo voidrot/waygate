@@ -5,7 +5,7 @@ import json
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
 
-from waygate_workflows.agents.common import resolve_chat_model
+from waygate_workflows.runtime.llm import resolve_chat_model
 from waygate_workflows.schema import DraftGraphState
 from waygate_workflows.schema import ReviewOutcomeModel
 

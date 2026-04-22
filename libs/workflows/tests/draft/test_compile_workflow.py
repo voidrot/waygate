@@ -19,7 +19,7 @@ from waygate_workflows.schema import ReviewOutcomeModel
 from waygate_workflows.schema import SummaryExtractionModel
 from waygate_workflows.schema import WorkflowEvent
 from waygate_workflows.schema import WorkflowType
-from waygate_workflows.tools.documents import derive_source_set_key
+from waygate_workflows.content.documents import derive_source_set_key
 from waygate_workflows.workflows import compile as workflow_module
 
 compile_source_document_module = importlib.import_module(
@@ -32,7 +32,7 @@ normalize_request_module = importlib.import_module(
 source_normalization_module = importlib.import_module(
     "waygate_workflows.agents.source_normalization"
 )
-guidance_module = importlib.import_module("waygate_workflows.tools.guidance")
+guidance_module = importlib.import_module("waygate_workflows.content.guidance")
 publish_module = importlib.import_module("waygate_workflows.nodes.publish")
 review_module = importlib.import_module("waygate_workflows.nodes.review")
 synthesis_module = importlib.import_module("waygate_workflows.nodes.synthesis")

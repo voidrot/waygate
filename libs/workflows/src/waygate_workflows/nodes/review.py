@@ -3,8 +3,8 @@ from __future__ import annotations
 from waygate_core import get_app_context
 
 from waygate_workflows.agents.review import review_draft_with_specialist
+from waygate_workflows.runtime.text import normalize_string_list
 from waygate_workflows.schema import DraftGraphState, DraftWorkflowStatus
-from waygate_workflows.tools.common import normalize_string_list
 
 MAX_REVISIONS = 3
 

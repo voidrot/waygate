@@ -4,22 +4,15 @@ from datetime import UTC, datetime
 
 import frontmatter
 
+from waygate_workflows.runtime.text import normalize_string_list
 from waygate_workflows.schema import DocumentMetadataState
 from waygate_workflows.schema import DraftGraphState
-from waygate_workflows.tools.common import normalize_string_list
 
 
 def aggregate_metadata(
     metadata_entries: list[DocumentMetadataState],
 ) -> dict[str, list[str]]:
-    """Aggregate per-document metadata into published frontmatter fields.
-
-    Args:
-        metadata_entries: Per-document metadata collected during compile.
-
-    Returns:
-        Deduplicated metadata grouped by published frontmatter field.
-    """
+    """Aggregate per-document metadata into published frontmatter fields."""
     aggregated = {
         "tags": [],
         "topics": [],
@@ -34,14 +27,7 @@ def aggregate_metadata(
 
 
 def render_published_document(state: DraftGraphState) -> str:
-    """Render the final published markdown document with frontmatter.
-
-    Args:
-        state: Draft workflow state at the publish boundary.
-
-    Returns:
-        Markdown document string with compiled frontmatter.
-    """
+    """Render the final published markdown document with frontmatter."""
     aggregated = aggregate_metadata(state["extracted_metadata"])
     metadata = {
         "doc_id": state["source_set_key"],
