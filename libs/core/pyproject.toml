@@ -24,6 +24,9 @@ dependencies = [
   "content-types>=0.3.0,<0.4.0",
 ]
 
+[project.entry-points."waygate.migrations"]
+waygate-core = "waygate_core.database:waygate_migration_metadata"
+
 [dependency-groups]
 dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
 

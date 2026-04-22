@@ -1,13 +1,12 @@
 from logging.config import fileConfig
-import importlib
+from os import getenv
 from pathlib import Path
 import sys
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+import tomllib
 
 from alembic import context
-from os import getenv
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,16 +17,57 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Ensure workspace package sources are importable when Alembic runs from repo root.
+
+def _prepend_workspace_src_paths(repo_root: Path) -> None:
+    """Ensure workspace package sources are importable for Alembic.
+
+    The monorepo uses multiple editable packages under the uv workspace. Alembic
+    can be executed directly from the repository root before those packages are
+    installed into the active environment, so we add every member's `src`
+    directory (or package root when it does not use a src layout) to `sys.path`.
+    """
+
+    root_pyproject = repo_root / "pyproject.toml"
+    if not root_pyproject.exists():
+        return
+
+    with root_pyproject.open("rb") as file_handle:
+        root_config = tomllib.load(file_handle)
+
+    members = (
+        root_config.get("tool", {})
+        .get("uv", {})
+        .get("workspace", {})
+        .get("members", [])
+    )
+    seen_paths: set[str] = set()
+
+    for member_pattern in members:
+        for member_path in sorted(repo_root.glob(member_pattern)):
+            if not member_path.is_dir():
+                continue
+
+            import_path = member_path / "src"
+            resolved_path = import_path if import_path.is_dir() else member_path
+            resolved_str = str(resolved_path)
+            if resolved_str in seen_paths:
+                continue
+            seen_paths.add(resolved_str)
+            sys.path.insert(0, resolved_str)
+
+
 repo_root = Path(__file__).resolve().parents[1]
-core_src = repo_root / "packages" / "core" / "src"
-if str(core_src) not in sys.path:
-    sys.path.insert(0, str(core_src))
+_prepend_workspace_src_paths(repo_root)
 
-Base = importlib.import_module("waygate_core.database.models").Base
 
-# Tell Alembic which SQLAlchemy metadata to diff against.
-target_metadata = Base.metadata
+def _discover_target_metadata(repo_root: Path):
+    from waygate_core.database import discover_migration_metadata
+
+    return discover_migration_metadata(repo_root=repo_root)
+
+
+# Tell Alembic which SQLAlchemy metadata collections to diff against.
+target_metadata = _discover_target_metadata(repo_root)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

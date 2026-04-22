@@ -142,6 +142,34 @@ To add a plugin, follow the existing pattern:
 
 That is enough for the core runtime to discover, configure, and instantiate the plugin without app-specific wiring.
 
+## Migration Metadata Discovery
+
+Alembic metadata discovery is intentionally separate from runtime bootstrap.
+
+- `migrations/env.py` adds workspace `src` paths and asks `waygate_core.database.discover_migration_metadata()` for `target_metadata`
+- first-party workspace packages can declare migration contributors in their package `pyproject.toml`
+- installed third-party packages can declare the same contract through normal Python entry points
+
+The explicit entry-point group is `waygate.migrations`.
+
+Each contributor must point to a zero-argument callable that returns either:
+
+- one `sqlalchemy.MetaData` object
+- or an iterable of `sqlalchemy.MetaData` objects
+
+Example:
+
+- entry point group: `waygate.migrations`
+- entry point value: `my_package.models:waygate_migration_metadata`
+
+This contract is explicit on purpose:
+
+- Alembic does not scan packages looking for ORM models
+- Alembic does not call `bootstrap_app()` or instantiate runtime plugins
+- broken contributors fail migration generation early instead of silently drifting schema state
+
+Workspace contributors win over installed contributors with the same entry-point name so local monorepo development can override already-installed package metadata.
+
 ## Why This Model Exists
 
 The plugin system is not only an extensibility mechanism. It is also the main architectural boundary between product-specific workflow logic and environment-specific integrations.
