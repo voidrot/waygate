@@ -1,6 +1,6 @@
 [project]
 name = "waygate-nats-worker"
-version = "0.1.0"
+version = "0.1.1"
 description = "JetStream worker for queued WayGate workflow triggers"
 readme = "README.md"
 authors = [
