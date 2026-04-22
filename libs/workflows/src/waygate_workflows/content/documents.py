@@ -4,6 +4,7 @@ import hashlib
 from datetime import UTC, datetime
 
 import frontmatter
+from waygate_core.files import compute_content_hash, normalize_document_body
 
 from waygate_workflows.schema import OrderedDocumentRef
 from waygate_workflows.schema import SourceDocumentState
@@ -23,9 +24,12 @@ def parse_source_document(document_uri: str, raw_content: str) -> SourceDocument
     """Parse stored markdown into the normalized source-document state shape."""
     post = frontmatter.loads(raw_content)
     metadata = post.metadata
+    normalized_content = normalize_document_body(post.content)
     return {
         "uri": document_uri,
-        "content": post.content.strip(),
+        "content": normalized_content,
+        "content_hash": normalize_frontmatter_value(metadata.get("content_hash"))
+        or compute_content_hash(normalized_content),
         "source_hash": normalize_frontmatter_value(metadata.get("source_hash")),
         "source_uri": normalize_frontmatter_value(metadata.get("source_uri")),
         "source_type": normalize_frontmatter_value(metadata.get("source_type")),
@@ -37,6 +41,7 @@ def to_ordered_document_ref(document: SourceDocumentState) -> OrderedDocumentRef
     """Project a full source document into the lighter ordering reference."""
     return {
         "uri": document["uri"],
+        "content_hash": document.get("content_hash"),
         "source_hash": document.get("source_hash"),
         "source_uri": document.get("source_uri"),
         "source_type": document.get("source_type"),
@@ -49,18 +54,12 @@ def derive_source_set_key(documents: list[SourceDocumentState]) -> str:
     if not documents:
         raise ValueError("Compile workflow requires at least one source document")
 
-    source_hashes = [document.get("source_hash") for document in documents]
-    if all(source_hashes):
-        payload = "\n".join(sorted(str(value) for value in source_hashes))
+    content_hashes = [document.get("content_hash") for document in documents]
+    if all(content_hashes):
+        payload = "\n".join(sorted(str(value) for value in content_hashes))
         digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
         return f"hash-{digest}"
 
-    source_uris = [document.get("source_uri") for document in documents]
-    if not any(source_hashes) and all(source_uris):
-        payload = "\n".join(sorted(str(value) for value in source_uris))
-        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-        return f"uri-{digest}"
-
     raise ValueError(
-        "Compile workflow requires either complete source_hash coverage or complete source_uri coverage for the source set"
+        "Compile workflow requires content_hash coverage for the source set"
     )

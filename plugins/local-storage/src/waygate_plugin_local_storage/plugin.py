@@ -32,6 +32,10 @@ class LocalStorageConfig(BaseModel):
         default="review",
         description="Directory for files needing review within the base path.",
     )
+    compiled_dir: str = Field(
+        default="compiled",
+        description="Directory for approved compiled files within the base path.",
+    )
     publish_dir: str = Field(
         default="published",
         description="Directory for published files within the base path.",
@@ -75,6 +79,7 @@ class LocalStoragePlugin(StoragePlugin):
         self.raw_dir = self.base_dir / self._config.raw_dir
         self.staging_dir = self.base_dir / self._config.staging_dir
         self.review_dir = self.base_dir / self._config.review_dir
+        self.compiled_dir = self.base_dir / self._config.compiled_dir
         self.publish_dir = self.base_dir / self._config.publish_dir
         self.metadata_dir = self.base_dir / self._config.metadata_dir
         self.templates_dir = self.base_dir / self._config.templates_dir
@@ -88,6 +93,7 @@ class LocalStoragePlugin(StoragePlugin):
             "raw": self.raw_dir,
             "staging": self.staging_dir,
             "review": self.review_dir,
+            "compiled": self.compiled_dir,
             "published": self.publish_dir,
             "metadata": self.metadata_dir,
             "templates": self.templates_dir,
@@ -155,6 +161,7 @@ class LocalStoragePlugin(StoragePlugin):
             self.raw_dir,
             self.staging_dir,
             self.review_dir,
+            self.compiled_dir,
             self.publish_dir,
             self.metadata_dir,
             self.templates_dir,
@@ -264,6 +271,7 @@ class LocalStoragePlugin(StoragePlugin):
             StorageNamespace.Raw: self._config.raw_dir,
             StorageNamespace.Staging: self._config.staging_dir,
             StorageNamespace.Review: self._config.review_dir,
+            StorageNamespace.Compiled: self._config.compiled_dir,
             StorageNamespace.Published: self._config.publish_dir,
             StorageNamespace.Metadata: self._config.metadata_dir,
             StorageNamespace.Templates: self._config.templates_dir,

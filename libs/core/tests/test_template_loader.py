@@ -3,7 +3,12 @@ from datetime import datetime
 import pytest
 
 from waygate_core.files import template
-from waygate_core.schema import RawDocument
+from waygate_core.schema import (
+    CompiledDocument,
+    PublishedDocument,
+    RawDocument,
+    SourceDocumentReference,
+)
 
 
 class _FakeTemplate:
@@ -28,13 +33,23 @@ def test_get_template_settings_reads_env(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     monkeypatch.setenv("WAYGATE_CORE__RAW_DOC_TEMPLATE", "custom_raw.j2")
     monkeypatch.setenv("WAYGATE_CORE__DRAFT_DOC_TEMPLATE", "custom_draft.j2")
+    monkeypatch.setenv("WAYGATE_CORE__COMPILED_DOC_TEMPLATE", "custom_compiled.j2")
+    monkeypatch.setenv("WAYGATE_CORE__PUBLISHED_DOC_TEMPLATE", "custom_published.j2")
 
     _clear_template_caches()
-    packages, raw_template_name, draft_template_name = template._get_template_settings()
+    (
+        packages,
+        raw_template_name,
+        draft_template_name,
+        compiled_template_name,
+        published_template_name,
+    ) = template._get_template_settings()
 
     assert packages == ("waygate_core", "waygate_plugin_communication_http")
     assert raw_template_name == "custom_raw.j2"
     assert draft_template_name == "custom_draft.j2"
+    assert compiled_template_name == "custom_compiled.j2"
+    assert published_template_name == "custom_published.j2"
 
 
 def test_build_template_env_raises_for_missing_packages() -> None:
@@ -52,7 +67,13 @@ def test_render_raw_document_uses_configured_template(
     monkeypatch.setattr(
         template,
         "_get_template_settings",
-        lambda: (("waygate_core",), "custom_raw.j2", "custom_draft.j2"),
+        lambda: (
+            ("waygate_core",),
+            "custom_raw.j2",
+            "custom_draft.j2",
+            "custom_compiled.j2",
+            "custom_published.j2",
+        ),
     )
     monkeypatch.setattr(
         template,
@@ -80,7 +101,13 @@ def test_render_draft_document_uses_configured_template(
     monkeypatch.setattr(
         template,
         "_get_template_settings",
-        lambda: (("waygate_core",), "custom_raw.j2", "custom_draft.j2"),
+        lambda: (
+            ("waygate_core",),
+            "custom_raw.j2",
+            "custom_draft.j2",
+            "custom_compiled.j2",
+            "custom_published.j2",
+        ),
     )
     monkeypatch.setattr(
         template,
@@ -95,3 +122,145 @@ def test_render_draft_document_uses_configured_template(
     assert result == "rendered-output"
     assert fake_template.render_calls[0]["content"] == "draft"
     assert fake_template.render_calls[0]["doc_uri"] == "raw/example.md"
+
+
+def test_build_raw_document_frontmatter_populates_content_hash() -> None:
+    raw_doc = RawDocument(
+        source_type="webhook",
+        timestamp=datetime(2026, 1, 1),
+        content="hello",
+    )
+
+    frontmatter = template.build_raw_document_frontmatter(raw_doc)
+
+    assert frontmatter.content_hash == template.compute_content_hash("hello")
+
+
+def test_compute_content_hash_normalizes_line_endings_and_outer_whitespace() -> None:
+    assert template.compute_content_hash(
+        "\nhello\r\n"
+    ) == template.compute_content_hash("hello\n")
+
+
+def test_build_compiled_document_frontmatter() -> None:
+    compiled_doc = CompiledDocument(
+        doc_id="compiled-123",
+        source_set_key="hash-source-set",
+        source_documents=[
+            SourceDocumentReference(
+                uri="file://raw/one.txt",
+                content_hash="content-one",
+                source_hash="source-one",
+                source_uri="https://example.test/one",
+                source_type="generic",
+                timestamp="2026-01-01T00:00:00Z",
+            )
+        ],
+        compiled_at=datetime(2026, 1, 2),
+        review_feedback=["looks good"],
+        tags=["tag-one"],
+        topics=["topic-one"],
+        people=["Alice"],
+        organizations=["WayGate"],
+        projects=["WayGate Core"],
+        content="# Compiled",
+    )
+
+    frontmatter = template.build_compiled_document_frontmatter(compiled_doc)
+
+    assert frontmatter.doc_id == "compiled-123"
+    assert frontmatter.source_documents == ["file://raw/one.txt"]
+    assert frontmatter.source_content_hashes == ["content-one"]
+    assert frontmatter.source_hashes == ["source-one"]
+    assert frontmatter.source_uris == ["https://example.test/one"]
+    assert frontmatter.review_feedback == ["looks good"]
+
+
+def test_build_published_document_frontmatter() -> None:
+    published_doc = PublishedDocument(
+        doc_id="published-123",
+        compiled_document_ids=["compiled-123"],
+        compiled_document_uris=["file://compiled/compiled-123.md"],
+        source_set_keys=["hash-source-set"],
+        published_at=datetime(2026, 1, 3),
+        tags=["tag-one"],
+        topics=["topic-one"],
+        people=["Alice"],
+        organizations=["WayGate"],
+        projects=["WayGate Core"],
+        content="# Published",
+    )
+
+    frontmatter = template.build_published_document_frontmatter(published_doc)
+
+    assert frontmatter.doc_id == "published-123"
+    assert frontmatter.compiled_document_ids == ["compiled-123"]
+    assert frontmatter.compiled_document_uris == ["file://compiled/compiled-123.md"]
+    assert frontmatter.source_set_keys == ["hash-source-set"]
+
+
+def test_render_compiled_document_uses_configured_template(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_template = _FakeTemplate()
+
+    monkeypatch.setattr(
+        template,
+        "_get_template_settings",
+        lambda: (
+            ("waygate_core",),
+            "custom_raw.j2",
+            "custom_draft.j2",
+            "custom_compiled.j2",
+            "custom_published.j2",
+        ),
+    )
+    monkeypatch.setattr(template, "_get_template", lambda packages, name: fake_template)
+
+    compiled_doc = CompiledDocument(
+        doc_id="compiled-123",
+        source_set_key="hash-source-set",
+        source_documents=[],
+        compiled_at=datetime(2026, 1, 2),
+        content="# Compiled",
+    )
+
+    result = template.render_compiled_document(compiled_doc)
+
+    assert result == "rendered-output"
+    assert fake_template.render_calls[0]["content"] == "# Compiled"
+    assert "doc_id: compiled-123" in str(fake_template.render_calls[0]["frontmatter"])
+
+
+def test_render_published_document_uses_configured_template(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_template = _FakeTemplate()
+
+    monkeypatch.setattr(
+        template,
+        "_get_template_settings",
+        lambda: (
+            ("waygate_core",),
+            "custom_raw.j2",
+            "custom_draft.j2",
+            "custom_compiled.j2",
+            "custom_published.j2",
+        ),
+    )
+    monkeypatch.setattr(template, "_get_template", lambda packages, name: fake_template)
+
+    published_doc = PublishedDocument(
+        doc_id="published-123",
+        compiled_document_ids=["compiled-123"],
+        compiled_document_uris=["file://compiled/compiled-123.md"],
+        source_set_keys=["hash-source-set"],
+        published_at=datetime(2026, 1, 3),
+        content="# Published",
+    )
+
+    result = template.render_published_document(published_doc)
+
+    assert result == "rendered-output"
+    assert fake_template.render_calls[0]["content"] == "# Published"
+    assert "doc_id: published-123" in str(fake_template.render_calls[0]["frontmatter"])

@@ -140,3 +140,36 @@ def test_submit_workflow_trigger_maps_redis_errors_to_transient(monkeypatch) -> 
 
     assert result.accepted is False
     assert result.error_kind == DispatchErrorKind.TRANSIENT
+
+
+def test_submit_workflow_trigger_routes_ready_integrate_to_draft_queue(
+    monkeypatch,
+) -> None:
+    fake_queue = FakeQueue("draft", object())
+
+    monkeypatch.setattr(
+        "waygate_plugin_communication_rq.plugin.Redis.from_url",
+        lambda url: object(),
+    )
+    monkeypatch.setattr(
+        "waygate_plugin_communication_rq.plugin.Queue",
+        lambda name, connection: fake_queue,
+    )
+
+    plugin = CommunicationRQPlugin(
+        CommunicationRQConfig(redis_url="redis://example", retry_max=1)
+    )
+    result = asyncio.run(
+        plugin.submit_workflow_trigger(
+            WorkflowTriggerMessage(
+                event_type="ready.integrate",
+                source="test",
+                document_paths=["file://compiled/compiled-abc.md"],
+                idempotency_key="compiled-abc",
+            )
+        )
+    )
+
+    assert result.accepted is True
+    assert result.transport_message_id == "ready.integrate-compiled-abc"
+    assert fake_queue.name == "draft"

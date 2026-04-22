@@ -10,6 +10,7 @@ from waygate_plugin_local_storage.plugin import LocalStorageConfig, LocalStorage
         (StorageNamespace.Raw, "raw"),
         (StorageNamespace.Staging, "staging"),
         (StorageNamespace.Review, "review"),
+        (StorageNamespace.Compiled, "compiled"),
         (StorageNamespace.Published, "published"),
         (StorageNamespace.Metadata, "metadata"),
         (StorageNamespace.Templates, "templates"),

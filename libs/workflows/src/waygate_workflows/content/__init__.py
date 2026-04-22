@@ -4,13 +4,20 @@ from .documents import (
     to_ordered_document_ref,
 )
 from .guidance import load_agent_guidance_instructions
-from .publishing import aggregate_metadata, render_published_document
+from .publishing import (
+    aggregate_metadata,
+    build_compiled_document,
+    build_draft_document,
+    render_compiled_artifact,
+)
 
 __all__ = [
     "aggregate_metadata",
+    "build_compiled_document",
+    "build_draft_document",
     "derive_source_set_key",
     "load_agent_guidance_instructions",
     "parse_source_document",
-    "render_published_document",
+    "render_compiled_artifact",
     "to_ordered_document_ref",
 ]

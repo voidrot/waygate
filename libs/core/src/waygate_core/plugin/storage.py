@@ -15,6 +15,7 @@ class StorageNamespace(StrEnum):
     Raw = "raw"
     Staging = "staging"
     Review = "review"
+    Compiled = "compiled"
     Published = "published"
     Metadata = "metadata"
     Templates = "templates"

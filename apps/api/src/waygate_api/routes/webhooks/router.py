@@ -1,10 +1,9 @@
 """Dynamic webhook routing for the WayGate API app."""
 
-from uuid import uuid7
 from waygate_core import get_app_context
 from waygate_api.clients import send_workflow_message
 from waygate_api.routes.webhooks.errors import map_dispatch_failure_to_http
-from waygate_core.files import render_raw_document
+from waygate_core.files import compute_content_hash, render_raw_document
 from waygate_core.plugin.storage import StorageNamespace
 from waygate_core.logging import get_logger
 import json
@@ -59,15 +58,18 @@ def _make_handler(plugin: WebhookPlugin) -> Callable:
                 )
                 written_paths = []
                 for doc in raw_documents:
+                    content_hash = doc.content_hash or compute_content_hash(doc.content)
                     path = (
                         storage.build_namespaced_path(
-                            StorageNamespace.Raw, f"{uuid7()}"
+                            StorageNamespace.Raw, content_hash
                         )
                         + ".txt"
                     )
                     written_paths.append(
                         storage.write_document(path, render_raw_document(doc))
                     )
+
+                written_paths = list(dict.fromkeys(written_paths))
 
                 workflow_message = plugin.build_workflow_trigger(payload, written_paths)
                 if workflow_message is not None:

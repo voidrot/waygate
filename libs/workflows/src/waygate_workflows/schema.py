@@ -64,6 +64,7 @@ class WorkflowEvent(StrEnum):
     """Workflow trigger and lifecycle event names."""
 
     DRAFT_READY = "draft.ready"
+    READY_INTEGRATE = "ready.integrate"
     DRAFT_IN_PROGRESS = "draft.in_progress"
     DRAFT_COMPLETED = "draft.completed"
     REVIEW_READY = "review.ready"
@@ -95,6 +96,7 @@ class SourceDocumentState(TypedDict):
 
     uri: str
     content: str
+    content_hash: str | None
     source_hash: str | None
     source_uri: str | None
     source_type: str | None
@@ -105,6 +107,7 @@ class OrderedDocumentRef(TypedDict):
     """Lightweight durable reference for document ordering state."""
 
     uri: str
+    content_hash: str | None
     source_hash: str | None
     source_uri: str | None
     source_type: str | None
@@ -316,8 +319,9 @@ class DraftGraphState(TypedDict):
     current_draft: str
     review_feedback: list[str]
     review_outcome: ReviewOutcomeState | None
-    published_document_uri: str | None
-    published_document_id: str | None
+    compiled_document_uri: str | None
+    compiled_document_id: str | None
+    compiled_document_hash: str | None
     human_review_record_uri: str | None
     human_review_action: str | None
 
