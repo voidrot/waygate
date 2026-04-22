@@ -73,3 +73,23 @@ generic_webhook = "waygate_plugin_webhook_generic.plugin:GenericWebhookPlugin"
 ## Extending
 
 Subclass `GenericWebhookPlugin` (or implement `WebhookPlugin` directly from `waygate-core`) to handle a specific webhook provider, adding signature verification and payload normalisation as needed.
+
+## Local Smoke Test
+
+For the minimum local draft pipeline, run the Compose services documented in the
+root [README.md](../../README.md), then post the sample payload below.
+
+```bash
+curl -X POST http://127.0.0.1:8080/webhooks/generic-webhook \
+  -H "Content-Type: application/json" \
+  --data @scripts/fixtures/generic-webhook.sample.json
+```
+
+Expected behavior:
+
+- The API returns a success payload for the webhook request.
+- Raw source artifacts are written to the configured storage backend.
+- A `draft.ready` workflow trigger is enqueued through `communication-rq`.
+- The draft worker either publishes a compiled markdown document or writes a human-review record.
+
+The sample payload fixture lives at [scripts/fixtures/generic-webhook.sample.json](../../scripts/fixtures/generic-webhook.sample.json).

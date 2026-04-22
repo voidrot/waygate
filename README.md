@@ -45,6 +45,55 @@ uv run waygate-scheduler
 
 Copy `env.example` to `.env` and set values appropriate for your environment before starting.
 
+## Docker Compose Smoke Test
+
+Use the Compose stack when you want to exercise the generic webhook -> API ->
+RQ -> draft-worker pipeline with the Ollama provider.
+
+The minimum path for that flow is `db`, `valkey`, `ollama`, `api`, and
+`draft-worker`. `scheduler` is not required for webhook-driven draft runs.
+
+Use [.env.compose.example](.env.compose.example) as the template for your local
+`.env.compose` file before starting the stack.
+
+1. Start the infrastructure and Ollama service.
+
+```bash
+docker compose up -d db valkey ollama
+```
+
+1. Pull the models required by the local smoke test before starting the worker.
+
+```bash
+docker compose exec ollama ollama pull qwen3.5:9b
+docker compose exec ollama ollama pull hermes3:8b
+```
+
+1. Start the API and draft worker.
+
+```bash
+docker compose up -d api draft-worker
+```
+
+1. Post the sample generic webhook payload.
+
+```bash
+curl -X POST http://127.0.0.1:8080/webhooks/generic-webhook \
+  -H "Content-Type: application/json" \
+  --data @scripts/fixtures/generic-webhook.sample.json
+```
+
+1. Verify the result in the bind-mounted wiki directory.
+
+Raw webhook artifacts are written under `./wiki/raw/`. Successful compile runs
+write published markdown under `./wiki/published/`. If the workflow stops for a
+human decision, the review record is written under `./wiki/review/`.
+
+Important runtime details:
+
+- [.env.compose.example](.env.compose.example) includes `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://ollama:11434` so containers reach the Compose Ollama service instead of their own loopback interface.
+- The draft worker validates the configured compile models at startup. If you change `WAYGATE_CORE__METADATA_MODEL_NAME`, `WAYGATE_CORE__DRAFT_MODEL_NAME`, or `WAYGATE_CORE__REVIEW_MODEL_NAME`, pull those models into Ollama before restarting the worker.
+
 ## Packages
 
 | Package                                                            | Description                               |
