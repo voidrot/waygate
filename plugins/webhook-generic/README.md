@@ -89,7 +89,7 @@ Expected behavior:
 
 - The API returns a success payload for the webhook request.
 - Raw source artifacts are written to the configured storage backend.
-- A `draft.ready` workflow trigger is enqueued through `communication-rq`.
-- The draft worker either publishes a compiled markdown document or writes a human-review record.
+- A `draft.ready` workflow trigger is published through `communication-nats` by default.
+- The NATS worker either publishes a compiled markdown document or writes a human-review record.
 
 The sample payload fixture lives at [scripts/fixtures/generic-webhook.sample.json](../../scripts/fixtures/generic-webhook.sample.json).

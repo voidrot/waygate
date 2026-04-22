@@ -24,10 +24,20 @@ shape.
 ## Field semantics
 
 - `event_type`: trigger category (for example `draft.ready` or `cron.tick`).
+- `event_type`: trigger category (for example `draft.ready`, `ready.integrate`, or `cron.tick`).
 - `source`: producer identifier, used for auditability.
 - `document_paths`: storage-backed document URIs relevant to the trigger.
 - `idempotency_key`: optional deduplication key.
 - `metadata`: optional transport-agnostic key/value context.
+
+## Current trigger usage
+
+- `draft.ready` starts the compile workflow from raw artifact URIs.
+- `ready.integrate` is emitted after compile writes an approved artifact in the
+  `compiled` namespace.
+- `ready.integrate` is transport-valid today, but the worker router still treats
+  it as a deferred follow-on event and returns `ignored` until the integration
+  workflow is implemented.
 
 ## HTTP transport
 
@@ -59,6 +69,27 @@ importable Python function.
 - Job ID: derived from `idempotency_key` when present and valid for RQ
 
 The plugin returns the RQ job ID as `transport_message_id` when enqueue succeeds.
+
+During the current phased rollout, `ready.integrate` is routed through the same
+draft worker path as `draft.ready` so the event can be accepted and explicitly
+ignored without introducing a dead-letter backlog.
+
+## NATS transport
+
+The NATS communication plugin publishes the same trigger payload to JetStream.
+
+- Default stream: `WAYGATE_WORKFLOW`
+- Default draft subject: `waygate.workflow.draft`
+- Default cron subject: `waygate.workflow.cron`
+- Publish dedupe header: `Nats-Msg-Id` derived from `event_type` and `idempotency_key` when present
+
+The `waygate-nats-worker` app consumes those JetStream subjects with explicit
+ACKs and periodic `in_progress()` heartbeats so long-running compile jobs do
+not redeliver solely because a fixed worker timeout elapsed.
+
+During the current phased rollout, `ready.integrate` is published to the same
+draft subject as `draft.ready` so existing workers can accept and ignore it
+until the integration workflow is implemented.
 
 ## Local mock worker
 

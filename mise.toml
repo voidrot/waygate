@@ -23,11 +23,12 @@ run = "docker compose up -d"
 [tasks."docker:down"]
 run = "docker compose down"
 
+[tasks."test:compose:nats-smoke"]
+run = "uv run python scripts/compose_smoke_nats.py"
+
 [tasks."ollama:pull"]
-run = [
-  "docker compose exec ollama ollama pull ${DRAFT_MODEL}",
-  "docker compose exec ollama ollama pull ${REVIEW_MODEL}",
-]
+usage   = 'arg "<model>" help="Ollama model to pull"'
+run     = "docker compose exec ollama ollama pull ${usage_model?}"
 depends = "docker:up"
 
 [tasks."format"]

@@ -13,6 +13,7 @@ dependencies = [
   "pydantic>=2.12.5",
   "waygate-core",
   "waygate-plugin-communication-http",
+  "waygate-plugin-communication-nats",
   "waygate-plugin-communication-rq",
   "waygate-plugin-local-storage",
   "waygate-plugin-webhook-generic",
@@ -31,6 +32,7 @@ build-backend = "uv_build"
 [tool.uv.sources]
 waygate-core                      = { workspace = true }
 waygate-plugin-communication-http = { workspace = true }
+waygate-plugin-communication-nats = { workspace = true }
 waygate-plugin-communication-rq   = { workspace = true }
 waygate-plugin-local-storage      = { workspace = true }
 waygate-plugin-webhook-generic    = { workspace = true }

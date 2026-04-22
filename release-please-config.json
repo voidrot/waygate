@@ -32,12 +32,30 @@
         }
       ]
     },
+    "apps/nats-worker": {
+      "package-name": "waygate-nats-worker",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "apps/nats-worker/src/waygate_nats_worker/__init__.py"
+        }
+      ]
+    },
     "libs/core": {
       "package-name": "waygate-core",
       "extra-files": [
         {
           "type": "generic",
           "path": "libs/core/src/waygate_core/__init__.py"
+        }
+      ]
+    },
+    "libs/worker": {
+      "package-name": "waygate-worker",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "libs/worker/src/waygate_worker/__init__.py"
         }
       ]
     },
@@ -74,6 +92,15 @@
         {
           "type": "generic",
           "path": "plugins/communication-rq/src/waygate_plugin_communication_rq/__init__.py"
+        }
+      ]
+    },
+    "plugins/communication-nats": {
+      "package-name": "waygate-plugin-communication-nats",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/communication-nats/src/waygate_plugin_communication_nats/__init__.py"
         }
       ]
     },

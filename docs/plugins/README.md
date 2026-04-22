@@ -5,6 +5,7 @@ This section documents the first-party plugins shipped with WayGate.
 ## Plugins
 
 - [Communication HTTP](communication-http.md): HTTP transport for workflow trigger messages.
+- [Communication NATS](communication-nats.md): JetStream transport for durable workflow trigger messages.
 - [Communication RQ](communication-rq.md): RQ/Redis transport for queued workflow triggers.
 - [Local Storage](local-storage.md): Filesystem-backed storage implementation.
 - [Provider Featherless AI](provider-featherless-ai.md): Featherless-backed OpenAI-compatible LLM provider.

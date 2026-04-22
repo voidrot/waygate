@@ -9,13 +9,16 @@ apps/
   api/          — FastAPI HTTP server; exposes webhook endpoints and the OpenAPI schema
   scheduler/    — Background job runner for cron-style workflows
   draft-worker/ — RQ worker for queued draft workflow triggers
+  nats-worker/  — JetStream worker for durable workflow trigger execution
 libs/
   core/         — Shared framework: plugin system, config registry, bootstrap, logging
+  worker/       — Shared worker runtime helpers and JetStream consumer loop
   workflows/    — Shared workflow entrypoints executed by workers
 plugins/
   local-storage/    — StoragePlugin backed by the local filesystem
   provider-ollama/  — LLMProviderPlugin backed by a local Ollama server
   communication-http/ — CommunicationClientPlugin for HTTP worker dispatch
+  communication-nats/ — CommunicationClientPlugin for JetStream worker dispatch
   communication-rq/   — CommunicationClientPlugin for RQ worker dispatch
   webhook-generic/  — WebhookPlugin for generic HTTP webhook ingestion
 ```
@@ -48,10 +51,11 @@ Copy `env.example` to `.env` and set values appropriate for your environment bef
 ## Docker Compose Smoke Test
 
 Use the Compose stack when you want to exercise the generic webhook -> API ->
-RQ -> draft-worker pipeline with the Ollama provider.
+JetStream -> nats-worker pipeline with the Ollama provider.
 
-The minimum path for that flow is `db`, `valkey`, `ollama`, `api`, and
-`draft-worker`. `scheduler` is not required for webhook-driven draft runs.
+The minimum path for that flow is `db`, `valkey`, `chromadb`, `nats`, `ollama`,
+`api`, and `nats-worker`. `scheduler` is not required for webhook-driven draft
+runs.
 
 Use [env.compose.example](env.compose.example) as the template for your local
 `.env.compose` file before starting the stack.
@@ -59,7 +63,7 @@ Use [env.compose.example](env.compose.example) as the template for your local
 1. Start the infrastructure and Ollama service.
 
 ```bash
-docker compose up -d db valkey ollama
+docker compose up -d db valkey chromadb nats ollama
 ```
 
 1. Pull the models required by the local smoke test before starting the worker.
@@ -69,10 +73,10 @@ docker compose exec ollama ollama pull qwen3.5:9b
 docker compose exec ollama ollama pull hermes3:8b
 ```
 
-1. Start the API and draft worker.
+1. Start the API and NATS worker.
 
 ```bash
-docker compose up -d api draft-worker
+docker compose up -d api nats-worker
 ```
 
 1. Post the sample generic webhook payload.
@@ -92,7 +96,8 @@ human decision, the review record is written under `./wiki/review/`.
 Important runtime details:
 
 - [env.compose.example](env.compose.example) includes `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://ollama:11434` so containers reach the Compose Ollama service instead of their own loopback interface.
-- The draft worker validates the configured compile models at startup. If you change `WAYGATE_CORE__METADATA_MODEL_NAME`, `WAYGATE_CORE__DRAFT_MODEL_NAME`, or `WAYGATE_CORE__REVIEW_MODEL_NAME`, pull those models into Ollama before restarting the worker.
+- The NATS worker validates the configured compile models at startup. If you change `WAYGATE_CORE__METADATA_MODEL_NAME`, `WAYGATE_CORE__DRAFT_MODEL_NAME`, or `WAYGATE_CORE__REVIEW_MODEL_NAME`, pull those models into Ollama before restarting the worker.
+- `mise run test:compose:nats-smoke` runs the same workflow in an isolated Compose project using a lightweight Ollama smoke-model profile so end-to-end verification completes faster.
 
 ## Packages
 
@@ -102,9 +107,12 @@ Important runtime details:
 | [`waygate-api`](apps/api/)                                         | FastAPI HTTP server                       |
 | [`waygate-scheduler`](apps/scheduler/)                             | Cron job runner                           |
 | [`waygate-draft-worker`](apps/draft-worker/)                       | RQ draft worker                           |
+| [`waygate-nats-worker`](apps/nats-worker/)                         | JetStream workflow worker                 |
+| [`waygate-worker`](libs/worker/)                                   | Shared worker runtime helpers             |
 | [`waygate-plugin-local-storage`](plugins/local-storage/)           | Filesystem storage plugin                 |
 | [`waygate-plugin-provider-ollama`](plugins/provider-ollama/)       | Ollama LLM provider plugin                |
 | [`waygate-plugin-communication-http`](plugins/communication-http/) | HTTP communication client plugin          |
+| [`waygate-plugin-communication-nats`](plugins/communication-nats/) | JetStream communication client plugin     |
 | [`waygate-plugin-communication-rq`](plugins/communication-rq/)     | RQ communication client plugin            |
 | [`waygate-workflows`](libs/workflows/)                             | Shared workflow entrypoints               |
 | [`waygate-plugin-webhook-generic`](plugins/webhook-generic/)       | Generic webhook ingestion plugin          |

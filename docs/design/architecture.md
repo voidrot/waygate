@@ -8,11 +8,11 @@ WayGate is a Python monorepo for building Generation-Augmented Retrieval workflo
 
 The repository is organized into three layers.
 
-- `apps`: `api`, `scheduler`, `draft-worker`
-  Responsibility: long-running processes that expose HTTP ingress, schedule recurring jobs, or execute queued workflow work.
-- `libs`: `core`, `workflows`
-  Responsibility: shared runtime primitives, plugin contracts, configuration, and workflow implementation.
-- `plugins`: `local-storage`, `provider-ollama`, `provider-featherless-ai`, `communication-http`, `communication-rq`, `webhook-generic`, `webhook-agent-session`
+- `apps`: `api`, `scheduler`, `draft-worker`, `nats-worker`
+  Responsibility: long-running processes that expose HTTP ingress, schedule recurring jobs, or execute workflow work over RQ or JetStream.
+- `libs`: `core`, `worker`, `workflows`
+  Responsibility: shared runtime primitives, worker execution helpers, plugin contracts, configuration, and workflow implementation.
+- `plugins`: `local-storage`, `provider-ollama`, `provider-featherless-ai`, `communication-http`, `communication-nats`, `communication-rq`, `webhook-generic`, `webhook-agent-session`
   Responsibility: first-party implementations of the plugin interfaces defined in `waygate-core`.
 
 ## Package Boundaries
@@ -39,11 +39,24 @@ The repository is organized into three layers.
 - Preflights the active compile-workflow LLM provider before polling Redis so provider-construction errors fail at startup.
 - The concrete worker-side workflow entrypoint currently resolves to `waygate_workflows.draft.jobs.process_workflow_trigger`.
 
+### apps/nats-worker
+
+- JetStream worker runtime for durable workflow execution.
+- Consumes the `draft.ready` and `cron.tick` subjects configured by `communication-nats`.
+- Uses the shared helpers in `libs/worker` to extend ACK leases while long-running workflow steps execute.
+- Preflights the active compile-workflow LLM provider before polling JetStream so provider-construction errors fail at startup.
+
 ### libs/core
 
 - Defines the WayGate bootstrap path.
 - Owns plugin hooks, abstract base classes, config merging, logging setup, and common schema types.
 - Produces the frozen `WaygateAppContext` shared by all runtime processes.
+
+### libs/worker
+
+- Holds worker-runtime helpers shared across transport-specific worker apps.
+- Currently ships the JetStream consumer loop used by `apps/nats-worker`.
+- Keeps workflow execution concerns separate from transport configuration and settlement mechanics.
 
 ### libs/workflows
 
@@ -82,7 +95,7 @@ The current implementation does not treat a search index, vector store, static s
 
 ### Transport-agnostic workflow dispatch
 
-The API and scheduler do not know whether work is being delivered over HTTP or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
+The API and scheduler do not know whether work is being delivered over HTTP, JetStream, or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
 
 ### Workflow logic separate from worker runtime
 
@@ -125,6 +138,7 @@ Implemented in this repo today:
 - plugin loading and merged configuration
 - webhook ingestion through FastAPI
 - transport-agnostic workflow trigger dispatch
+- JetStream worker support for durable workflow execution
 - RQ worker support for queued draft work
 - LangGraph compile, review, publish, and human-review interruption flow
 - storage-backed raw, review, and published document artifacts
@@ -149,8 +163,10 @@ Several legacy docs described the right long-term direction, but with names that
 | Legacy term  | Current repo term                                        |
 | ------------ | -------------------------------------------------------- |
 | receiver     | `apps/api`                                               |
-| compiler app | `libs/workflows` plus `apps/draft-worker`                |
+| compiler app | `libs/workflows` plus RQ and JetStream worker processes. |
 | live wiki    | `published` storage namespace                            |
 | meta         | `metadata`, `templates`, and `agents` storage namespaces |
 
 Use the current names when writing new documentation or code.
+
+In the current repository, "worker apps" means `apps/draft-worker` for the legacy RQ path or `apps/nats-worker` for the JetStream-backed path.

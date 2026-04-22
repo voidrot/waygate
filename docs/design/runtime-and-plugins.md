@@ -44,7 +44,7 @@ WayGate defines five plugin groups.
 - `waygate.plugins.communication`
   Hook: `waygate_communication_client_plugin`
   Purpose: transport-specific delivery of workflow triggers.
-  First-party packages: `waygate-plugin-communication-http`, `waygate-plugin-communication-rq`.
+  First-party packages: `waygate-plugin-communication-http`, `waygate-plugin-communication-nats`, `waygate-plugin-communication-rq`.
 
 ## Configuration Registry
 
@@ -104,7 +104,7 @@ The runtime fails fast when a configured communication plugin is missing. It doe
 - Validates a richer transcript payload, can enforce HMAC verification, and stores the canonical session bundle as JSON in the raw artifact body.
 - Overrides the default webhook trigger builder so the compile trigger carries stable session metadata and an idempotency key.
 
-### Communication HTTP and RQ
+### Communication HTTP, NATS, and RQ
 
 - Implement the same `submit_workflow_trigger()` contract.
 - Let producers dispatch work without knowing whether delivery is an HTTP POST or an RQ enqueue operation.
