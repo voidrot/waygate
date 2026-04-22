@@ -5,9 +5,9 @@ from langgraph.types import interrupt
 from waygate_core.plugin import StorageNamespace
 
 from waygate_workflows.agents.human_review import build_human_review_record
+from waygate_workflows.runtime.storage import resolve_storage
+from waygate_workflows.runtime.text import normalize_string_list
 from waygate_workflows.schema import DraftGraphState, DraftWorkflowStatus
-from waygate_workflows.tools.common import normalize_string_list
-from waygate_workflows.utils import resolve_storage
 
 
 def human_review_gate(state: DraftGraphState) -> dict[str, object]:

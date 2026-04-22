@@ -14,8 +14,8 @@ from waygate_workflows.schema import GlossaryEntry
 from waygate_workflows.schema import ProcessedDocumentBrief
 from waygate_workflows.schema import ReferenceIndexEntry
 from waygate_workflows.schema import claim_id_for_text, normalize_key
-from waygate_workflows.tools.common import normalize_string_list
-from waygate_workflows.tools.guidance import load_agent_guidance_instructions
+from waygate_workflows.content.guidance import load_agent_guidance_instructions
+from waygate_workflows.runtime.text import normalize_string_list
 
 
 def _supporting_source_uris(

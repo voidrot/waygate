@@ -1,6 +1,8 @@
 # ARG must be declared before the first FROM to be available in all stages.
 # Override at build time: docker build --build-arg APP=scheduler ...
 ARG APP=api
+ARG APP_UID=1000
+ARG APP_GID=1000
 
 # =============================================================================
 # Stage 1: builder
@@ -36,17 +38,22 @@ COPY pyproject.toml uv.lock ./
 COPY apps/api/pyproject.toml        apps/api/
 COPY apps/scheduler/pyproject.toml  apps/scheduler/
 COPY apps/draft-worker/pyproject.toml apps/draft-worker/
+COPY apps/nats-worker/pyproject.toml apps/nats-worker/
 COPY libs/core/pyproject.toml       libs/core/
+COPY libs/worker/pyproject.toml     libs/worker/
 COPY libs/workflows/pyproject.toml  libs/workflows/
+COPY plugins/communication-http/pyproject.toml plugins/communication-http/
+COPY plugins/communication-nats/pyproject.toml plugins/communication-nats/
 COPY plugins/communication-rq/pyproject.toml plugins/communication-rq/
 COPY plugins/local-storage/pyproject.toml   plugins/local-storage/
 COPY plugins/provider-ollama/pyproject.toml plugins/provider-ollama/
+COPY plugins/webhook-generic/pyproject.toml plugins/webhook-generic/
 
 # 5. Install only the third-party PyPI dependencies for the target app.
 # --no-install-workspace: skips local workspace packages (source not copied yet).
 # --package waygate-${APP}: uv expects the workspace package name, not folder slug.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-workspace --package "waygate-${APP}"
+  uv sync --frozen --no-dev --no-install-workspace --package "waygate-${APP}"
 
 # --- SOURCE LAYER: WORKSPACE CODE ---
 # Copies source after the dependency cache layer so that code edits don't bust
@@ -65,7 +72,7 @@ COPY plugins/ plugins/
 # instead of editable path references. This makes the .venv fully self-contained
 # — the runtime stage only needs to copy .venv, not the source tree.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-editable --package "waygate-${APP}"
+  uv sync --frozen --no-dev --no-editable --package "waygate-${APP}"
 
 # =============================================================================
 # Stage 2: runtime
@@ -76,10 +83,14 @@ FROM python:3.14-slim AS runtime
 
 # Re-declare ARG to bring it into this stage's scope.
 ARG APP
+ARG APP_UID
+ARG APP_GID
 
-# 9. Create a non-root system user and group to run the application.
-RUN addgroup --system appgroup \
-    && adduser --system --ingroup appgroup --no-create-home appuser
+# 9. Create a non-root user and group to run the application.
+# Defaulting to uid/gid 1000 keeps bind-mounted development directories writable
+# on typical Linux hosts while still allowing build-time overrides.
+RUN addgroup --system --gid "${APP_GID}" appgroup \
+  && adduser --system --uid "${APP_UID}" --ingroup appgroup --no-create-home appuser
 
 WORKDIR /app
 

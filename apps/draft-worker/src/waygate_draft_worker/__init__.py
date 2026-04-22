@@ -7,6 +7,7 @@ from rq import Queue, Worker
 
 from waygate_core import bootstrap_app
 from waygate_core.logging import get_logger
+from waygate_workflows.runtime import validate_compile_llm_readiness
 
 __VERSION__ = "0.1.0"  # x-release-please-version
 
@@ -40,6 +41,7 @@ def main() -> None:
     """Start the draft worker process."""
 
     app_context = bootstrap_app()
+    validate_compile_llm_readiness()
     redis_url, queue_name = _resolve_runtime(app_context)
 
     connection = Redis.from_url(redis_url)

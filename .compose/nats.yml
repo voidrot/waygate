@@ -1,0 +1,16 @@
+services:
+  nats:
+    image: nats:${NATS_VERSION:-2-alpine}
+    ports:
+      - ${NATS_CLIENT_PORT:-4222}:4222
+      - ${NATS_MONITORING_PORT:-8222}:8222
+      - ${NATS_CLUSTER_PORT:-6222}:6222
+    command:
+      - -js
+      - -m
+      - "8222"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8222/varz" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5

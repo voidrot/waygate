@@ -1,10 +1,11 @@
 """Ollama-backed LLM provider for WayGate workflows."""
 
-from typing import Type, TypeVar, Any
+from typing import Any, Type, TypeVar
 
+from langchain_core.embeddings import Embeddings
 from langchain_core.runnables import Runnable
-from pydantic import BaseModel, Field
-from langchain_ollama import ChatOllama
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from pydantic import BaseModel, Field, field_validator
 from waygate_core.plugin.hooks import PluginConfigRegistration, hookimpl
 from waygate_core.plugin.llm import (
     LLMInvocationRequest,
@@ -24,6 +25,21 @@ class OllamaProviderConfig(BaseModel):
     """Configuration for the Ollama provider."""
 
     base_url: str = Field(default="http://localhost:11434")
+    validate_model_on_init: bool = Field(default=True)
+
+    @field_validator("base_url")
+    @classmethod
+    def _normalize_base_url(cls, value: str) -> str:
+        """Normalize the Ollama host URL expected by the client."""
+
+        normalized = value.strip().rstrip("/")
+        if not normalized:
+            raise ValueError("base_url must not be empty")
+        if normalized.endswith("/api/chat") or normalized.endswith("/api/generate"):
+            raise ValueError(
+                "base_url must point to the Ollama server root, not a concrete /api endpoint"
+            )
+        return normalized
 
 
 class OllamaProvider(LLMProviderPlugin):
@@ -107,13 +123,20 @@ class OllamaProvider(LLMProviderPlugin):
                 "max_tokens",
             },
             supported_provider_options={
+                "validate_model_on_init",
                 "num_ctx",
+                "num_gpu",
+                "num_thread",
                 "mirostat",
                 "mirostat_tau",
                 "mirostat_eta",
                 "num_predict",
                 "repeat_last_n",
                 "repeat_penalty",
+                "logprobs",
+                "top_logprobs",
+                "format",
+                "reasoning",
                 "tfs_z",
                 "keep_alive",
             },
@@ -133,6 +156,7 @@ class OllamaProvider(LLMProviderPlugin):
 
         kwargs: dict[str, Any] = {
             "base_url": self._config.base_url,
+            "validate_model_on_init": self._config.validate_model_on_init,
             **resolved.common_options,
             **resolved.provider_options,
         }
@@ -158,6 +182,11 @@ class OllamaProvider(LLMProviderPlugin):
         kwargs = self._build_ollama_kwargs(request)
         return ChatOllama(model=request.model_name, **kwargs)
 
+    def validate_llm_readiness(self, request: LLMInvocationRequest) -> None:
+        """Preflight a text-generation request for startup/readiness checks."""
+
+        self.get_llm(request)
+
     def get_structured_llm(
         self,
         schema: Type[T],
@@ -174,4 +203,25 @@ class OllamaProvider(LLMProviderPlugin):
         """
 
         llm = self.get_llm(request)
-        return llm.with_structured_output(schema)
+        return llm.with_structured_output(
+            schema,
+            method="json_schema",
+            include_raw=True,
+        )
+
+    def validate_structured_llm_readiness(
+        self,
+        schema: type[BaseModel],
+        request: LLMInvocationRequest,
+    ) -> None:
+        """Preflight a structured-output request for startup/readiness checks."""
+
+        self.get_structured_llm(schema, request)
+
+    def get_embeddings(self, model_name: str) -> Embeddings:
+        """Return an Ollama embeddings client for the requested model."""
+
+        return OllamaEmbeddings(
+            model=model_name,
+            base_url=self._config.base_url,
+        )

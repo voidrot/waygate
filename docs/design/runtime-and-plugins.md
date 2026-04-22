@@ -25,13 +25,26 @@ The result is a frozen `WaygateAppContext` with two top-level parts:
 
 WayGate defines five plugin groups.
 
-| Group                           | Hook                                  | Purpose                                                                      | First-party packages in this repo                                      |
-| ------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `waygate.plugins.storage`       | `waygate_storage_plugin`              | Persistent document storage and namespace handling                           | `waygate-plugin-local-storage`                                         |
-| `waygate.plugins.webhooks`      | `waygate_webhook_plugin`              | Inbound payload verification, enrichment, and normalization to `RawDocument` | `waygate-plugin-webhook-generic`                                       |
-| `waygate.plugins.llm`           | `waygate_llm_provider_plugin`         | LLM invocation for workflow stages                                           | `waygate-plugin-provider-ollama`                                       |
-| `waygate.plugins.cron`          | `waygate_cron_plugin`                 | Scheduled job sources for the scheduler                                      | none currently shipped                                                 |
-| `waygate.plugins.communication` | `waygate_communication_client_plugin` | Transport-specific delivery of workflow triggers                             | `waygate-plugin-communication-http`, `waygate-plugin-communication-rq` |
+- `waygate.plugins.storage`
+  Hook: `waygate_storage_plugin`
+  Purpose: persistent document storage and namespace handling.
+  First-party packages: `waygate-plugin-local-storage`.
+- `waygate.plugins.webhooks`
+  Hook: `waygate_webhook_plugin`
+  Purpose: inbound payload verification, enrichment, normalization to `RawDocument`, and workflow-trigger construction.
+  First-party packages: `waygate-plugin-webhook-generic`, `waygate-plugin-webhook-agent-session`.
+- `waygate.plugins.llm`
+  Hook: `waygate_llm_provider_plugin`
+  Purpose: LLM invocation for workflow stages.
+  First-party packages: `waygate-plugin-provider-ollama`, `waygate-plugin-provider-featherless-ai`.
+- `waygate.plugins.cron`
+  Hook: `waygate_cron_plugin`
+  Purpose: scheduled job sources for the scheduler.
+  First-party packages: none currently shipped.
+- `waygate.plugins.communication`
+  Hook: `waygate_communication_client_plugin`
+  Purpose: transport-specific delivery of workflow triggers.
+  First-party packages: `waygate-plugin-communication-http`, `waygate-plugin-communication-nats`, `waygate-plugin-communication-rq`.
 
 ## Configuration Registry
 
@@ -83,15 +96,25 @@ The runtime fails fast when a configured communication plugin is missing. It doe
 - Provides a concrete webhook reference implementation.
 - Validates a structured JSON payload and maps each incoming document to a `RawDocument`.
 - Leaves request verification permissive by default so it can be subclassed for provider-specific production integrations.
+- Uses the default webhook trigger builder, which emits `draft.ready` after raw artifacts are written.
 
-### Communication HTTP and RQ
+### Agent-session webhook
+
+- Provides a dedicated first-party ingress path for completed session transcript uploads.
+- Validates a richer transcript payload, can enforce HMAC verification, and stores the canonical session bundle as JSON in the raw artifact body.
+- Overrides the default webhook trigger builder so the compile trigger carries stable session metadata and an idempotency key.
+
+### Communication HTTP, NATS, and RQ
 
 - Implement the same `submit_workflow_trigger()` contract.
 - Let producers dispatch work without knowing whether delivery is an HTTP POST or an RQ enqueue operation.
 
-### Ollama provider
+### Ollama and Featherless providers
 
-- Supplies the current first-party LLM provider implementation used by workflow stages.
+- Supply the current first-party LLM provider implementations used by workflow stages.
+- Resolve workflow-profile options through the shared `LLMProviderPlugin` contract instead of letting workflows construct provider SDKs directly.
+- Can optionally expose the `LLMReadinessProbe` companion contract so worker startup can fail fast on provider-construction or model-validation errors before jobs are accepted.
+- Can optionally expose the `LLMEmbeddingsProvider` companion contract so future retrieval-oriented consumers can request embeddings without expanding the base text-generation API.
 
 ## Planned Agent Runtime Boundary
 

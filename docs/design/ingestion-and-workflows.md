@@ -16,7 +16,8 @@ Current behavior:
 
 - validates payloads as `WorkflowTriggerMessage`
 - handles `draft.ready`
-- ignores unsupported event types such as `cron.tick`
+- temporarily ignores deferred events such as `ready.integrate` and unsupported
+  events such as `cron.tick`
 - returns structured `completed`, `human_review`, `failed`, or `ignored`
   results
 
@@ -55,10 +56,10 @@ sequential, not a broad per-document fan-out.
 
 The source set still requires one complete identity mode across all documents:
 
-- full `source_hash` coverage, producing `hash-<sha256>`
-- or full `source_uri` coverage, producing `uri-<sha256>`
+- full `content_hash` coverage, producing `hash-<sha256>` over the sorted
+  body-content hashes
 
-Mixed or incomplete coverage is rejected.
+Mixed or incomplete content-hash coverage is rejected.
 
 ### 2. Sequential source analysis
 
@@ -126,6 +127,8 @@ The synthesis prompt includes:
 - selected durable compile context such as canonical topics, tags, glossary,
   entity registry, and claim ledger
 
+The resulting markdown body still lives in `DraftGraphState.current_draft`, but the publish boundary now projects that state into a dedicated `DraftDocument` and then into a `CompiledDocument` before rendering.
+
 ### 6. Review
 
 `review_draft` keeps the bounded retry behavior:
@@ -146,10 +149,20 @@ interrupts with bounded resume actions:
 
 `publish_draft` writes the rendered Markdown artifact to:
 
-- `published/<source_set_key>.md`
+- `compiled/<compiled_document_hash>.md`
 
-Published frontmatter currently includes source ids, source URIs, compile time,
-review feedback, and aggregated metadata.
+Compiled frontmatter currently includes the compiled artifact id, the source set
+key, source document URIs, source content hashes, source provenance fields,
+compile time, review feedback, and aggregated metadata.
+
+That frontmatter is now built from the typed `CompiledDocument` contract and rendered through the shared compiled-document template in `waygate-core`.
+
+After the compiled artifact is written, the router emits a follow-on
+`ready.integrate` trigger that points at the compiled document URI.
+
+The real integration workflow is still deferred. For now, workers accept and
+ignore `ready.integrate` so the trigger contract is live without introducing an
+unconsumed transport backlog.
 
 ## Current Result Shapes
 
@@ -164,8 +177,9 @@ review feedback, and aggregated metadata.
     "origin": "unit-test"
   },
   "source_set_key": "hash-abc",
-  "published_document_uri": "file://published/hash-abc.md",
-  "published_document_id": "hash-abc"
+  "compiled_document_uri": "file://compiled/compiled-abc.md",
+  "compiled_document_id": "compiled-abc",
+  "compiled_document_hash": "compiled-abc"
 }
 ```
 
@@ -210,9 +224,11 @@ review feedback, and aggregated metadata.
 ```json
 {
   "status": "ignored",
-  "event_type": "cron.tick",
-  "document_paths": [],
-  "metadata": {}
+  "event_type": "ready.integrate",
+  "document_paths": ["file://compiled/compiled-abc.md"],
+  "metadata": {
+    "compiled_document_id": "compiled-abc"
+  }
 }
 ```
 
@@ -226,4 +242,4 @@ These contracts remain stable in the current implementation:
 - review retry and human-review escalation semantics
 - human-review resume action shape
 - completed, human-review, failed/config, and ignored router results
-- raw, review, and published artifacts as the durable system of record
+- raw, review, and compiled artifacts as the durable system of record

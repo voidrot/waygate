@@ -4,8 +4,8 @@ import json
 
 from langchain.agents import create_agent
 
-from waygate_workflows.agents.common import extract_final_text
-from waygate_workflows.agents.common import resolve_chat_model
+from waygate_workflows.runtime.llm import resolve_chat_model
+from waygate_workflows.runtime.text import extract_final_text
 from waygate_workflows.schema import DraftGraphState
 
 

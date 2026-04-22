@@ -1,0 +1,32 @@
+{
+    "metadata": {
+        "event": "document.created",
+        "source": "local-smoke-test",
+        "topics": [
+            "engineering",
+            "release"
+        ],
+        "tags": [
+            "draft",
+            "local"
+        ],
+        "originated_at": "2026-04-22T12:00:00Z"
+    },
+    "documents": [
+        {
+            "document_type": "markdown",
+            "document_name": "sample-release-notes.md",
+            "document_path": "docs/sample-release-notes.md",
+            "document_hash": "sha256:sample-release-notes",
+            "content": "# Sample Release Notes\n\nWayGate compose smoke test content.\n\n- Added generic webhook fixture\n- Verified NATS transport wiring\n- Targeted Ollama-backed draft pipeline",
+            "metadata": {
+                "topics": [
+                    "docs"
+                ],
+                "tags": [
+                    "public"
+                ]
+            }
+        }
+    ]
+}

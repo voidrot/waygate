@@ -6,6 +6,7 @@ import importlib
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
+from waygate_core.files import compute_content_hash
 
 from waygate_workflows.agents.layout import CompileAgentRole
 from waygate_workflows.agents.layout import DEFAULT_COMPILE_AGENT_LAYOUT
@@ -19,7 +20,8 @@ from waygate_workflows.schema import ReviewOutcomeModel
 from waygate_workflows.schema import SummaryExtractionModel
 from waygate_workflows.schema import WorkflowEvent
 from waygate_workflows.schema import WorkflowType
-from waygate_workflows.tools.documents import derive_source_set_key
+from waygate_workflows.content.documents import derive_source_set_key
+from waygate_workflows.content.documents import parse_source_document
 from waygate_workflows.workflows import compile as workflow_module
 
 compile_source_document_module = importlib.import_module(
@@ -32,7 +34,7 @@ normalize_request_module = importlib.import_module(
 source_normalization_module = importlib.import_module(
     "waygate_workflows.agents.source_normalization"
 )
-guidance_module = importlib.import_module("waygate_workflows.tools.guidance")
+guidance_module = importlib.import_module("waygate_workflows.content.guidance")
 publish_module = importlib.import_module("waygate_workflows.nodes.publish")
 review_module = importlib.import_module("waygate_workflows.nodes.review")
 synthesis_module = importlib.import_module("waygate_workflows.nodes.synthesis")
@@ -116,8 +118,9 @@ def _make_initial_state(document_paths: list[str]) -> dict[str, object]:
         "current_draft": "",
         "review_feedback": [],
         "review_outcome": None,
-        "published_document_uri": None,
-        "published_document_id": None,
+        "compiled_document_uri": None,
+        "compiled_document_id": None,
+        "compiled_document_hash": None,
         "human_review_record_uri": None,
         "human_review_action": None,
     }
@@ -128,6 +131,7 @@ def test_derive_source_set_key_prefers_hashes_and_is_order_independent() -> None
         {
             "uri": "a",
             "content": "A",
+            "content_hash": "content-b",
             "source_hash": "hash-b",
             "source_uri": "https://b",
             "source_type": None,
@@ -136,6 +140,7 @@ def test_derive_source_set_key_prefers_hashes_and_is_order_independent() -> None
         {
             "uri": "b",
             "content": "B",
+            "content_hash": "content-a",
             "source_hash": "hash-a",
             "source_uri": "https://a",
             "source_type": None,
@@ -147,11 +152,12 @@ def test_derive_source_set_key_prefers_hashes_and_is_order_independent() -> None
     assert derive_source_set_key(documents_a) == derive_source_set_key(documents_b)
 
 
-def test_derive_source_set_key_rejects_mixed_identity_inputs() -> None:
+def test_derive_source_set_key_rejects_missing_content_hash() -> None:
     documents = [
         {
             "uri": "a",
             "content": "A",
+            "content_hash": "content-a",
             "source_hash": "hash-a",
             "source_uri": "https://a",
             "source_type": None,
@@ -160,6 +166,7 @@ def test_derive_source_set_key_rejects_mixed_identity_inputs() -> None:
         {
             "uri": "b",
             "content": "B",
+            "content_hash": None,
             "source_hash": None,
             "source_uri": "https://b",
             "source_type": None,
@@ -167,8 +174,18 @@ def test_derive_source_set_key_rejects_mixed_identity_inputs() -> None:
         },
     ]
 
-    with pytest.raises(ValueError, match="source_hash coverage"):
+    with pytest.raises(ValueError, match="content_hash coverage"):
         derive_source_set_key(documents)
+
+
+def test_parse_source_document_preserves_raw_body_and_content_type() -> None:
+    parsed = parse_source_document(
+        "file://raw/doc.md",
+        "---\ncontent_type: markdown\nsource_type: generic-webhook\n---\n# Heading\n\nBody",
+    )
+
+    assert parsed["content_type"] == "markdown"
+    assert parsed["content"] == "# Heading\n\nBody"
 
 
 def test_prompt_context_reconstructs_relevant_subsets() -> None:
@@ -305,6 +322,9 @@ def test_prompt_context_reconstructs_relevant_subsets() -> None:
             {
                 "uri": "file://raw/current.md",
                 "content": "Alpha references Alice and the launch date.",
+                "content_hash": compute_content_hash(
+                    "Alpha references Alice and the launch date."
+                ),
                 "source_hash": "hash-current",
                 "source_uri": "https://example.test/current",
                 "source_type": "generic",
@@ -350,6 +370,7 @@ def test_prompt_context_loads_optional_agent_guidance(monkeypatch) -> None:
             {
                 "uri": "file://raw/current.md",
                 "content": "Generic document content.",
+                "content_hash": compute_content_hash("Generic document content."),
                 "source_hash": "hash-current",
                 "source_uri": "https://example.test/current",
                 "source_type": "generic",
@@ -450,10 +471,13 @@ def test_compile_workflow_processes_documents_sequentially(monkeypatch) -> None:
         config={"configurable": {"thread_id": "compile-test-1"}},
     )
 
-    assert result["status"] == DraftWorkflowStatus.PUBLISHED
+    compiled_hash = compute_content_hash("# Draft")
+
+    assert result["status"] == DraftWorkflowStatus.APPROVED
     assert result["document_cursor"] == 2
-    assert result["published_document_id"] == result["source_set_key"]
-    assert result["published_document_uri"].startswith("file://published/")
+    assert result["compiled_document_id"] == compiled_hash
+    assert result["compiled_document_hash"] == compiled_hash
+    assert result["compiled_document_uri"] == f"file://compiled/{compiled_hash}.md"
     assert len(result["prior_document_briefs"]) == 2
     assert [entry["term"] for entry in result["glossary"]] == ["Alpha", "Beta"]
     assert [entry["name"] for entry in result["canonical_topics"]] == [
@@ -470,7 +494,7 @@ def test_compile_workflow_processes_documents_sequentially(monkeypatch) -> None:
     ]
     assert "Alpha" in summary_prompts[1]
     assert "topic-one" in summary_prompts[1]
-    assert any(path.startswith("published/") for path, _ in storage.writes)
+    assert any(path.startswith("compiled/") for path, _ in storage.writes)
 
 
 def test_compile_workflow_resolves_prior_unresolved_mentions(monkeypatch) -> None:
@@ -541,7 +565,7 @@ def test_compile_workflow_resolves_prior_unresolved_mentions(monkeypatch) -> Non
         config={"configurable": {"thread_id": "compile-test-resolution"}},
     )
 
-    assert result["status"] == DraftWorkflowStatus.PUBLISHED
+    assert result["status"] == DraftWorkflowStatus.APPROVED
     assert result["unresolved_mentions"] == [
         {
             "raw_text": "launch date",
@@ -619,8 +643,11 @@ def test_compile_workflow_can_resume_from_human_review_to_publish(monkeypatch) -
         config=config,
     )
 
-    assert resumed["status"] == DraftWorkflowStatus.PUBLISHED
-    assert resumed["published_document_uri"].startswith("file://published/")
+    compiled_hash = compute_content_hash("# Draft")
+
+    assert resumed["status"] == DraftWorkflowStatus.APPROVED
+    assert resumed["compiled_document_uri"] == f"file://compiled/{compiled_hash}.md"
+    assert resumed["compiled_document_hash"] == compiled_hash
     assert resumed["human_review_record_uri"].startswith("file://review/")
     assert "approved by human" in resumed["review_feedback"]
 

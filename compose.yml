@@ -6,13 +6,14 @@ services:
       args:
         - APP=api
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     environment:
       PORT: 8080
     depends_on:
       - db
+      - nats
       - valkey
       - chromadb
     volumes:
@@ -32,10 +33,11 @@ services:
       args:
         - APP=scheduler
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     environment: {}
     depends_on:
       - db
+      - nats
       - valkey
       - chromadb
     volumes:
@@ -55,12 +57,15 @@ services:
       args:
         - APP=draft-worker
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     environment: {}
     depends_on:
-      - db
-      - valkey
-      - chromadb
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     volumes:
       - wiki_data:/data/wiki
     develop:
@@ -71,21 +76,47 @@ services:
           action: rebuild
         - path: plugins
           action: rebuild
+  nats-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=nats-worker
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    environment: {}
+    depends_on:
+      db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    volumes:
+      - wiki_data:/data/wiki
+    develop:
+      watch:
+        - path: apps/nats-worker
+          action: rebuild
+        - path: libs
+          action: rebuild
+        - path: plugins
+          action: rebuild
   db:
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     extends:
       file: .compose/postgresql.yml
       service: db
   valkey:
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     extends:
       file: .compose/valkey.yml
       service: valkey
   chromadb:
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     extends:
       file: .compose/chromadb.yml
       service: chromadb
@@ -94,7 +125,14 @@ services:
       file: .compose/ollama.yml
       service: ollama
     env_file:
-      - .env.compose
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    restart: unless-stopped
+  nats:
+    extends:
+      file: .compose/nats.yml
+      service: nats
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     restart: unless-stopped
 volumes:
   valkey_data:
@@ -107,3 +145,4 @@ volumes:
       o: bind
       device: ${WIKI_DATA_DIR:-./wiki}
   ollama_data:
+    name: ${OLLAMA_VOLUME_NAME:-waygate_ollama_data}

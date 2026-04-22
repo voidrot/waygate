@@ -1,6 +1,7 @@
 """Core configuration models used by the WayGate settings registry."""
 
 import json
+from typing import Annotated, cast
 
 from pydantic import (
     AliasChoices,
@@ -10,7 +11,7 @@ from pydantic import (
     TypeAdapter,
     field_validator,
 )
-from typing import cast
+from pydantic_settings import NoDecode
 
 from waygate_core.plugin.llm import LLMCommonOptions, LLMOptionPolicy
 
@@ -45,16 +46,26 @@ class CoreSettings(BaseModel):
     storage_plugin_name: str = Field(default="local-storage")
     llm_plugin_name: str = Field(default="OllamaProvider")
     communication_plugin_name: str = Field(default="communication-http")
-    template_packages: list[str] = Field(default_factory=lambda: ["waygate_core"])
+    template_packages: Annotated[
+        list[str],
+        NoDecode,
+    ] = Field(default_factory=lambda: ["waygate_core"])
     raw_doc_template: str = Field(
         default="raw_document.j2",
         validation_alias=AliasChoices("raw_doc_template", "raw_document_template"),
     )
-    draft_doc_template: str = Field(
-        default="draft_source_text.j2",
+    compiled_doc_template: str = Field(
+        default="compiled_document.j2",
         validation_alias=AliasChoices(
-            "draft_doc_template",
-            "draft_document_template",
+            "compiled_doc_template",
+            "compiled_document_template",
+        ),
+    )
+    published_doc_template: str = Field(
+        default="published_document.j2",
+        validation_alias=AliasChoices(
+            "published_doc_template",
+            "published_document_template",
         ),
     )
     metadata_model_name: str = Field(

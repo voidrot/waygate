@@ -1,0 +1,39 @@
+[project]
+name = "waygate-worker"
+version = "0.1.0"
+description = "Shared worker runtime helpers for WayGate transports"
+readme = "README.md"
+authors = [
+    { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "nats-py>=2.11.0",
+    "pydantic>=2.13.2",
+    "pydantic-settings>=2.13.1",
+    "waygate-core",
+    "waygate-workflows",
+]
+
+[tool.uv.sources]
+waygate-core      = { workspace = true }
+waygate-workflows = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
+
+[build-system]
+requires      = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "--cov=waygate_worker",
+    "--cov-report=term-missing",
+]

@@ -8,11 +8,12 @@ WayGate is a Python monorepo for building Generation-Augmented Retrieval workflo
 
 The repository is organized into three layers.
 
-| Layer   | Packages                                                                                        | Responsibility                                                                                             |
-| ------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| apps    | `api`, `scheduler`, `draft-worker`                                                              | Long-running processes that expose HTTP ingress, schedule recurring jobs, or execute queued workflow work. |
-| libs    | `core`, `workflows`                                                                             | Shared runtime primitives, plugin contracts, configuration, and workflow implementation.                   |
-| plugins | `local-storage`, `provider-ollama`, `communication-http`, `communication-rq`, `webhook-generic` | First-party implementations of the plugin interfaces defined in `waygate-core`.                            |
+- `apps`: `api`, `scheduler`, `draft-worker`, `nats-worker`
+  Responsibility: long-running processes that expose HTTP ingress, schedule recurring jobs, or execute workflow work over RQ or JetStream.
+- `libs`: `core`, `worker`, `workflows`
+  Responsibility: shared runtime primitives, worker execution helpers, plugin contracts, configuration, and workflow implementation.
+- `plugins`: `local-storage`, `provider-ollama`, `provider-featherless-ai`, `communication-http`, `communication-nats`, `communication-rq`, `webhook-generic`, `webhook-agent-session`
+  Responsibility: first-party implementations of the plugin interfaces defined in `waygate-core`.
 
 ## Package Boundaries
 
@@ -21,7 +22,8 @@ The repository is organized into three layers.
 - FastAPI ingress service.
 - Discovers webhook plugins and mounts one route per plugin under `/webhooks/<plugin-name>`.
 - Persists normalized raw documents through the configured storage plugin.
-- Dispatches `draft.ready` messages through the configured communication plugin.
+- Asks the matched webhook plugin to build the downstream workflow trigger after storage writes complete.
+- Dispatches that workflow trigger through the configured communication plugin. The default webhook behavior still emits `draft.ready`.
 
 ### apps/scheduler
 
@@ -34,13 +36,27 @@ The repository is organized into three layers.
 - RQ worker runtime for queued workflow execution.
 - Depends on `waygate-workflows` for importable job entrypoints.
 - Consumes the RQ communication plugin configuration and listens on the configured draft queue.
+- Preflights the active compile-workflow LLM provider before polling Redis so provider-construction errors fail at startup.
 - The concrete worker-side workflow entrypoint currently resolves to `waygate_workflows.draft.jobs.process_workflow_trigger`.
+
+### apps/nats-worker
+
+- JetStream worker runtime for durable workflow execution.
+- Consumes the `draft.ready` and `cron.tick` subjects configured by `communication-nats`.
+- Uses the shared helpers in `libs/worker` to extend ACK leases while long-running workflow steps execute.
+- Preflights the active compile-workflow LLM provider before polling JetStream so provider-construction errors fail at startup.
 
 ### libs/core
 
 - Defines the WayGate bootstrap path.
 - Owns plugin hooks, abstract base classes, config merging, logging setup, and common schema types.
 - Produces the frozen `WaygateAppContext` shared by all runtime processes.
+
+### libs/worker
+
+- Holds worker-runtime helpers shared across transport-specific worker apps.
+- Currently ships the JetStream consumer loop used by `apps/nats-worker`.
+- Keeps workflow execution concerns separate from transport configuration and settlement mechanics.
 
 ### libs/workflows
 
@@ -79,7 +95,7 @@ The current implementation does not treat a search index, vector store, static s
 
 ### Transport-agnostic workflow dispatch
 
-The API and scheduler do not know whether work is being delivered over HTTP or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
+The API and scheduler do not know whether work is being delivered over HTTP, JetStream, or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
 
 ### Workflow logic separate from worker runtime
 
@@ -106,9 +122,10 @@ The current repo supports this main path:
 1. A webhook request reaches `apps/api`.
 2. The selected webhook plugin verifies, enriches, and converts the payload into `RawDocument` objects.
 3. The API writes those raw documents into storage.
-4. The API dispatches a `draft.ready` trigger with the written document URIs.
-5. A worker consumes the trigger and runs the compile workflow from `libs/workflows`.
-6. The workflow writes a published markdown document or, on repeated review failure, a human-review record.
+4. The API asks the webhook plugin to build the downstream workflow trigger for the written document URIs.
+5. In the default case, that trigger is still `draft.ready`; dedicated webhook plugins can attach metadata, stable idempotency keys, or skip dispatch entirely.
+6. A worker consumes the trigger and runs the compile workflow from `libs/workflows`.
+7. The workflow writes a published markdown document or, on repeated review failure, a human-review record.
 
 The scheduler uses the same dispatch path, but it starts from cron plugins and emits `cron.tick` instead of `draft.ready`.
 
@@ -121,6 +138,7 @@ Implemented in this repo today:
 - plugin loading and merged configuration
 - webhook ingestion through FastAPI
 - transport-agnostic workflow trigger dispatch
+- JetStream worker support for durable workflow execution
 - RQ worker support for queued draft work
 - LangGraph compile, review, publish, and human-review interruption flow
 - storage-backed raw, review, and published document artifacts
@@ -145,8 +163,10 @@ Several legacy docs described the right long-term direction, but with names that
 | Legacy term  | Current repo term                                        |
 | ------------ | -------------------------------------------------------- |
 | receiver     | `apps/api`                                               |
-| compiler app | `libs/workflows` plus `apps/draft-worker`                |
+| compiler app | `libs/workflows` plus RQ and JetStream worker processes. |
 | live wiki    | `published` storage namespace                            |
 | meta         | `metadata`, `templates`, and `agents` storage namespaces |
 
 Use the current names when writing new documentation or code.
+
+In the current repository, "worker apps" means `apps/draft-worker` for the legacy RQ path or `apps/nats-worker` for the JetStream-backed path.

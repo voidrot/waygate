@@ -2,7 +2,7 @@
 
 `waygate-workflows` is the workflow runtime library for WayGate. It owns the
 worker-side trigger router, the LangGraph compile workflow, the sequential
-source-analysis loop, the publish and human-review boundaries, and the helper
+source-analysis loop, the compiled-artifact and human-review boundaries, and the helper
 code that reconstructs prompt context from durable workflow state.
 
 ## What it owns
@@ -14,8 +14,9 @@ code that reconstructs prompt context from durable workflow state.
   agents.
 - Durable compile context including topics, tags, glossary entries, entity
   registry, claim ledger, reference index, and unresolved mentions.
-- Synthesis, review retry, human-review interrupt, and publish boundaries.
-- Publish rendering and human-review artifact generation.
+- Synthesis, review retry, human-review interrupt, and compiled-artifact
+   boundaries.
+- Compiled-artifact rendering and human-review artifact generation.
 
 ## Runtime flow
 
@@ -31,8 +32,8 @@ code that reconstructs prompt context from durable workflow state.
 7. `review_draft()` approves, rejects for retry, or escalates to human review.
 8. `human_review_gate()` writes a review artifact and interrupts when retries
    are exhausted.
-9. `publish_draft()` renders the final markdown artifact and writes it to the
-   `published` namespace.
+9. `publish_draft()` renders the approved compile artifact and writes it to the
+   `compiled` namespace, then the router emits `ready.integrate`.
 
 ## Compile workflow diagram
 
@@ -54,6 +55,10 @@ flowchart TD
     K -- resume_to_publish --> H
     H --> L[end]
 ```
+
+The graph still uses the historical `publish` node name, but its current
+behavior is to persist the approved compile artifact in `compiled/`, not to
+write a final published document.
 
 ## Source-analysis loop
 
@@ -79,6 +84,12 @@ The current source-analysis supervisor coordinates four specialist roles:
 - grounded findings
 - continuity inspection
 
+When the supervisor model does not return a final structured response after
+delegating to those tools, the runtime falls back to invoking the specialists
+directly and combines their validated outputs deterministically. This keeps the
+compile loop working with providers that can call tools but do not reliably
+emit simultaneous tool-driven structured output.
+
 ## Durable state model
 
 The main state container is `DraftGraphState` in
@@ -96,7 +107,8 @@ Important durable fields include:
 - `claim_ledger`
 - `reference_index`
 - `unresolved_mentions`
-- `current_draft`, `review_feedback`, `review_outcome`, and publish fields
+- `current_draft`, `review_feedback`, `review_outcome`, and compiled artifact
+   fields
 
 The compile node also performs cross-document continuity resolution. When a
 later document introduces a matching term, entity, claim, or reference key,
@@ -122,16 +134,22 @@ older unresolved mentions can be moved from `open` to `resolved`.
 - `analyze_source_document()` runs the source-analysis supervisor.
 - `synthesize_draft_with_specialist()` produces the draft.
 - `review_draft_with_specialist()` performs structured review.
-- `render_publish_artifact()` builds the publishable markdown artifact.
+- `render_publish_artifact()` builds the approved compiled markdown artifact.
 - `build_human_review_record()` builds the persisted human-review artifact.
 
 ### Shared helpers
 
-- `tools.documents` parses source documents and derives `source_set_key`.
-- `tools.guidance` loads optional guidance text from the `agents` namespace.
-- `tools.publishing` renders the published document with frontmatter.
-- `tools.llm` resolves provider-backed model invocations.
-- `resolve_storage()` resolves the active storage plugin.
+- `tools.source_analysis` provides the LangChain-callable specialist tools used
+   by the document-analysis supervisor.
+- `content.documents` parses source documents and derives `source_set_key`.
+- `content.guidance` loads optional guidance text from the `agents`
+   namespace.
+- `content.publishing` projects workflow state into typed `DraftDocument` and `CompiledDocument` artifacts before rendering the compiled document with frontmatter.
+- `runtime.llm` resolves provider-backed model invocations and worker startup
+   preflight checks.
+- `runtime.storage` resolves the active storage plugin.
+- `runtime.checkpoint` builds the LangGraph Postgres checkpoint connection
+   string.
 
 ## Trigger handling and outcomes
 
@@ -139,11 +157,14 @@ The worker router currently treats `draft.ready` as the implemented workflow
 entrypoint.
 
 - `draft.ready` runs the compile workflow.
+- `ready.integrate` is accepted as a deferred follow-on trigger and currently
+  returns `ignored` until the integration workflow is implemented.
 - `cron.tick` is still ignored by the default workflow router.
 
 The router returns one of four result shapes:
 
-- `completed` with `published_document_uri` and `published_document_id`
+- `completed` with `compiled_document_uri`, `compiled_document_id`, and
+   `compiled_document_hash`
 - `human_review` with `human_review_record_uri` and interrupt payload
 - `failed` with `error_kind = config` and `detail` when LLM provider
    configuration cannot satisfy a compile request
@@ -155,7 +176,7 @@ The workflow uses storage namespaces as its durable system-of-record boundary.
 
 - Raw source documents are read from the trigger-provided URIs.
 - Human-review artifacts are written to the `review` namespace.
-- Published markdown is written to the `published` namespace.
+- Approved compile artifacts are written to the `compiled` namespace.
 - Optional prompt guidance is read from the `agents` namespace.
 
 ## LLM Workflow Profiles
@@ -178,6 +199,11 @@ execution. In strict mode, unsupported common or provider-specific options
 raise `LLMConfigurationError` instead of being silently dropped. Structured
 output roles also fail fast when the active provider does not advertise
 structured-output support.
+
+For startup preflight, LLM-dependent worker roles can use the optional
+`LLMReadinessProbe` companion contract when a provider implements it. When the
+provider does not expose a dedicated readiness hook, the workflow layer falls
+back to constructing the configured stage clients so startup still fails fast.
 
 ```json
 {

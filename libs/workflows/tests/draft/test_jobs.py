@@ -1,4 +1,5 @@
 from waygate_core.plugin import LLMConfigurationError
+from waygate_core.plugin import WorkflowDispatchResult
 from waygate_workflows.draft.jobs import process_workflow_trigger
 
 
@@ -11,9 +12,17 @@ def test_process_workflow_trigger_returns_completed_result(monkeypatch) -> None:
             "compile:draft-123",
             {
                 "source_set_key": "hash-abc",
-                "published_document_uri": "file://published/hash-abc.md",
-                "published_document_id": "hash-abc",
+                "compiled_document_uri": "file://compiled/compiled-abc.md",
+                "compiled_document_id": "compiled-abc",
+                "compiled_document_hash": "compiled-abc",
             },
+        ),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.router._dispatch_integration_trigger",
+        lambda parent_message, result: WorkflowDispatchResult(
+            accepted=True,
+            transport_message_id="ready.integrate-compiled-abc",
         ),
     )
 
@@ -31,8 +40,9 @@ def test_process_workflow_trigger_returns_completed_result(monkeypatch) -> None:
     assert result["request_key"] == "compile:draft-123"
     assert result["document_paths"] == [document_uri]
     assert result["metadata"] == {"origin": "unit-test"}
-    assert result["published_document_uri"] == "file://published/hash-abc.md"
-    assert result["published_document_id"] == "hash-abc"
+    assert result["compiled_document_uri"] == "file://compiled/compiled-abc.md"
+    assert result["compiled_document_id"] == "compiled-abc"
+    assert result["compiled_document_hash"] == "compiled-abc"
 
 
 def test_process_workflow_trigger_returns_human_review(monkeypatch) -> None:
@@ -76,6 +86,20 @@ def test_process_workflow_trigger_ignores_unknown_event_type() -> None:
 
     assert result["status"] == "ignored"
     assert result["event_type"] == "unknown.event"
+
+
+def test_process_workflow_trigger_ignores_ready_integrate_until_implemented() -> None:
+    result = process_workflow_trigger(
+        {
+            "event_type": "ready.integrate",
+            "source": "test-suite",
+            "document_paths": ["file://compiled/compiled-abc.md"],
+            "metadata": {"compiled_document_id": "compiled-abc"},
+        }
+    )
+
+    assert result["status"] == "ignored"
+    assert result["event_type"] == "ready.integrate"
 
 
 def test_process_workflow_trigger_returns_failed_config_result(monkeypatch) -> None:

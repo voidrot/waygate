@@ -13,6 +13,15 @@ jobs by string reference while worker processes import and execute the same code
 - `draft.ready` currently hands through already-written draft document URIs as
   the minimal boundary for the future draft workflow.
 
+## Package layout
+
+- `waygate_workflows.tools` is reserved for LangChain-callable tools used by
+   workflow agents.
+- `waygate_workflows.runtime` contains provider resolution, storage
+   resolution, checkpoint wiring, and other runtime-facing helpers.
+- `waygate_workflows.content` contains source-document parsing, guidance
+   loading, and publish-artifact rendering helpers.
+
 ## LLM Workflow Profiles
 
 Workflow execution still resolves models through the active LLM provider plugin.
@@ -31,6 +40,13 @@ The runtime validates every resolved LLM request before execution. In strict
 mode, unsupported options and missing structured-output capability raise
 `LLMConfigurationError`, and the worker router returns a `failed` result with
 `error_kind = config` instead of attempting a partial run.
+
+The draft worker also preflights the active provider at startup. Providers can
+optionally implement the `LLMReadinessProbe` companion contract for a dedicated
+readiness check; otherwise the workflow layer falls back to constructing the
+compile workflow's configured stage clients. This catches missing credentials,
+invalid provider options, and provider-construction failures before the worker
+begins polling for jobs.
 
 ```json
 {

@@ -100,10 +100,15 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
             The dispatch result describing the transport outcome.
         """
 
-        if message.event_type == "draft.ready" and not message.document_paths:
+        if (
+            message.event_type in {"draft.ready", "ready.integrate"}
+            and not message.document_paths
+        ):
             return WorkflowDispatchResult(
                 accepted=False,
-                detail="draft.ready triggers require at least one document path",
+                detail=(
+                    f"{message.event_type} triggers require at least one document path"
+                ),
                 error_kind=DispatchErrorKind.VALIDATION,
             )
 
@@ -175,6 +180,8 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         """
 
         if event_type == "draft.ready":
+            return self._config.draft_queue_name
+        if event_type == "ready.integrate":
             return self._config.draft_queue_name
         if event_type == "cron.tick":
             return self._config.cron_queue_name

@@ -1,22 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 
 from langgraph.checkpoint.postgres import PostgresSaver
 
+from waygate_core import get_app_context
 from waygate_core.logging import get_logger
 from waygate_core.plugin import (
     DispatchErrorKind,
     LLMConfigurationError,
+    WorkflowDispatchResult,
     WorkflowTriggerMessage,
+    resolve_communication_client,
 )
 
 from waygate_workflows.schema import DraftGraphState
 from waygate_workflows.schema import DraftWorkflowStatus
 from waygate_workflows.schema import WorkflowEvent
 from waygate_workflows.schema import WorkflowType
-from waygate_workflows.tools.checkpoint import build_postgres_connection_string
+from waygate_workflows.runtime.checkpoint import build_postgres_connection_string
 from waygate_workflows.workflows.compile import compile_workflow
 
 logger = get_logger(__name__)
@@ -75,11 +79,59 @@ def _build_initial_state(message: WorkflowTriggerMessage) -> DraftGraphState:
         "current_draft": "",
         "review_feedback": [],
         "review_outcome": None,
-        "published_document_uri": None,
-        "published_document_id": None,
+        "compiled_document_uri": None,
+        "compiled_document_id": None,
+        "compiled_document_hash": None,
         "human_review_record_uri": None,
         "human_review_action": None,
     }
+
+
+def _dispatch_integration_trigger(
+    parent_message: WorkflowTriggerMessage,
+    result: dict[str, object],
+) -> WorkflowDispatchResult | None:
+    """Dispatch the follow-on ready.integrate trigger for a compiled artifact."""
+
+    compiled_document_uri = result.get("compiled_document_uri")
+    compiled_document_id = result.get("compiled_document_id")
+    compiled_document_hash = result.get("compiled_document_hash")
+    if not isinstance(compiled_document_uri, str) or not isinstance(
+        compiled_document_id, str
+    ):
+        return None
+
+    metadata = dict(parent_message.metadata)
+    source_set_key = result.get("source_set_key")
+    if source_set_key is not None:
+        metadata["source_set_key"] = str(source_set_key)
+    metadata["compiled_document_id"] = compiled_document_id
+    metadata["compiled_document_hash"] = str(
+        compiled_document_hash or compiled_document_id
+    )
+
+    trigger = WorkflowTriggerMessage(
+        event_type=WorkflowEvent.READY_INTEGRATE.value,
+        source="waygate-workflows.compile",
+        document_paths=[compiled_document_uri],
+        idempotency_key=compiled_document_id,
+        metadata=metadata,
+    )
+
+    try:
+        app_context = get_app_context()
+        client = resolve_communication_client(
+            app_context.plugins.communication,
+            app_context.config.core.communication_plugin_name,
+            allow_fallback=False,
+        )
+        return asyncio.run(client.submit_workflow_trigger(trigger))
+    except Exception as exc:
+        return WorkflowDispatchResult(
+            accepted=False,
+            detail=f"Failed to dispatch ready.integrate trigger: {exc}",
+            error_kind=DispatchErrorKind.CONFIG,
+        )
 
 
 def _invoke_compile_workflow(
@@ -172,14 +224,47 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
                     "interrupts": result["__interrupt__"],
                 }
 
+            dispatch_result = _dispatch_integration_trigger(message, result)
+            if dispatch_result is not None and not dispatch_result.accepted:
+                return {
+                    "status": "failed",
+                    "error_kind": (
+                        dispatch_result.error_kind.value
+                        if dispatch_result.error_kind is not None
+                        else DispatchErrorKind.PERMANENT.value
+                    ),
+                    "detail": dispatch_result.detail,
+                    "request_key": thread_id,
+                    "event_type": event_type,
+                    "document_paths": message.document_paths,
+                    "metadata": message.metadata,
+                    "source_set_key": result.get("source_set_key"),
+                    "compiled_document_uri": result.get("compiled_document_uri"),
+                    "compiled_document_id": result.get("compiled_document_id"),
+                    "compiled_document_hash": result.get("compiled_document_hash"),
+                }
+
             return {
                 "status": "completed",
                 "request_key": thread_id,
                 "document_paths": message.document_paths,
                 "metadata": message.metadata,
                 "source_set_key": result.get("source_set_key"),
-                "published_document_uri": result.get("published_document_uri"),
-                "published_document_id": result.get("published_document_id"),
+                "compiled_document_uri": result.get("compiled_document_uri"),
+                "compiled_document_id": result.get("compiled_document_id"),
+                "compiled_document_hash": result.get("compiled_document_hash"),
+            }
+        case WorkflowEvent.READY_INTEGRATE.value:
+            logger.info(
+                "Ignoring deferred ready.integrate workflow trigger",
+                source=message.source,
+                document_paths=message.document_paths,
+            )
+            return {
+                "status": "ignored",
+                "event_type": event_type,
+                "document_paths": message.document_paths,
+                "metadata": message.metadata,
             }
         case _:
             logger.error(

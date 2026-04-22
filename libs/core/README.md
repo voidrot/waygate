@@ -43,10 +43,13 @@ Core settings are nested under `WAYGATE_CORE__*`:
 | `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME` | `communication-http`       | Active communication client plugin |
 | `WAYGATE_CORE__TEMPLATE_PACKAGES`         | `waygate_core`             | Comma-separated template packages  |
 | `WAYGATE_CORE__RAW_DOC_TEMPLATE`          | `raw_document.j2`          | Raw document template name         |
-| `WAYGATE_CORE__DRAFT_DOC_TEMPLATE`        | `draft_source_text.j2`     | Draft document template name       |
+| `WAYGATE_CORE__COMPILED_DOC_TEMPLATE`     | `compiled_document.j2`     | Compiled document template name    |
+| `WAYGATE_CORE__PUBLISHED_DOC_TEMPLATE`    | `published_document.j2`    | Published document template name   |
 | `WAYGATE_CORE__METADATA_MODEL_NAME`       | `qwen3.5:9b`               | Model used for metadata extraction |
 | `WAYGATE_CORE__DRAFT_MODEL_NAME`          | `qwen3.5:9b`               | Model used for draft generation    |
 | `WAYGATE_CORE__REVIEW_MODEL_NAME`         | `hermes3:8b`               | Model used for review              |
+
+The local and Compose example env files set `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME=communication-nats` for the durable JetStream-backed worker flow.
 
 `WAYGATE_CORE__LLM_WORKFLOW_PROFILES` (default `{}`) accepts a JSON object keyed by workflow name for model and option defaults.
 
@@ -54,7 +57,8 @@ The following aliases are also accepted for backward compatibility:
 
 - `WAYGATE_CORE__REDIS_URL` -> `WAYGATE_CORE__REDIS_DSN`
 - `WAYGATE_CORE__RAW_DOCUMENT_TEMPLATE` -> `WAYGATE_CORE__RAW_DOC_TEMPLATE`
-- `WAYGATE_CORE__DRAFT_DOCUMENT_TEMPLATE` -> `WAYGATE_CORE__DRAFT_DOC_TEMPLATE`
+- `WAYGATE_CORE__COMPILED_DOCUMENT_TEMPLATE` -> `WAYGATE_CORE__COMPILED_DOC_TEMPLATE`
+- `WAYGATE_CORE__PUBLISHED_DOCUMENT_TEMPLATE` -> `WAYGATE_CORE__PUBLISHED_DOC_TEMPLATE`
 - `WAYGATE_CORE__METADATA_MODEL` -> `WAYGATE_CORE__METADATA_MODEL_NAME`
 - `WAYGATE_CORE__DRAFT_MODEL` -> `WAYGATE_CORE__DRAFT_MODEL_NAME`
 - `WAYGATE_CORE__REVIEW_MODEL` -> `WAYGATE_CORE__REVIEW_MODEL_NAME`

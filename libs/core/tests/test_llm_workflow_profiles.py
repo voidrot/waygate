@@ -20,3 +20,11 @@ def test_llm_workflow_profiles_env_json(monkeypatch) -> None:
     assert draft.common_options.temperature == 0.2
     assert draft.provider_options["OllamaProvider"]["num_ctx"] == 4096
     assert draft.option_policy is LLMOptionPolicy.PERMISSIVE
+
+
+def test_template_packages_env_plain_string(monkeypatch) -> None:
+    monkeypatch.setenv("WAYGATE_CORE__TEMPLATE_PACKAGES", "waygate_core")
+
+    settings = ConfigRegistry(_NoPluginManager()).build_config()
+
+    assert settings.core.template_packages == ["waygate_core"]

@@ -8,7 +8,7 @@
 - Core settings under `WAYGATE_CORE__*`.
 - Plugin settings discovered through `waygate_plugin_config()` and exposed as normalized root fields such as `WAYGATE_LOCAL_STORAGE__*`.
 - Base classes and DTOs for storage, webhook, cron, LLM provider, and communication plugins.
-- Shared document models and template helpers for raw and draft document rendering.
+- Shared document models and template helpers for raw, compiled, and published document rendering.
 - Structured logging setup through `configure_logging()` and `get_logger()`.
 
 ## Runtime flow
@@ -56,8 +56,15 @@ Environment variables follow two conventions:
 ### Documents and templates
 
 - `RawDocument` and `RawDocumentFrontmatter` represent the shared raw-document contract.
+- `DraftDocument` represents the validated compile-stage draft artifact projected from workflow state.
+- `CompiledDocument` and `CompiledDocumentFrontmatter` represent the durable approved compile artifact.
+- `PublishedDocument` and `PublishedDocumentFrontmatter` represent the future corpus-level published artifact.
+- `SourceDocumentReference` represents normalized source provenance reused by draft and compiled artifacts.
 - `Visibility` defines the supported visibility states.
-- `build_raw_document_frontmatter()`, `render_raw_document()`, and `render_draft_document()` provide the shared rendering path.
+- `normalize_content_type()` canonicalizes explicit producer-supplied values onto the MIME-style contract.
+- `infer_content_type()` prefers source filename extensions via `content-types` and falls back to body heuristics when producers leave `content_type` empty.
+- `build_raw_document_frontmatter()`, `build_compiled_document_frontmatter()`, and `build_published_document_frontmatter()` build artifact-specific frontmatter models.
+- `render_raw_document()`, `render_compiled_document()`, and `render_published_document()` provide the shared rendering path.
 
 ### Logging
 

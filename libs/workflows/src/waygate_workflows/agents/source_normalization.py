@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from waygate_workflows.content.documents import derive_source_set_key
+from waygate_workflows.content.documents import parse_source_document
+from waygate_workflows.content.documents import to_ordered_document_ref
+from waygate_workflows.runtime.storage import resolve_storage
 from waygate_workflows.schema import OrderedDocumentRef
 from waygate_workflows.schema import SourceDocumentState
-from waygate_workflows.tools.documents import derive_source_set_key
-from waygate_workflows.tools.documents import parse_source_document
-from waygate_workflows.tools.documents import to_ordered_document_ref
-from waygate_workflows.utils import resolve_storage
 
 
 def normalize_source_documents(

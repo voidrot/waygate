@@ -26,6 +26,7 @@ members = [
     "apps/*",
     "plugins/*",
     "libs/core",
+    "libs/worker",
     "libs/workflows",
 ]
 

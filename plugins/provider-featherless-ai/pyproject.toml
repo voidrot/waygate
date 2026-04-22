@@ -1,0 +1,32 @@
+[project]
+name = "waygate-plugin-provider-featherless-ai"
+version = "0.1.0"
+description = "Featherless AI-backed LLM provider plugin for WayGate"
+readme = "README.md"
+authors = [
+  { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = ["langchain-openai>=1.1.16", "waygate-core"]
+
+[tool.uv.sources]
+waygate-core = { workspace = true }
+
+[project.entry-points."waygate.plugins.llm"]
+featherless_ai_provider = "waygate_plugin_provider_featherless_ai.plugin:FeatherlessAIProvider"
+
+[build-system]
+requires      = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=waygate_plugin_provider_featherless_ai",
+  "--cov-report=term-missing",
+]

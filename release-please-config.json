@@ -32,12 +32,30 @@
         }
       ]
     },
+    "apps/nats-worker": {
+      "package-name": "waygate-nats-worker",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "apps/nats-worker/src/waygate_nats_worker/__init__.py"
+        }
+      ]
+    },
     "libs/core": {
       "package-name": "waygate-core",
       "extra-files": [
         {
           "type": "generic",
           "path": "libs/core/src/waygate_core/__init__.py"
+        }
+      ]
+    },
+    "libs/worker": {
+      "package-name": "waygate-worker",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "libs/worker/src/waygate_worker/__init__.py"
         }
       ]
     },
@@ -77,12 +95,39 @@
         }
       ]
     },
+    "plugins/communication-nats": {
+      "package-name": "waygate-plugin-communication-nats",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/communication-nats/src/waygate_plugin_communication_nats/__init__.py"
+        }
+      ]
+    },
     "plugins/provider-ollama": {
       "package-name": "waygate-plugin-provider-ollama",
       "extra-files": [
         {
           "type": "generic",
           "path": "plugins/provider-ollama/src/waygate_plugin_provider_ollama/__init__.py"
+        }
+      ]
+    },
+    "plugins/provider-featherless-ai": {
+      "package-name": "waygate-plugin-provider-featherless-ai",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/provider-featherless-ai/src/waygate_plugin_provider_featherless_ai/__init__.py"
+        }
+      ]
+    },
+    "plugins/webhook-agent-session": {
+      "package-name": "waygate-plugin-webhook-agent-session",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "plugins/webhook-agent-session/src/waygate_plugin_webhook_agent_session/__init__.py"
         }
       ]
     },

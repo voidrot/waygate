@@ -70,6 +70,7 @@ def test_handle_webhook_maps_documents_with_stable_deduped_topics_and_tags() -> 
     assert len(documents) == 1
     document = documents[0]
     assert document.source_type == "generic-webhook"
+    assert document.content_type == "text/markdown"
     assert document.source_id == "doc-one.md"
     assert document.source_uri == "docs/doc-one.md"
     assert document.source_hash == "sha256:abc123"
