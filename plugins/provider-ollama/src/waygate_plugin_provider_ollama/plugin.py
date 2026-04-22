@@ -203,7 +203,11 @@ class OllamaProvider(LLMProviderPlugin):
         """
 
         llm = self.get_llm(request)
-        return llm.with_structured_output(schema)
+        return llm.with_structured_output(
+            schema,
+            method="json_schema",
+            include_raw=True,
+        )
 
     def validate_structured_llm_readiness(
         self,

@@ -120,15 +120,7 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
                 "system_prompt": system_prompt,
             }
         )
-        if tools:
-            return FakeAgent("supervisor", tools)
-        if len(create_agent_calls) == 1:
-            return FakeAgent("metadata")
-        if len(create_agent_calls) == 2:
-            return FakeAgent("summary")
-        if len(create_agent_calls) == 3:
-            return FakeAgent("findings")
-        return FakeAgent("continuity")
+        return FakeAgent("supervisor", tools)
 
     monkeypatch.setattr(
         "waygate_workflows.agents.document_analysis.create_agent",
@@ -149,6 +141,38 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
         "waygate_workflows.agents.document_analysis.resolve_chat_model",
         fake_resolve_chat_model,
     )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.invoke_structured_stage",
+        lambda *, schema, workflow_name, fallback_model_name, target_name=None, system_prompt, user_prompt: (
+            resolved_models.append((workflow_name, fallback_model_name, target_name))
+            or (
+                MetadataExtractionModel(
+                    tags=["tag-one"],
+                    topics=["topic-one"],
+                    people=["Alice"],
+                    organizations=[],
+                    projects=[],
+                )
+                if schema is MetadataExtractionModel
+                else SummaryExtractionModel(summary="Summary one")
+                if schema is SummaryExtractionModel
+                else FindingsExtractionModel(
+                    key_claims=["Claim A"],
+                    defined_terms=["Alpha"],
+                )
+                if schema is FindingsExtractionModel
+                else ContinuityExtractionModel(
+                    referenced_entities=["Alice"],
+                    unresolved_mentions=[
+                        ContinuityMentionModel(
+                            raw_text="the missing owner",
+                            kind_hint="entity",
+                        )
+                    ],
+                )
+            )
+        ),
+    )
 
     result = analyze_document_with_supervisor(
         document,
@@ -161,28 +185,106 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
     assert result.metadata.topics == ["topic-one"]
     assert result.findings.defined_terms == ["Alpha"]
     assert result.continuity.unresolved_mentions[0].raw_text == "the missing owner"
-    assert create_agent_calls[4]["tools"] == [
+    assert create_agent_calls[0]["tools"] == [
         "extract_document_metadata",
         "summarize_document",
         "extract_grounded_findings",
         "inspect_document_continuity",
     ]
-    assert [kind for kind, _ in invoked_payloads] == [
-        "supervisor",
-        "metadata",
-        "summary",
-        "findings",
-        "continuity",
-    ]
+    assert [kind for kind, _ in invoked_payloads] == ["supervisor"]
     assert "Document one referencing Alpha" in invoked_payloads[0][1]
-    assert "topic-one" in invoked_payloads[1][1]
-    assert "Alpha" in invoked_payloads[2][1]
-    assert "Alpha" in invoked_payloads[3][1]
-    assert "Alpha" in invoked_payloads[4][1]
     assert resolved_models == [
+        ("compile", "draft-model", "compile.source-analysis.supervisor"),
         ("compile", "metadata-model", "compile.source-analysis.metadata"),
         ("compile", "draft-model", "compile.source-analysis.summary"),
         ("compile", "draft-model", "compile.source-analysis.findings"),
         ("compile", "draft-model", "compile.source-analysis.continuity"),
-        ("compile", "draft-model", "compile.source-analysis.supervisor"),
+    ]
+
+
+def test_analyze_document_with_supervisor_falls_back_when_supervisor_lacks_structured_response(
+    monkeypatch,
+) -> None:
+    invoked_kinds: list[str] = []
+    document = {
+        "uri": "file://raw/fallback.md",
+        "content": "Document fallback content referencing Beta",
+        "source_hash": "hash-fallback",
+        "source_uri": "https://example.test/fallback",
+        "source_type": "generic",
+        "timestamp": None,
+    }
+    prompt_context = {
+        "active_document": document,
+        "active_document_position": 1,
+        "canonical_topics_subset": [],
+        "canonical_tags_subset": [],
+        "glossary_subset": [],
+        "entity_subset": [],
+        "claim_subset": [],
+        "reference_subset": [],
+        "prior_briefs_subset": [],
+        "unresolved_mentions_subset": [],
+        "prompt_instructions": [],
+    }
+
+    class FakeSupervisor:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            invoked_kinds.append("supervisor")
+            return {"messages": []}
+
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.create_agent",
+        lambda **kwargs: FakeSupervisor(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.resolve_chat_model",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.invoke_structured_stage",
+        lambda *, schema, workflow_name, fallback_model_name, target_name=None, system_prompt, user_prompt: (
+            invoked_kinds.append(str(target_name))
+            or (
+                MetadataExtractionModel(
+                    tags=["tag-fallback"],
+                    topics=["topic-fallback"],
+                    people=[],
+                    organizations=[],
+                    projects=[],
+                )
+                if schema is MetadataExtractionModel
+                else SummaryExtractionModel(summary="Fallback summary")
+                if schema is SummaryExtractionModel
+                else FindingsExtractionModel(
+                    key_claims=["Claim fallback"],
+                    defined_terms=["Beta"],
+                )
+                if schema is FindingsExtractionModel
+                else ContinuityExtractionModel(
+                    referenced_entities=["Beta"],
+                    unresolved_mentions=[],
+                )
+            )
+        ),
+    )
+
+    result = analyze_document_with_supervisor(
+        document,
+        prompt_context,
+        metadata_model_name="metadata-model",
+        draft_model_name="draft-model",
+    )
+
+    assert result.uri == document["uri"]
+    assert result.metadata.tags == ["tag-fallback"]
+    assert result.summary.summary == "Fallback summary"
+    assert result.findings.defined_terms == ["Beta"]
+    assert result.continuity.referenced_entities == ["Beta"]
+    assert invoked_kinds == [
+        "supervisor",
+        "compile.source-analysis.metadata",
+        "compile.source-analysis.summary",
+        "compile.source-analysis.findings",
+        "compile.source-analysis.continuity",
     ]

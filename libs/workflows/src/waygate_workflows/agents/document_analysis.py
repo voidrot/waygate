@@ -5,6 +5,7 @@ import json
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
 
+from waygate_workflows.runtime.llm import invoke_structured_stage
 from waygate_workflows.runtime.llm import resolve_chat_model
 from waygate_workflows.schema import ContinuityExtractionModel
 from waygate_workflows.schema import DocumentAnalysisPromptContext
@@ -14,6 +15,50 @@ from waygate_workflows.schema import MetadataExtractionModel
 from waygate_workflows.schema import SourceDocumentState
 from waygate_workflows.schema import SummaryExtractionModel
 from waygate_workflows.tools import build_source_analysis_tools
+
+
+class _StructuredSpecialistAdapter:
+    """Expose a direct structured stage through the agent-like invoke interface."""
+
+    def __init__(
+        self,
+        *,
+        schema: type[
+            MetadataExtractionModel
+            | SummaryExtractionModel
+            | FindingsExtractionModel
+            | ContinuityExtractionModel
+        ],
+        fallback_model_name: str,
+        target_name: str,
+        system_prompt: str,
+    ) -> None:
+        self._schema = schema
+        self._fallback_model_name = fallback_model_name
+        self._target_name = target_name
+        self._system_prompt = system_prompt
+
+    def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+        """Invoke the structured stage and mirror the create_agent result shape."""
+
+        messages = payload.get("messages")
+        if not isinstance(messages, list) or not messages:
+            raise ValueError("structured specialist requires at least one message")
+
+        first_message = messages[0]
+        if not isinstance(first_message, dict):
+            raise ValueError("structured specialist messages must be dict objects")
+
+        user_prompt = str(first_message.get("content", ""))
+        result = invoke_structured_stage(
+            schema=self._schema,
+            workflow_name="compile",
+            fallback_model_name=self._fallback_model_name,
+            target_name=self._target_name,
+            system_prompt=self._system_prompt,
+            user_prompt=user_prompt,
+        )
+        return {"structured_response": result}
 
 
 def _build_document_prompt(
@@ -58,6 +103,76 @@ def _coerce_model(
     return schema.model_validate(value)
 
 
+def _extract_structured_response(
+    result: dict[str, object],
+    schema: type[MetadataExtractionModel]
+    | type[SummaryExtractionModel]
+    | type[FindingsExtractionModel]
+    | type[ContinuityExtractionModel]
+    | type[DocumentAnalysisResultModel],
+):
+    """Return a validated structured response when the agent produced one."""
+
+    structured = result.get("structured_response")
+    if structured is None:
+        return None
+    return _coerce_model(schema, structured)
+
+
+def _invoke_specialist_agent(
+    agent: object,
+    schema: type[MetadataExtractionModel]
+    | type[SummaryExtractionModel]
+    | type[FindingsExtractionModel]
+    | type[ContinuityExtractionModel],
+    *,
+    document_prompt: str,
+):
+    """Invoke one specialist directly and require a structured response."""
+
+    result = agent.invoke({"messages": [{"role": "user", "content": document_prompt}]})
+    structured = _extract_structured_response(result, schema)
+    if structured is None:
+        raise KeyError("structured_response")
+    return structured
+
+
+def _fallback_document_analysis_result(
+    document: SourceDocumentState,
+    *,
+    document_prompt: str,
+    metadata_agent: object,
+    summary_agent: object,
+    findings_agent: object,
+    continuity_agent: object,
+) -> DocumentAnalysisResultModel:
+    """Build the combined result without relying on supervisor structured output."""
+
+    return DocumentAnalysisResultModel(
+        uri=document["uri"],
+        metadata=_invoke_specialist_agent(
+            metadata_agent,
+            MetadataExtractionModel,
+            document_prompt=document_prompt,
+        ),
+        summary=_invoke_specialist_agent(
+            summary_agent,
+            SummaryExtractionModel,
+            document_prompt=document_prompt,
+        ),
+        findings=_invoke_specialist_agent(
+            findings_agent,
+            FindingsExtractionModel,
+            document_prompt=document_prompt,
+        ),
+        continuity=_invoke_specialist_agent(
+            continuity_agent,
+            ContinuityExtractionModel,
+            document_prompt=document_prompt,
+        ),
+    )
+
+
 def analyze_document_with_supervisor(
     document: SourceDocumentState,
     prompt_context: DocumentAnalysisPromptContext,
@@ -78,68 +193,60 @@ def analyze_document_with_supervisor(
     """
     document_prompt = _build_document_prompt(document, prompt_context)
 
-    metadata_agent = create_agent(
-        model=resolve_chat_model(
-            "compile",
-            metadata_model_name,
-            target_name="compile.source-analysis.metadata",
-            requires_structured_output=True,
-        ),
-        tools=[],
-        response_format=ToolStrategy(MetadataExtractionModel),
-        system_prompt=(
-            "You are the metadata extraction specialist for the compile workflow. "
-            "Return only grounded tags, topics, people, organizations, and projects for the active document. "
-            "Prefer consistency with the provided rolling compile context when the document supports it."
-        ),
+    metadata_system_prompt = (
+        "You are the metadata extraction specialist for the compile workflow. "
+        "Return only grounded tags, topics, people, organizations, and projects for the active document. "
+        "Prefer consistency with the provided rolling compile context when the document supports it."
     )
-    summary_agent = create_agent(
-        model=resolve_chat_model(
-            "compile",
-            draft_model_name,
-            target_name="compile.source-analysis.summary",
-            requires_structured_output=True,
-        ),
-        tools=[],
-        response_format=ToolStrategy(SummaryExtractionModel),
-        system_prompt=(
-            "You are the document summarization specialist for the compile workflow. "
-            "Return a concise narrative summary for the active document. "
-            "Use the rolling compile context only to keep terminology and cross-document references consistent."
-        ),
+    summary_system_prompt = (
+        "You are the document summarization specialist for the compile workflow. "
+        "Return a concise narrative summary for the active document. "
+        "Use the rolling compile context only to keep terminology and cross-document references consistent."
     )
-    findings_agent = create_agent(
-        model=resolve_chat_model(
-            "compile",
-            draft_model_name,
-            target_name="compile.source-analysis.findings",
-            requires_structured_output=True,
-        ),
-        tools=[],
-        response_format=ToolStrategy(FindingsExtractionModel),
-        system_prompt=(
-            "You are the grounded findings specialist for the compile workflow. "
-            "Extract only the key grounded claims and defined terms that are materially supported by the active document. "
-            "Do not summarize broadly and do not invent claims that are merely implied by prior context."
-        ),
+    findings_system_prompt = (
+        "You are the grounded findings specialist for the compile workflow. "
+        "Extract only the key grounded claims and defined terms that are materially supported by the active document. "
+        "Do not summarize broadly and do not invent claims that are merely implied by prior context."
     )
-    continuity_agent = create_agent(
-        model=resolve_chat_model(
-            "compile",
-            draft_model_name,
-            target_name="compile.source-analysis.continuity",
-            requires_structured_output=True,
-        ),
-        tools=[],
-        response_format=ToolStrategy(ContinuityExtractionModel),
-        system_prompt=(
-            "You are the continuity specialist for the compile workflow. "
-            "Identify references to prior known entities and any unresolved mentions that should remain open in durable compile state. "
-            "Only mark a mention unresolved when the active document clearly points to something that is not fully identified."
-        ),
+    continuity_system_prompt = (
+        "You are the continuity specialist for the compile workflow. "
+        "Identify references to prior known entities and any unresolved mentions that should remain open in durable compile state. "
+        "Only mark a mention unresolved when the active document clearly points to something that is not fully identified."
+    )
+
+    metadata_agent = _StructuredSpecialistAdapter(
+        schema=MetadataExtractionModel,
+        fallback_model_name=metadata_model_name,
+        target_name="compile.source-analysis.metadata",
+        system_prompt=metadata_system_prompt,
+    )
+    summary_agent = _StructuredSpecialistAdapter(
+        schema=SummaryExtractionModel,
+        fallback_model_name=draft_model_name,
+        target_name="compile.source-analysis.summary",
+        system_prompt=summary_system_prompt,
+    )
+    findings_agent = _StructuredSpecialistAdapter(
+        schema=FindingsExtractionModel,
+        fallback_model_name=draft_model_name,
+        target_name="compile.source-analysis.findings",
+        system_prompt=findings_system_prompt,
+    )
+    continuity_agent = _StructuredSpecialistAdapter(
+        schema=ContinuityExtractionModel,
+        fallback_model_name=draft_model_name,
+        target_name="compile.source-analysis.continuity",
+        system_prompt=continuity_system_prompt,
     )
 
     # The supervisor coordinates the specialist tools but does not bypass them.
+    supervisor_tools = build_source_analysis_tools(
+        document_prompt=document_prompt,
+        metadata_agent=metadata_agent,
+        summary_agent=summary_agent,
+        findings_agent=findings_agent,
+        continuity_agent=continuity_agent,
+    )
     supervisor = create_agent(
         model=resolve_chat_model(
             "compile",
@@ -147,13 +254,7 @@ def analyze_document_with_supervisor(
             target_name="compile.source-analysis.supervisor",
             requires_structured_output=True,
         ),
-        tools=build_source_analysis_tools(
-            document_prompt=document_prompt,
-            metadata_agent=metadata_agent,
-            summary_agent=summary_agent,
-            findings_agent=findings_agent,
-            continuity_agent=continuity_agent,
-        ),
+        tools=supervisor_tools,
         response_format=ToolStrategy(DocumentAnalysisResultModel),
         system_prompt=(
             "You are the document-analysis supervisor for the compile workflow. "
@@ -174,10 +275,19 @@ def analyze_document_with_supervisor(
             ]
         }
     )
-    structured = _coerce_model(
+    structured = _extract_structured_response(
+        supervisor_result,
         DocumentAnalysisResultModel,
-        supervisor_result["structured_response"],
     )
+    if structured is None:
+        structured = _fallback_document_analysis_result(
+            document,
+            document_prompt=document_prompt,
+            metadata_agent=metadata_agent,
+            summary_agent=summary_agent,
+            findings_agent=findings_agent,
+            continuity_agent=continuity_agent,
+        )
     if structured.uri != document["uri"]:
         structured.uri = document["uri"]
     return structured

@@ -22,8 +22,12 @@ def _install_fake_langchain_ollama(monkeypatch, created):
         def __init__(self, model: str, **kwargs) -> None:
             created.append((model, kwargs))
 
-        def with_structured_output(self, schema):
-            return {"schema": schema.__name__, "model": created[-1][0]}
+        def with_structured_output(self, schema, **kwargs):
+            return {
+                "schema": schema.__name__,
+                "model": created[-1][0],
+                "kwargs": kwargs,
+            }
 
     from waygate_plugin_provider_ollama import plugin as plugin_module
 
@@ -84,7 +88,14 @@ def test_get_structured_llm_returns_structured_model(monkeypatch) -> None:
 
     structured = provider.get_structured_llm(_DraftSchema, request)
 
-    assert structured == {"schema": "_DraftSchema", "model": "qwen3.5:9b"}
+    assert structured == {
+        "schema": "_DraftSchema",
+        "model": "qwen3.5:9b",
+        "kwargs": {
+            "method": "json_schema",
+            "include_raw": True,
+        },
+    }
 
 
 def test_validate_llm_readiness_constructs_client(monkeypatch) -> None:

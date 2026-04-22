@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TypeVar
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -336,6 +337,96 @@ def _merge_llm_profiles(profiles: list[object]):
     )
 
 
+def _decode_structured_json_candidate(candidate: object) -> object | None:
+    """Decode one candidate structured payload when it looks JSON-like."""
+
+    if isinstance(candidate, dict):
+        return candidate
+    if not isinstance(candidate, str):
+        return None
+
+    stripped = candidate.strip()
+    if not stripped:
+        return None
+
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+
+
+def _recover_structured_output_from_tool_calls(tool_calls: object) -> object | None:
+    """Recover structured payloads from raw tool-call envelopes."""
+
+    if not isinstance(tool_calls, list):
+        return None
+
+    for call in tool_calls:
+        if not isinstance(call, dict):
+            continue
+
+        args = _decode_structured_json_candidate(call.get("args"))
+        if args is not None:
+            return args
+
+        function = call.get("function")
+        if not isinstance(function, dict):
+            continue
+
+        arguments = _decode_structured_json_candidate(function.get("arguments"))
+        if arguments is not None:
+            return arguments
+
+    return None
+
+
+def _recover_structured_output_from_raw_message(raw: object) -> object | None:
+    """Recover a structured payload from a raw provider message when parsing failed."""
+
+    tool_calls = getattr(raw, "tool_calls", None)
+    recovered = _recover_structured_output_from_tool_calls(tool_calls)
+    if recovered is not None:
+        return recovered
+
+    additional_kwargs = getattr(raw, "additional_kwargs", None)
+    if isinstance(additional_kwargs, dict):
+        recovered = _recover_structured_output_from_tool_calls(
+            additional_kwargs.get("tool_calls")
+        )
+        if recovered is not None:
+            return recovered
+
+    content = getattr(raw, "content", None)
+    if isinstance(content, list):
+        content = "\n".join(str(item) for item in content).strip()
+
+    return _decode_structured_json_candidate(content)
+
+
+def _coerce_structured_stage_result(schema: type[TModel], result: object) -> TModel:
+    """Normalize direct or raw-envelope structured results into the target schema."""
+
+    if isinstance(result, schema):
+        return result
+
+    if isinstance(result, dict) and {"raw", "parsed", "parsing_error"}.issubset(result):
+        parsed = result.get("parsed")
+        if parsed is not None:
+            if isinstance(parsed, schema):
+                return parsed
+            return schema.model_validate(parsed)
+
+        recovered = _recover_structured_output_from_raw_message(result.get("raw"))
+        if recovered is not None:
+            return schema.model_validate(recovered)
+
+        parsing_error = result.get("parsing_error")
+        if isinstance(parsing_error, BaseException):
+            raise parsing_error
+
+    return schema.model_validate(result)
+
+
 def invoke_structured_stage(
     *,
     schema: type[TModel],
@@ -365,9 +456,7 @@ def invoke_structured_stage(
             HumanMessage(content=user_prompt),
         ]
     )
-    if isinstance(result, schema):
-        return result
-    return schema.model_validate(result)
+    return _coerce_structured_stage_result(schema, result)
 
 
 def invoke_text_stage(

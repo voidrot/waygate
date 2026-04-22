@@ -113,15 +113,17 @@ def test_build_llm_request_falls_back_to_legacy_stage_profile(monkeypatch) -> No
 def test_synthesis_and_review_use_compile_target_ids(monkeypatch) -> None:
     resolved_models: list[tuple[str, str, str | None]] = []
 
-    def fake_resolve_chat_model(
+    def fake_invoke_structured_stage(
+        *,
+        schema,
         workflow_name: str,
         fallback_model_name: str,
-        *,
         target_name: str | None = None,
-        requires_structured_output: bool = False,
+        system_prompt: str,
+        user_prompt: str,
     ) -> object:
         resolved_models.append((workflow_name, fallback_model_name, target_name))
-        return object()
+        return schema.model_validate({"approved": True, "feedback": []})
 
     class FakeMessage:
         def __init__(self, content: str) -> None:
@@ -131,27 +133,22 @@ def test_synthesis_and_review_use_compile_target_ids(monkeypatch) -> None:
         def invoke(self, payload: dict[str, object]) -> dict[str, object]:
             return {"messages": [FakeMessage("# Draft")]}
 
-    class FakeReviewAgent:
-        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
-            return {"structured_response": {"approved": True, "feedback": []}}
-
-    create_agent_results = iter([FakeSynthesisAgent(), FakeReviewAgent()])
+    create_agent_results = iter([FakeSynthesisAgent()])
 
     monkeypatch.setattr(
         "waygate_workflows.agents.synthesis.resolve_chat_model",
-        fake_resolve_chat_model,
-    )
-    monkeypatch.setattr(
-        "waygate_workflows.agents.review.resolve_chat_model",
-        fake_resolve_chat_model,
+        lambda workflow_name, fallback_model_name, *, target_name=None, requires_structured_output=False: (
+            resolved_models.append((workflow_name, fallback_model_name, target_name))
+            or object()
+        ),
     )
     monkeypatch.setattr(
         "waygate_workflows.agents.synthesis.create_agent",
         lambda **kwargs: next(create_agent_results),
     )
     monkeypatch.setattr(
-        "waygate_workflows.agents.review.create_agent",
-        lambda **kwargs: next(create_agent_results),
+        "waygate_workflows.agents.review.invoke_structured_stage",
+        fake_invoke_structured_stage,
     )
 
     state = {
@@ -424,9 +421,13 @@ def test_invoke_structured_stage_uses_active_ollama_provider_from_app_context(
             created.append((model, kwargs))
 
         def with_structured_output(
-            self, schema: type[BaseModel]
+            self, schema: type[BaseModel], **kwargs
         ) -> FakeStructuredRunnable:
             assert schema is _StructuredResult
+            assert kwargs == {
+                "method": "json_schema",
+                "include_raw": True,
+            }
             return FakeStructuredRunnable()
 
     monkeypatch.setattr(ollama_plugin_module, "ChatOllama", FakeChatOllama)
@@ -485,6 +486,59 @@ def test_invoke_structured_stage_uses_active_ollama_provider_from_app_context(
         "system prompt",
         "user prompt",
     ]
+
+
+def test_invoke_structured_stage_recovers_from_ollama_raw_tool_call_payload(
+    monkeypatch,
+) -> None:
+    parsing_error = ValueError("Invalid json output")
+
+    class FakeStructuredRunnable:
+        def invoke(self, messages: list[object]) -> dict[str, object]:
+            return {
+                "raw": SimpleNamespace(
+                    content="",
+                    additional_kwargs={
+                        "tool_calls": [
+                            {
+                                "function": {
+                                    "arguments": '{"summary": "recovered draft"}'
+                                }
+                            }
+                        ]
+                    },
+                ),
+                "parsed": None,
+                "parsing_error": parsing_error,
+            }
+
+    class FakeProvider:
+        def get_capabilities(self) -> LLMProviderCapabilities:
+            return LLMProviderCapabilities(
+                provider_name="OllamaProvider",
+                supports_structured_output=True,
+                supported_common_options={"temperature"},
+                supported_provider_options=set(),
+            )
+
+        def get_structured_llm(self, schema, request):
+            return FakeStructuredRunnable()
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
+        lambda: (FakeProvider(), _FakeCoreSettings({})),
+    )
+
+    result = invoke_structured_stage(
+        schema=_StructuredResult,
+        workflow_name="compile",
+        fallback_model_name="fallback-model",
+        target_name="compile.review",
+        system_prompt="system prompt",
+        user_prompt="user prompt",
+    )
+
+    assert result == _StructuredResult(summary="recovered draft")
 
 
 def test_invoke_text_stage_uses_active_featherless_provider_from_app_context(
