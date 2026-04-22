@@ -61,8 +61,10 @@ Environment variables follow two conventions:
 - `PublishedDocument` and `PublishedDocumentFrontmatter` represent the future corpus-level published artifact.
 - `SourceDocumentReference` represents normalized source provenance reused by draft and compiled artifacts.
 - `Visibility` defines the supported visibility states.
+- `normalize_content_type()` canonicalizes explicit producer-supplied values onto the MIME-style contract.
+- `infer_content_type()` prefers source filename extensions via `content-types` and falls back to body heuristics when producers leave `content_type` empty.
 - `build_raw_document_frontmatter()`, `build_compiled_document_frontmatter()`, and `build_published_document_frontmatter()` build artifact-specific frontmatter models.
-- `render_raw_document()`, `render_draft_document()`, `render_compiled_document()`, and `render_published_document()` provide the shared rendering path.
+- `render_raw_document()`, `render_compiled_document()`, and `render_published_document()` provide the shared rendering path.
 
 ### Logging
 

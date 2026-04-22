@@ -16,6 +16,7 @@ Important fields:
 | `source_id`                           | Optional provider-native identifier                                               |
 | `source_uri`                          | Optional canonical URI for the source                                             |
 | `source_hash`                         | Optional stable content hash                                                      |
+| `content_type`                        | Optional canonical MIME type; inferred when omitted                               |
 | `content_hash`                        | Internal body-only content hash used for storage and compile identity             |
 | `source_metadata`                     | Provider-specific metadata object; must include `kind` and may include extra keys |
 | `doc_id`                              | Generated UUIDv7 string by default                                                |
@@ -26,6 +27,10 @@ Important fields:
 | `content`                             | Raw body content                                                                  |
 
 This model is the handoff boundary between webhook integrations and the rest of the system.
+
+When `content_type` is supplied, raw-document handling canonicalizes it onto a MIME-style value such as `text/markdown`.
+
+When `content_type` is omitted, raw-document rendering prefers the source filename extension from `source_uri` or `source_id` and falls back to body heuristics.
 
 ## Artifact-Specific Document Models
 
@@ -45,13 +50,14 @@ The API does not store a `RawDocument` as JSON. It renders the model into a text
 The compile workflow currently depends on these parsed fields when it reloads a raw artifact:
 
 - `content`
+- `content_type`
 - `content_hash`
 - `source_hash`
 - `source_uri`
 - `source_type`
 - `timestamp`
 
-That means raw-document rendering must continue to preserve those fields in frontmatter.
+That means raw-document rendering must continue to preserve those fields in frontmatter while leaving the stored body content unchanged.
 
 The storage-facing identity for raw artifacts is now the internal `content_hash`.
 It is computed from the normalized raw body content only and ignores frontmatter.

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, ValidationError
 from uuid_utils import uuid4
 
+from waygate_core.files import normalize_content_type
 from waygate_core.plugin.hooks import PluginConfigRegistration, hookimpl
 from waygate_core.plugin.webhook import WebhookPlugin
 from waygate_core.schema.document import RawDocument
@@ -172,6 +173,7 @@ class GenericWebhookPlugin(WebhookPlugin):
             documents.append(
                 RawDocument(
                     source_type=PLUGIN_NAME,
+                    content_type=normalize_content_type(document.document_type),
                     source_id=document.document_name,
                     source_uri=document.document_path,
                     source_hash=document.document_hash,
