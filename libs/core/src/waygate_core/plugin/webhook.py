@@ -1,9 +1,12 @@
 """Webhook plugin contract used by the API ingress layer."""
 
-from waygate_core.schema.document import RawDocument
-from typing import Mapping
-from pydantic import BaseModel
 from abc import ABC, abstractmethod
+from typing import Mapping
+
+from pydantic import BaseModel
+
+from waygate_core.plugin.communication import WorkflowTriggerMessage
+from waygate_core.schema.document import RawDocument
 
 
 class WebhookVerificationError(ValueError):
@@ -124,3 +127,28 @@ class WebhookPlugin(ABC):
             ``None`` when the default response should be used.
         """
         return None
+
+    def build_workflow_trigger(
+        self,
+        payload: dict,
+        document_paths: list[str],
+    ) -> WorkflowTriggerMessage | None:
+        """Build the workflow trigger emitted after raw artifacts are written.
+
+        Subclasses can override this to customize the downstream workflow event,
+        source identifier, metadata, or to skip dispatch entirely by returning
+        ``None``.
+
+        Args:
+            payload: The enriched payload that produced the raw artifacts.
+            document_paths: Storage-backed raw artifact URIs written for the request.
+
+        Returns:
+            A workflow trigger message, or ``None`` to suppress dispatch.
+        """
+
+        return WorkflowTriggerMessage(
+            event_type="draft.ready",
+            source="waygate-api.webhooks",
+            document_paths=document_paths,
+        )

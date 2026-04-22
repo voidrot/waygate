@@ -37,10 +37,25 @@ async def send_draft_message(document_paths: list[str]) -> WorkflowDispatchResul
             accepted=True, detail="No document paths supplied"
         )
 
-    client = _resolve_communication_client()
     message = WorkflowTriggerMessage(
         event_type="draft.ready",
         source="waygate-api.webhooks",
         document_paths=document_paths,
     )
+    return await send_workflow_message(message)
+
+
+async def send_workflow_message(
+    message: WorkflowTriggerMessage,
+) -> WorkflowDispatchResult:
+    """Submit an arbitrary workflow trigger via the configured transport.
+
+    Args:
+        message: The workflow trigger message to submit.
+
+    Returns:
+        The dispatch result returned by the communication client.
+    """
+
+    client = _resolve_communication_client()
     return await client.submit_workflow_trigger(message)

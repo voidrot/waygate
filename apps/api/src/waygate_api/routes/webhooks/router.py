@@ -2,7 +2,7 @@
 
 from uuid import uuid7
 from waygate_core import get_app_context
-from waygate_api.clients import send_draft_message
+from waygate_api.clients import send_workflow_message
 from waygate_api.routes.webhooks.errors import map_dispatch_failure_to_http
 from waygate_core.files import render_raw_document
 from waygate_core.plugin.storage import StorageNamespace
@@ -69,10 +69,14 @@ def _make_handler(plugin: WebhookPlugin) -> Callable:
                         storage.write_document(path, render_raw_document(doc))
                     )
 
-                dispatch_result = await send_draft_message(written_paths)
-                if not dispatch_result.accepted:
-                    status_code, detail = map_dispatch_failure_to_http(dispatch_result)
-                    raise HTTPException(status_code=status_code, detail=detail)
+                workflow_message = plugin.build_workflow_trigger(payload, written_paths)
+                if workflow_message is not None:
+                    dispatch_result = await send_workflow_message(workflow_message)
+                    if not dispatch_result.accepted:
+                        status_code, detail = map_dispatch_failure_to_http(
+                            dispatch_result
+                        )
+                        raise HTTPException(status_code=status_code, detail=detail)
 
                 logger.debug(
                     f"Plugin '{plugin.name}' wrote {len(written_paths)} documents to storage: {written_paths}"

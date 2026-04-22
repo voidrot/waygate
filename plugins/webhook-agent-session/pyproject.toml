@@ -1,0 +1,32 @@
+[project]
+name = "waygate-plugin-webhook-agent-session"
+version = "0.1.0"
+description = "Dedicated completed agent-session webhook plugin for WayGate"
+readme = "README.md"
+authors = [
+  { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = ["waygate-core"]
+
+[tool.uv.sources]
+waygate-core = { workspace = true }
+
+[project.entry-points."waygate.plugins.webhooks"]
+agent_session_webhook = "waygate_plugin_webhook_agent_session.plugin:AgentSessionWebhookPlugin"
+
+[build-system]
+requires      = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=waygate_plugin_webhook_agent_session",
+  "--cov-report=term-missing",
+]
