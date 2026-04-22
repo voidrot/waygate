@@ -1,5 +1,5 @@
 {
-  "apps/api": "0.1.0",
+  "apps/api": "0.1.1",
   "apps/scheduler": "0.1.0",
   "apps/draft-worker": "0.1.0",
   "apps/nats-worker": "0.1.0",
