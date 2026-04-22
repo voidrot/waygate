@@ -1,22 +1,36 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
+from pydantic import BaseModel
 
 from waygate_core.plugin import LLMOptionPolicy
 from waygate_core.plugin import LLMConfigurationError
 from waygate_core.plugin import LLMProviderCapabilities
 from waygate_workflows.agents.review import review_draft_with_specialist
-from waygate_workflows.agents.common import resolve_chat_model
+from waygate_workflows.runtime.llm import resolve_chat_model
 from waygate_workflows.agents.synthesis import synthesize_draft_with_specialist
-from waygate_workflows.tools.llm import build_llm_request
-from waygate_workflows.tools.llm import invoke_text_stage
-from waygate_workflows.tools.llm import invoke_structured_stage
+from waygate_workflows.runtime.llm import build_llm_request
+from waygate_workflows.runtime.llm import invoke_text_stage
+from waygate_workflows.runtime.llm import invoke_structured_stage
+from waygate_workflows.runtime.llm import resolve_embeddings_model
+from waygate_workflows.runtime.llm import validate_compile_llm_readiness
+from waygate_plugin_provider_featherless_ai.plugin import (
+    FeatherlessAIProvider,
+    FeatherlessAIProviderConfig,
+)
+from waygate_plugin_provider_ollama.plugin import OllamaProvider, OllamaProviderConfig
 
 
 class _FakeCoreSettings:
     def __init__(self, llm_workflow_profiles: dict[str, object]) -> None:
         self.llm_workflow_profiles = llm_workflow_profiles
         self.llm_plugin_name = "OllamaProvider"
+
+
+class _StructuredResult(BaseModel):
+    summary: str
 
 
 def test_build_llm_request_prefers_target_profile_and_inherits_compile_defaults(
@@ -43,7 +57,7 @@ def test_build_llm_request_prefers_target_profile_and_inherits_compile_defaults(
     )
 
     monkeypatch.setattr(
-        "waygate_workflows.tools.llm.resolve_llm_provider",
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
         lambda: (object(), core_settings),
     )
 
@@ -81,7 +95,7 @@ def test_build_llm_request_falls_back_to_legacy_stage_profile(monkeypatch) -> No
     )
 
     monkeypatch.setattr(
-        "waygate_workflows.tools.llm.resolve_llm_provider",
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
         lambda: (object(), core_settings),
     )
 
@@ -198,7 +212,7 @@ def test_resolve_chat_model_rejects_unsupported_strict_options(monkeypatch) -> N
     )
 
     monkeypatch.setattr(
-        "waygate_workflows.agents.common.resolve_llm_provider",
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
         lambda: (provider, core_settings),
     )
 
@@ -229,7 +243,7 @@ def test_resolve_chat_model_rejects_missing_structured_output_support(
 
     provider = FakeProvider()
     monkeypatch.setattr(
-        "waygate_workflows.agents.common.resolve_llm_provider",
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
         lambda: (provider, _FakeCoreSettings({})),
     )
 
@@ -266,7 +280,7 @@ def test_invoke_structured_stage_rejects_missing_structured_output_support(
         pass
 
     monkeypatch.setattr(
-        "waygate_workflows.tools.llm.resolve_llm_provider",
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
         lambda: (FakeProvider(), _FakeCoreSettings({})),
     )
 
@@ -297,7 +311,7 @@ def test_invoke_text_stage_rejects_unsupported_strict_options(monkeypatch) -> No
             raise AssertionError("text runnable should not be requested")
 
     monkeypatch.setattr(
-        "waygate_workflows.tools.llm.resolve_llm_provider",
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
         lambda: (
             FakeProvider(),
             _FakeCoreSettings(
@@ -316,4 +330,633 @@ def test_invoke_text_stage_rejects_unsupported_strict_options(monkeypatch) -> No
             fallback_model_name="fallback-model",
             system_prompt="system",
             user_prompt="user",
+        )
+
+
+def test_invoke_text_stage_uses_active_ollama_provider_from_app_context(
+    monkeypatch,
+) -> None:
+    from waygate_core.config.schema import CoreSettings, LLMWorkflowProfile
+    from waygate_plugin_provider_ollama import plugin as ollama_plugin_module
+
+    created: list[tuple[str, dict[str, object]]] = []
+    invoked_messages: list[list[object]] = []
+
+    class FakeChatOllama:
+        def __init__(self, model: str, **kwargs) -> None:
+            created.append((model, kwargs))
+
+        def invoke(self, messages: list[object]) -> object:
+            invoked_messages.append(messages)
+            return SimpleNamespace(content="generated draft")
+
+    monkeypatch.setattr(ollama_plugin_module, "ChatOllama", FakeChatOllama)
+
+    provider = OllamaProvider(
+        config=OllamaProviderConfig(base_url="http://ollama.local")
+    )
+    core_settings = CoreSettings(
+        llm_plugin_name="OllamaProvider",
+        llm_workflow_profiles={
+            "compile": LLMWorkflowProfile(
+                common_options={"temperature": 0.2, "max_tokens": 256},
+                provider_options={
+                    "OllamaProvider": {
+                        "num_ctx": 4096,
+                        "validate_model_on_init": True,
+                    }
+                },
+            )
+        },
+    )
+    app_context = SimpleNamespace(
+        config=SimpleNamespace(core=core_settings),
+        plugins=SimpleNamespace(llm={"OllamaProvider": provider}),
+    )
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.get_app_context", lambda: app_context
+    )
+
+    result = invoke_text_stage(
+        workflow_name="compile",
+        fallback_model_name="fallback-model",
+        system_prompt="system prompt",
+        user_prompt="user prompt",
+    )
+
+    assert result == "generated draft"
+    assert created == [
+        (
+            "fallback-model",
+            {
+                "base_url": "http://ollama.local",
+                "validate_model_on_init": True,
+                "temperature": 0.2,
+                "num_ctx": 4096,
+                "num_predict": 256,
+            },
+        )
+    ]
+    assert len(invoked_messages) == 1
+    assert [message.content for message in invoked_messages[0]] == [
+        "system prompt",
+        "user prompt",
+    ]
+
+
+def test_invoke_structured_stage_uses_active_ollama_provider_from_app_context(
+    monkeypatch,
+) -> None:
+    from waygate_core.config.schema import CoreSettings, LLMWorkflowProfile
+    from waygate_plugin_provider_ollama import plugin as ollama_plugin_module
+
+    created: list[tuple[str, dict[str, object]]] = []
+    invoked_messages: list[list[object]] = []
+
+    class FakeStructuredRunnable:
+        def invoke(self, messages: list[object]) -> dict[str, str]:
+            invoked_messages.append(messages)
+            return {"summary": "structured draft"}
+
+    class FakeChatOllama:
+        def __init__(self, model: str, **kwargs) -> None:
+            created.append((model, kwargs))
+
+        def with_structured_output(
+            self, schema: type[BaseModel]
+        ) -> FakeStructuredRunnable:
+            assert schema is _StructuredResult
+            return FakeStructuredRunnable()
+
+    monkeypatch.setattr(ollama_plugin_module, "ChatOllama", FakeChatOllama)
+
+    provider = OllamaProvider(
+        config=OllamaProviderConfig(
+            base_url="http://ollama.local/",
+            validate_model_on_init=True,
+        )
+    )
+    core_settings = CoreSettings(
+        llm_plugin_name="OllamaProvider",
+        llm_workflow_profiles={
+            "compile.review": LLMWorkflowProfile(
+                model_name="structured-model",
+                provider_options={
+                    "OllamaProvider": {
+                        "validate_model_on_init": False,
+                        "reasoning": True,
+                    }
+                },
+            )
+        },
+    )
+    app_context = SimpleNamespace(
+        config=SimpleNamespace(core=core_settings),
+        plugins=SimpleNamespace(llm={"OllamaProvider": provider}),
+    )
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.get_app_context", lambda: app_context
+    )
+
+    result = invoke_structured_stage(
+        schema=_StructuredResult,
+        workflow_name="compile",
+        fallback_model_name="fallback-model",
+        target_name="compile.review",
+        system_prompt="system prompt",
+        user_prompt="user prompt",
+    )
+
+    assert result == _StructuredResult(summary="structured draft")
+    assert created == [
+        (
+            "structured-model",
+            {
+                "base_url": "http://ollama.local",
+                "validate_model_on_init": False,
+                "reasoning": True,
+            },
+        )
+    ]
+    assert len(invoked_messages) == 1
+    assert [message.content for message in invoked_messages[0]] == [
+        "system prompt",
+        "user prompt",
+    ]
+
+
+def test_invoke_text_stage_uses_active_featherless_provider_from_app_context(
+    monkeypatch,
+) -> None:
+    from pydantic import SecretStr
+    from waygate_core.config.schema import CoreSettings, LLMWorkflowProfile
+    from waygate_plugin_provider_featherless_ai import (
+        plugin as featherless_plugin_module,
+    )
+
+    created: list[dict[str, object]] = []
+    invoked_messages: list[list[object]] = []
+
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs) -> None:
+            created.append(kwargs)
+
+        def invoke(self, messages: list[object]) -> object:
+            invoked_messages.append(messages)
+            return SimpleNamespace(content="generated featherless draft")
+
+    monkeypatch.setattr(featherless_plugin_module, "ChatOpenAI", FakeChatOpenAI)
+
+    provider = FeatherlessAIProvider(
+        config=FeatherlessAIProviderConfig(
+            featherless_api_key=SecretStr("test-key"),
+            featherless_base_url="https://featherless.invalid/v1/",
+        )
+    )
+    core_settings = CoreSettings(
+        llm_plugin_name="FeatherlessAIProvider",
+        llm_workflow_profiles={
+            "compile": LLMWorkflowProfile(
+                common_options={
+                    "temperature": 0.2,
+                    "top_k": 20,
+                    "max_tokens": 256,
+                },
+                provider_options={
+                    "FeatherlessAIProvider": {
+                        "presence_penalty": 0.3,
+                        "min_p": 0.05,
+                    }
+                },
+            )
+        },
+    )
+    app_context = SimpleNamespace(
+        config=SimpleNamespace(core=core_settings),
+        plugins=SimpleNamespace(llm={"FeatherlessAIProvider": provider}),
+    )
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.get_app_context", lambda: app_context
+    )
+
+    result = invoke_text_stage(
+        workflow_name="compile",
+        fallback_model_name="fallback-model",
+        system_prompt="system prompt",
+        user_prompt="user prompt",
+    )
+
+    assert result == "generated featherless draft"
+    assert created == [
+        {
+            "model": "fallback-model",
+            "api_key": "test-key",
+            "base_url": "https://featherless.invalid/v1",
+            "temperature": 0.2,
+            "max_tokens": 256,
+            "presence_penalty": 0.3,
+            "extra_body": {
+                "top_k": 20,
+                "min_p": 0.05,
+            },
+        }
+    ]
+    assert len(invoked_messages) == 1
+    assert [message.content for message in invoked_messages[0]] == [
+        "system prompt",
+        "user prompt",
+    ]
+
+
+def test_invoke_structured_stage_uses_active_featherless_provider_from_app_context(
+    monkeypatch,
+) -> None:
+    from pydantic import SecretStr
+    from waygate_core.config.schema import CoreSettings, LLMWorkflowProfile
+    from waygate_plugin_provider_featherless_ai import (
+        plugin as featherless_plugin_module,
+    )
+
+    created: list[dict[str, object]] = []
+    invoked_messages: list[list[object]] = []
+
+    class FakeStructuredRunnable:
+        def invoke(self, messages: list[object]) -> dict[str, str]:
+            invoked_messages.append(messages)
+            return {"summary": "structured featherless draft"}
+
+    class FakeChatOpenAI:
+        def __init__(self, **kwargs) -> None:
+            created.append(kwargs)
+
+        def with_structured_output(
+            self, schema: type[BaseModel]
+        ) -> FakeStructuredRunnable:
+            assert schema is _StructuredResult
+            return FakeStructuredRunnable()
+
+    monkeypatch.setattr(featherless_plugin_module, "ChatOpenAI", FakeChatOpenAI)
+
+    provider = FeatherlessAIProvider(
+        config=FeatherlessAIProviderConfig(
+            featherless_api_key=SecretStr("test-key"),
+            featherless_base_url="https://featherless.invalid/v1",
+        )
+    )
+    core_settings = CoreSettings(
+        llm_plugin_name="FeatherlessAIProvider",
+        llm_workflow_profiles={
+            "compile.review": LLMWorkflowProfile(
+                model_name="structured-featherless-model",
+                common_options={"temperature": 0.0},
+                provider_options={
+                    "FeatherlessAIProvider": {
+                        "frequency_penalty": 0.4,
+                        "include_stop_str_in_output": True,
+                    }
+                },
+            )
+        },
+    )
+    app_context = SimpleNamespace(
+        config=SimpleNamespace(core=core_settings),
+        plugins=SimpleNamespace(llm={"FeatherlessAIProvider": provider}),
+    )
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.get_app_context", lambda: app_context
+    )
+
+    result = invoke_structured_stage(
+        schema=_StructuredResult,
+        workflow_name="compile",
+        fallback_model_name="fallback-model",
+        target_name="compile.review",
+        system_prompt="system prompt",
+        user_prompt="user prompt",
+    )
+
+    assert result == _StructuredResult(summary="structured featherless draft")
+    assert created == [
+        {
+            "model": "structured-featherless-model",
+            "api_key": "test-key",
+            "base_url": "https://featherless.invalid/v1",
+            "temperature": 0.0,
+            "frequency_penalty": 0.4,
+            "extra_body": {
+                "include_stop_str_in_output": True,
+            },
+        }
+    ]
+    assert len(invoked_messages) == 1
+    assert [message.content for message in invoked_messages[0]] == [
+        "system prompt",
+        "user prompt",
+    ]
+
+
+def test_validate_compile_llm_readiness_builds_all_compile_targets(monkeypatch) -> None:
+    from waygate_core.config.schema import CoreSettings, LLMWorkflowProfile
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.text_targets: list[tuple[str, str]] = []
+            self.structured_targets: list[tuple[str, str, str]] = []
+
+        def get_capabilities(self) -> LLMProviderCapabilities:
+            return LLMProviderCapabilities(
+                provider_name="OllamaProvider",
+                supports_structured_output=True,
+                supported_common_options={
+                    "temperature",
+                    "top_k",
+                    "top_p",
+                    "seed",
+                    "stop",
+                    "max_tokens",
+                },
+                supported_provider_options={
+                    "validate_model_on_init",
+                    "num_ctx",
+                    "num_gpu",
+                    "num_thread",
+                    "mirostat",
+                    "mirostat_tau",
+                    "mirostat_eta",
+                    "num_predict",
+                    "repeat_last_n",
+                    "repeat_penalty",
+                    "logprobs",
+                    "top_logprobs",
+                    "format",
+                    "reasoning",
+                    "tfs_z",
+                    "keep_alive",
+                },
+            )
+
+        def get_llm(self, request):
+            self.text_targets.append((request.target_name, request.model_name))
+            return object()
+
+        def get_structured_llm(self, schema, request):
+            self.structured_targets.append(
+                (request.target_name, request.model_name, schema.__name__)
+            )
+            return object()
+
+    provider = FakeProvider()
+    core_settings = CoreSettings(
+        llm_plugin_name="OllamaProvider",
+        metadata_model_name="metadata-default",
+        draft_model_name="draft-default",
+        review_model_name="review-default",
+        llm_workflow_profiles={
+            "compile.source-analysis.summary": LLMWorkflowProfile(
+                model_name="summary-override"
+            ),
+            "compile.review": LLMWorkflowProfile(model_name="review-override"),
+        },
+    )
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
+        lambda: (provider, core_settings),
+    )
+
+    validate_compile_llm_readiness()
+
+    assert provider.text_targets == [
+        ("compile.source-analysis.metadata", "metadata-default"),
+        ("compile.source-analysis.summary", "summary-override"),
+        ("compile.source-analysis.findings", "draft-default"),
+        ("compile.source-analysis.continuity", "draft-default"),
+        ("compile.source-analysis.supervisor", "draft-default"),
+        ("compile.synthesis", "draft-default"),
+    ]
+    assert provider.structured_targets == [
+        ("compile.review", "review-override", "_PreflightStructuredSchema")
+    ]
+
+
+def test_validate_compile_llm_readiness_wraps_provider_initialization_errors(
+    monkeypatch,
+) -> None:
+    from waygate_core.config.schema import CoreSettings
+
+    class FakeProvider:
+        def get_capabilities(self) -> LLMProviderCapabilities:
+            return LLMProviderCapabilities(
+                provider_name="FakeProvider",
+                supports_structured_output=True,
+                supported_common_options={
+                    "temperature",
+                    "top_k",
+                    "top_p",
+                    "seed",
+                    "stop",
+                    "max_tokens",
+                },
+                supported_provider_options=set(),
+            )
+
+        def get_llm(self, request):
+            raise RuntimeError("provider exploded")
+
+        def get_structured_llm(self, schema, request):
+            raise AssertionError("structured target should not be reached")
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.resolve_llm_provider",
+        lambda: (
+            FakeProvider(),
+            CoreSettings(
+                llm_plugin_name="FakeProvider",
+                metadata_model_name="metadata-default",
+                draft_model_name="draft-default",
+                review_model_name="review-default",
+            ),
+        ),
+    )
+
+    with pytest.raises(
+        LLMConfigurationError,
+        match="FakeProvider'.*compile.source-analysis.metadata.*metadata-default.*provider exploded",
+    ):
+        validate_compile_llm_readiness()
+
+
+def test_validate_compile_llm_readiness_uses_optional_readiness_probe(
+    monkeypatch,
+) -> None:
+    from waygate_core.config.schema import CoreSettings
+
+    class FakeProvider:
+        def __init__(self) -> None:
+            self.text_targets: list[tuple[str, str]] = []
+            self.structured_targets: list[tuple[str, str, str]] = []
+
+        def get_capabilities(self) -> LLMProviderCapabilities:
+            return LLMProviderCapabilities(
+                provider_name="FakeProvider",
+                supports_structured_output=True,
+                supported_common_options={
+                    "temperature",
+                    "top_k",
+                    "top_p",
+                    "seed",
+                    "stop",
+                    "max_tokens",
+                },
+                supported_provider_options=set(),
+            )
+
+        def validate_llm_readiness(self, request) -> None:
+            self.text_targets.append((request.target_name, request.model_name))
+
+        def validate_structured_llm_readiness(self, schema, request) -> None:
+            self.structured_targets.append(
+                (request.target_name, request.model_name, schema.__name__)
+            )
+
+        def get_llm(self, request):
+            raise AssertionError("fallback get_llm should not be used")
+
+        def get_structured_llm(self, schema, request):
+            raise AssertionError("fallback get_structured_llm should not be used")
+
+    provider = FakeProvider()
+    core_settings = CoreSettings(
+        llm_plugin_name="FakeProvider",
+        metadata_model_name="metadata-default",
+        draft_model_name="draft-default",
+        review_model_name="review-default",
+    )
+
+    validate_compile_llm_readiness(provider=provider, core_settings=core_settings)
+
+    assert provider.text_targets == [
+        ("compile.source-analysis.metadata", "metadata-default"),
+        ("compile.source-analysis.summary", "draft-default"),
+        ("compile.source-analysis.findings", "draft-default"),
+        ("compile.source-analysis.continuity", "draft-default"),
+        ("compile.source-analysis.supervisor", "draft-default"),
+        ("compile.synthesis", "draft-default"),
+    ]
+    assert provider.structured_targets == [
+        ("compile.review", "review-default", "_PreflightStructuredSchema")
+    ]
+
+
+def test_validate_compile_llm_readiness_wraps_readiness_probe_errors(
+    monkeypatch,
+) -> None:
+    from waygate_core.config.schema import CoreSettings
+
+    class FakeProvider:
+        def get_capabilities(self) -> LLMProviderCapabilities:
+            return LLMProviderCapabilities(
+                provider_name="FakeProvider",
+                supports_structured_output=True,
+                supported_common_options={
+                    "temperature",
+                    "top_k",
+                    "top_p",
+                    "seed",
+                    "stop",
+                    "max_tokens",
+                },
+                supported_provider_options=set(),
+            )
+
+        def validate_llm_readiness(self, request) -> None:
+            raise RuntimeError("probe exploded")
+
+        def validate_structured_llm_readiness(self, schema, request) -> None:
+            raise AssertionError("structured target should not be reached")
+
+        def get_llm(self, request):
+            raise AssertionError("fallback get_llm should not be used")
+
+        def get_structured_llm(self, schema, request):
+            raise AssertionError("fallback get_structured_llm should not be used")
+
+    with pytest.raises(
+        LLMConfigurationError,
+        match="FakeProvider'.*readiness validation.*compile.source-analysis.metadata.*metadata-default.*probe exploded",
+    ):
+        validate_compile_llm_readiness(
+            provider=FakeProvider(),
+            core_settings=CoreSettings(
+                llm_plugin_name="FakeProvider",
+                metadata_model_name="metadata-default",
+                draft_model_name="draft-default",
+                review_model_name="review-default",
+            ),
+        )
+
+
+def test_resolve_embeddings_model_uses_active_ollama_provider_from_app_context(
+    monkeypatch,
+) -> None:
+    from waygate_core.config.schema import CoreSettings
+    from waygate_plugin_provider_ollama import plugin as ollama_plugin_module
+
+    created: list[tuple[str, dict[str, object]]] = []
+
+    class FakeOllamaEmbeddings:
+        def __init__(self, model: str, **kwargs) -> None:
+            created.append((model, kwargs))
+
+    monkeypatch.setattr(
+        ollama_plugin_module,
+        "OllamaEmbeddings",
+        FakeOllamaEmbeddings,
+    )
+
+    provider = OllamaProvider(
+        config=OllamaProviderConfig(base_url="http://ollama.local/")
+    )
+    core_settings = CoreSettings(llm_plugin_name="OllamaProvider")
+    app_context = SimpleNamespace(
+        config=SimpleNamespace(core=core_settings),
+        plugins=SimpleNamespace(llm={"OllamaProvider": provider}),
+    )
+
+    monkeypatch.setattr(
+        "waygate_workflows.runtime.llm.get_app_context", lambda: app_context
+    )
+
+    result = resolve_embeddings_model("nomic-embed-text")
+
+    assert result is not None
+    assert created == [
+        (
+            "nomic-embed-text",
+            {"base_url": "http://ollama.local"},
+        )
+    ]
+
+
+def test_resolve_embeddings_model_raises_when_provider_lacks_embeddings() -> None:
+    class FakeProvider:
+        def get_capabilities(self) -> LLMProviderCapabilities:
+            return LLMProviderCapabilities(
+                provider_name="FakeProvider",
+                supports_structured_output=True,
+                supported_common_options=set(),
+                supported_provider_options=set(),
+            )
+
+    with pytest.raises(
+        LLMConfigurationError,
+        match="FakeProvider'.*does not support embeddings",
+    ):
+        resolve_embeddings_model(
+            "text-embedding-3-large",
+            provider=FakeProvider(),
         )

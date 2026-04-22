@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from waygate_draft_worker import _resolve_runtime, main
+from waygate_core.plugin import LLMConfigurationError
 
 
 def _make_context(redis_url: str | None = None, queue_name: str = "draft"):
@@ -47,6 +48,10 @@ def test_main_builds_worker_and_starts(monkeypatch) -> None:
 
     monkeypatch.setattr("waygate_draft_worker.bootstrap_app", lambda: context)
     monkeypatch.setattr(
+        "waygate_draft_worker.validate_compile_llm_readiness",
+        lambda: None,
+    )
+    monkeypatch.setattr(
         "waygate_draft_worker.Redis.from_url",
         lambda url: {"url": url},
     )
@@ -60,3 +65,26 @@ def test_main_builds_worker_and_starts(monkeypatch) -> None:
 
     assert queue_calls == [("draft-queue", {"url": "redis://core"})]
     assert worker_calls[-1] == {"with_scheduler": False}
+
+
+def test_main_fails_fast_when_llm_preflight_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _make_context(redis_url=None, queue_name="draft-queue")
+
+    monkeypatch.setattr("waygate_draft_worker.bootstrap_app", lambda: context)
+    monkeypatch.setattr(
+        "waygate_draft_worker.validate_compile_llm_readiness",
+        lambda: (_ for _ in ()).throw(
+            LLMConfigurationError("Configured LLM provider startup preflight failed")
+        ),
+    )
+    monkeypatch.setattr(
+        "waygate_draft_worker.Redis.from_url",
+        lambda url: (_ for _ in ()).throw(
+            AssertionError("Redis should not be reached")
+        ),
+    )
+
+    with pytest.raises(LLMConfigurationError, match="startup preflight failed"):
+        main()
