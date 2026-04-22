@@ -1,6 +1,6 @@
 [project]
 name = "waygate-draft-worker"
-version = "0.1.0"
+version = "0.1.1"
 description = "RQ worker for queued WayGate draft workflow triggers"
 readme = "README.md"
 authors = [
