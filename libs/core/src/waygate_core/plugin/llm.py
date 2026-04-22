@@ -1,8 +1,10 @@
 """LLM provider contracts and request-option resolution helpers."""
 
-from enum import StrEnum
-from typing import Any, Type, TypeVar
 from abc import ABC, abstractmethod
+from enum import StrEnum
+from typing import Any, Protocol, Type, TypeVar, runtime_checkable
+
+from langchain_core.embeddings import Embeddings
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
 
@@ -66,6 +68,29 @@ class LLMProviderCapabilities(BaseModel):
     supports_structured_output: bool = Field(default=True)
     supported_common_options: set[str] = Field(default_factory=set)
     supported_provider_options: set[str] = Field(default_factory=set)
+
+
+@runtime_checkable
+class LLMReadinessProbe(Protocol):
+    """Optional companion protocol for provider-specific readiness checks."""
+
+    def validate_llm_readiness(self, request: LLMInvocationRequest) -> None:
+        """Preflight a text-generation request without invoking the model."""
+
+    def validate_structured_llm_readiness(
+        self,
+        schema: type[BaseModel],
+        request: LLMInvocationRequest,
+    ) -> None:
+        """Preflight a structured-output request without invoking the model."""
+
+
+@runtime_checkable
+class LLMEmbeddingsProvider(Protocol):
+    """Optional companion protocol for embedding-capable LLM providers."""
+
+    def get_embeddings(self, model_name: str) -> Embeddings:
+        """Return an embeddings client for the requested model name."""
 
 
 def resolve_invocation_options(
