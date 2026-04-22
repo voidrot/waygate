@@ -188,6 +188,15 @@ wheels = [
 ]
 
 [[package]]
+name = "content-types"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/d3/bf844cce155dfa692d4d6acb4db89a9295e581c182b22dddf2677d43c6e9/content_types-0.3.0.tar.gz", hash = "sha256:f873a77a5a79a2c960286247b65690d1f80be59e34c9b3cf62129e7afd5225e6", size = 13987, upload-time = "2025-10-01T23:00:09.87Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/88/4319b7e2229d63dc02c8811bcca1b944486f85510ec9b35aeef278caef09/content_types-0.3.0-py3-none-any.whl", hash = "sha256:f242fce326b6c0d76abd91819a402e3be805c5e0d78ea06792a9cb66a5fa9376", size = 10082, upload-time = "2025-10-01T23:00:07.811Z" },
+]
+
+[[package]]
 name = "coverage"
 version = "7.13.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1902,6 +1911,7 @@ version = "0.1.0"
 source = { editable = "libs/core" }
 dependencies = [
     { name = "asyncpg" },
+    { name = "content-types" },
     { name = "langchain-core" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint-postgres" },
@@ -1925,6 +1935,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.31.0" },
+    { name = "content-types", specifier = ">=0.3.0,<0.4.0" },
     { name = "langchain-core", specifier = ">=1.2.28" },
     { name = "langgraph", specifier = ">=1.1.6" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=3.0.5" },

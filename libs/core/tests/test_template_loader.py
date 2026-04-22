@@ -32,7 +32,6 @@ def test_get_template_settings_reads_env(monkeypatch: pytest.MonkeyPatch) -> Non
         "waygate_core,waygate_plugin_communication_http",
     )
     monkeypatch.setenv("WAYGATE_CORE__RAW_DOC_TEMPLATE", "custom_raw.j2")
-    monkeypatch.setenv("WAYGATE_CORE__DRAFT_DOC_TEMPLATE", "custom_draft.j2")
     monkeypatch.setenv("WAYGATE_CORE__COMPILED_DOC_TEMPLATE", "custom_compiled.j2")
     monkeypatch.setenv("WAYGATE_CORE__PUBLISHED_DOC_TEMPLATE", "custom_published.j2")
 
@@ -40,14 +39,12 @@ def test_get_template_settings_reads_env(monkeypatch: pytest.MonkeyPatch) -> Non
     (
         packages,
         raw_template_name,
-        draft_template_name,
         compiled_template_name,
         published_template_name,
     ) = template._get_template_settings()
 
     assert packages == ("waygate_core", "waygate_plugin_communication_http")
     assert raw_template_name == "custom_raw.j2"
-    assert draft_template_name == "custom_draft.j2"
     assert compiled_template_name == "custom_compiled.j2"
     assert published_template_name == "custom_published.j2"
 
@@ -70,7 +67,6 @@ def test_render_raw_document_uses_configured_template(
         lambda: (
             ("waygate_core",),
             "custom_raw.j2",
-            "custom_draft.j2",
             "custom_compiled.j2",
             "custom_published.j2",
         ),
@@ -93,7 +89,82 @@ def test_render_raw_document_uses_configured_template(
     assert fake_template.render_calls[0]["raw_content"] == "hello"
 
 
-def test_render_draft_document_uses_configured_template(
+def test_build_raw_document_frontmatter_populates_content_hash() -> None:
+    raw_doc = RawDocument(
+        source_type="webhook",
+        content_type="markdown",
+        timestamp=datetime(2026, 1, 1),
+        content="hello",
+    )
+
+    frontmatter = template.build_raw_document_frontmatter(raw_doc)
+
+    assert frontmatter.content_type == "text/markdown"
+    assert frontmatter.content_hash == template.compute_content_hash("hello")
+
+
+@pytest.mark.parametrize(
+    ("content_type", "expected_content_type"),
+    [
+        ("markdown", "text/markdown"),
+        (".json", "application/json"),
+        ("TEXT/HTML", "text/html"),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_normalize_content_type(
+    content_type: str | None,
+    expected_content_type: str | None,
+) -> None:
+    assert template.normalize_content_type(content_type) == expected_content_type
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_content_type"),
+    [
+        ("# Heading\n\nBody", "text/markdown"),
+        ('{"hello": "world"}', "application/json"),
+        ("<!DOCTYPE html><html><body>hello</body></html>", "text/html"),
+        ("<?xml version='1.0'?><note>hello</note>", "application/xml"),
+        ("hello world", "text/plain"),
+    ],
+)
+def test_infer_content_type(content: str, expected_content_type: str) -> None:
+    assert template.infer_content_type(content) == expected_content_type
+
+
+def test_infer_content_type_prefers_source_uri_extension() -> None:
+    assert (
+        template.infer_content_type(
+            '{"hello": "world"}',
+            source_uri="https://example.test/files/document.md?download=1",
+        )
+        == "text/markdown"
+    )
+
+
+def test_infer_content_type_falls_back_to_source_id_extension() -> None:
+    assert (
+        template.infer_content_type("binary-ish content", source_id="report.pdf")
+        == "application/pdf"
+    )
+
+
+def test_build_raw_document_frontmatter_infers_content_type_when_missing() -> None:
+    raw_doc = RawDocument(
+        source_type="webhook",
+        source_uri="docs/meeting-notes.md",
+        timestamp=datetime(2026, 1, 1),
+        content="# Heading\n\nBody",
+    )
+
+    frontmatter = template.build_raw_document_frontmatter(raw_doc)
+
+    assert frontmatter.content_type == "text/markdown"
+
+
+def test_render_raw_document_preserves_body_verbatim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_template = _FakeTemplate()
@@ -104,36 +175,21 @@ def test_render_draft_document_uses_configured_template(
         lambda: (
             ("waygate_core",),
             "custom_raw.j2",
-            "custom_draft.j2",
             "custom_compiled.j2",
             "custom_published.j2",
         ),
     )
-    monkeypatch.setattr(
-        template,
-        "_get_template",
-        lambda packages, name: fake_template,
-    )
+    monkeypatch.setattr(template, "_get_template", lambda packages, name: fake_template)
 
-    result = template.render_draft_document(
-        context={"a": 1}, content="draft", doc_uri="raw/example.md"
-    )
-
-    assert result == "rendered-output"
-    assert fake_template.render_calls[0]["content"] == "draft"
-    assert fake_template.render_calls[0]["doc_uri"] == "raw/example.md"
-
-
-def test_build_raw_document_frontmatter_populates_content_hash() -> None:
     raw_doc = RawDocument(
         source_type="webhook",
         timestamp=datetime(2026, 1, 1),
-        content="hello",
+        content="<xml>hello</xml>",
     )
 
-    frontmatter = template.build_raw_document_frontmatter(raw_doc)
+    template.render_raw_document(raw_doc)
 
-    assert frontmatter.content_hash == template.compute_content_hash("hello")
+    assert fake_template.render_calls[0]["raw_content"] == "<xml>hello</xml>"
 
 
 def test_compute_content_hash_normalizes_line_endings_and_outer_whitespace() -> None:
@@ -210,7 +266,6 @@ def test_render_compiled_document_uses_configured_template(
         lambda: (
             ("waygate_core",),
             "custom_raw.j2",
-            "custom_draft.j2",
             "custom_compiled.j2",
             "custom_published.j2",
         ),
@@ -243,7 +298,6 @@ def test_render_published_document_uses_configured_template(
         lambda: (
             ("waygate_core",),
             "custom_raw.j2",
-            "custom_draft.j2",
             "custom_compiled.j2",
             "custom_published.j2",
         ),

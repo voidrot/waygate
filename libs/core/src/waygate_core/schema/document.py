@@ -41,6 +41,7 @@ class RawDocument(BaseModel):
     """Canonical raw artifact produced by ingress plugins."""
 
     source_type: str
+    content_type: Optional[str] = None
     source_id: Optional[str] = None
     source_uri: Optional[str] = None
     source_hash: Optional[str] = None
@@ -63,6 +64,7 @@ class RawDocumentFrontmatter(BaseModel):
     """Frontmatter subset serialized into rendered raw-document files."""
 
     source_type: str
+    content_type: Optional[str] = None
     source_id: Optional[str] = None
     source_hash: Optional[str] = None
     content_hash: Optional[str] = None

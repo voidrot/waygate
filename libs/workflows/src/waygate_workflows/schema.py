@@ -96,6 +96,7 @@ class SourceDocumentState(TypedDict):
 
     uri: str
     content: str
+    content_type: str | None
     content_hash: str | None
     source_hash: str | None
     source_uri: str | None
@@ -107,6 +108,7 @@ class OrderedDocumentRef(TypedDict):
     """Lightweight durable reference for document ordering state."""
 
     uri: str
+    content_type: str | None
     content_hash: str | None
     source_hash: str | None
     source_uri: str | None

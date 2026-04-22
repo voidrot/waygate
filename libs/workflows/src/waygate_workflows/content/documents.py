@@ -28,6 +28,7 @@ def parse_source_document(document_uri: str, raw_content: str) -> SourceDocument
     return {
         "uri": document_uri,
         "content": normalized_content,
+        "content_type": normalize_frontmatter_value(metadata.get("content_type")),
         "content_hash": normalize_frontmatter_value(metadata.get("content_hash"))
         or compute_content_hash(normalized_content),
         "source_hash": normalize_frontmatter_value(metadata.get("source_hash")),
@@ -41,6 +42,7 @@ def to_ordered_document_ref(document: SourceDocumentState) -> OrderedDocumentRef
     """Project a full source document into the lighter ordering reference."""
     return {
         "uri": document["uri"],
+        "content_type": document.get("content_type"),
         "content_hash": document.get("content_hash"),
         "source_hash": document.get("source_hash"),
         "source_uri": document.get("source_uri"),

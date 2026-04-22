@@ -54,13 +54,6 @@ class CoreSettings(BaseModel):
         default="raw_document.j2",
         validation_alias=AliasChoices("raw_doc_template", "raw_document_template"),
     )
-    draft_doc_template: str = Field(
-        default="draft_source_text.j2",
-        validation_alias=AliasChoices(
-            "draft_doc_template",
-            "draft_document_template",
-        ),
-    )
     compiled_doc_template: str = Field(
         default="compiled_document.j2",
         validation_alias=AliasChoices(

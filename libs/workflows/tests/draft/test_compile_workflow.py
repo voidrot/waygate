@@ -21,6 +21,7 @@ from waygate_workflows.schema import SummaryExtractionModel
 from waygate_workflows.schema import WorkflowEvent
 from waygate_workflows.schema import WorkflowType
 from waygate_workflows.content.documents import derive_source_set_key
+from waygate_workflows.content.documents import parse_source_document
 from waygate_workflows.workflows import compile as workflow_module
 
 compile_source_document_module = importlib.import_module(
@@ -175,6 +176,16 @@ def test_derive_source_set_key_rejects_missing_content_hash() -> None:
 
     with pytest.raises(ValueError, match="content_hash coverage"):
         derive_source_set_key(documents)
+
+
+def test_parse_source_document_preserves_raw_body_and_content_type() -> None:
+    parsed = parse_source_document(
+        "file://raw/doc.md",
+        "---\ncontent_type: markdown\nsource_type: generic-webhook\n---\n# Heading\n\nBody",
+    )
+
+    assert parsed["content_type"] == "markdown"
+    assert parsed["content"] == "# Heading\n\nBody"
 
 
 def test_prompt_context_reconstructs_relevant_subsets() -> None:
