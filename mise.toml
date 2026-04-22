@@ -1,4 +1,6 @@
 [tools]
+node = "lts"
+pnpm = "latest"
 prek   = "latest"
 python = "3.14"
 ruff   = "latest"
