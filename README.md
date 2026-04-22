@@ -53,7 +53,7 @@ RQ -> draft-worker pipeline with the Ollama provider.
 The minimum path for that flow is `db`, `valkey`, `ollama`, `api`, and
 `draft-worker`. `scheduler` is not required for webhook-driven draft runs.
 
-Use [.env.compose.example](.env.compose.example) as the template for your local
+Use [env.compose.example](env.compose.example) as the template for your local
 `.env.compose` file before starting the stack.
 
 1. Start the infrastructure and Ollama service.
@@ -91,7 +91,7 @@ human decision, the review record is written under `./wiki/review/`.
 
 Important runtime details:
 
-- [.env.compose.example](.env.compose.example) includes `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://ollama:11434` so containers reach the Compose Ollama service instead of their own loopback interface.
+- [env.compose.example](env.compose.example) includes `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://ollama:11434` so containers reach the Compose Ollama service instead of their own loopback interface.
 - The draft worker validates the configured compile models at startup. If you change `WAYGATE_CORE__METADATA_MODEL_NAME`, `WAYGATE_CORE__DRAFT_MODEL_NAME`, or `WAYGATE_CORE__REVIEW_MODEL_NAME`, pull those models into Ollama before restarting the worker.
 
 ## Packages
