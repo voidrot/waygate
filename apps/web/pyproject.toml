@@ -13,6 +13,7 @@ dependencies = [
   "fastapi[standard]>=0.135.3",
   "opentelemetry-instrumentation-fastapi>=0.62b0",
   "pydantic>=2.12.5",
+  "pydantic-settings>=2.13.1",
   "waygate-core",
   "waygate-plugin-communication-http",
   "waygate-plugin-communication-nats",
@@ -56,4 +57,10 @@ addopts = [
   "--strict-markers",
   "--cov=waygate_web",
   "--cov-report=term-missing",
+]
+filterwarnings = [
+  "ignore:authlib\\.jose module is deprecated, please use joserfc instead\\.:authlib.deprecate.AuthlibDeprecationWarning",
+  "ignore:'asyncio\\.iscoroutinefunction' is deprecated and slated for removal in Python 3\\.16; use inspect\\.iscoroutinefunction\\(\\) instead:DeprecationWarning",
+  "ignore:Duplicate Operation ID logout_user_auth_logout_(get|post) for function logout_user:UserWarning",
+  "ignore:Duplicate Operation ID get_current_user_info_auth_user_info_(get|post) for function get_current_user_info:UserWarning",
 ]

@@ -30,15 +30,18 @@ def test_main_runs_when_configured_plugin_is_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     context = _make_context("communication-http", {"communication-http": object()})
-    run_calls = {"count": 0}
+    run_calls: dict[str, object] = {}
 
     monkeypatch.setattr("waygate_web.bootstrap_app", lambda: context)
+    monkeypatch.setenv("WAYGATE_WEB__HOST", "127.0.0.1")
+    monkeypatch.setenv("WAYGATE_WEB__PORT", "9090")
 
     def fake_run(*args, **kwargs):
-        run_calls["count"] += 1
+        run_calls.update(kwargs)
 
     monkeypatch.setattr("waygate_web.uvicorn.run", fake_run)
 
     main()
 
-    assert run_calls["count"] == 1
+    assert run_calls["host"] == "127.0.0.1"
+    assert run_calls["port"] == 9090

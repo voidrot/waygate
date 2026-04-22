@@ -2,30 +2,44 @@
 
 from __future__ import annotations
 
-from os import getenv
-
 from authtuna import init_app, init_settings
+from authtuna.core.config import Settings as AuthTunaSettings
 from fastapi import FastAPI
+from pydantic import Field, SecretStr
+from pydantic_settings import SettingsConfigDict
 
 _DEV_FERNET_KEY = "2frEu1Z8ib60_6mFcq6VjA_CVxUeNbtOULgNtGx6uiE="
-_DEV_JWT_SECRET = "waygate-web-dev-secret-change-me"
 
 
-def configure_auth(app: FastAPI) -> None:
-    """Initialize AuthTuna with local-safe defaults and environment overrides."""
+class WaygateWebAuthSettings(AuthTunaSettings):
+    """WayGate-scoped settings wrapper for the full AuthTuna config surface."""
 
-    base_url = getenv(
-        "WAYGATE_WEB_BASE_URL", getenv("API_BASE_URL", "http://localhost:8080")
+    model_config = SettingsConfigDict(
+        env_prefix="WAYGATE_WEB_AUTH__",
+        env_nested_delimiter="__",
+        env_file=".env",
+        extra="ignore",
+        populate_by_name=True,
     )
 
-    init_settings(
-        API_BASE_URL=base_url,
-        APP_NAME="WayGate",
-        STRATEGY=getenv("WAYGATE_WEB_AUTH_STRATEGY", "AUTO"),
-        FERNET_KEYS=[getenv("WAYGATE_WEB_FERNET_KEY", _DEV_FERNET_KEY)],
-        JWT_SECRET_KEY=getenv("WAYGATE_WEB_JWT_SECRET", _DEV_JWT_SECRET),
-        SESSION_SECURE=getenv("WAYGATE_WEB_SESSION_SECURE", "false").lower() == "true",
-        UI_ENABLED=True,
-        dont_use_env=False,
+    APP_NAME: str = Field(default="WayGate")
+    API_BASE_URL: str = Field(default="http://localhost:8080")
+    STRATEGY: str = Field(default="AUTO")
+    JWT_SECRET_KEY: SecretStr = Field(
+        default=SecretStr("dev-secret-key-change-in-production")
     )
+    FERNET_KEYS: list[SecretStr] = Field(
+        default_factory=lambda: [SecretStr(_DEV_FERNET_KEY)]
+    )
+    SESSION_SECURE: bool = Field(default=False)
+
+
+def configure_auth(
+    app: FastAPI, *, settings: WaygateWebAuthSettings | None = None
+) -> None:
+    """Initialize AuthTuna using the typed web auth settings interface."""
+
+    resolved_settings = settings or WaygateWebAuthSettings()
+
+    init_settings(**resolved_settings.model_dump(), dont_use_env=True)
     init_app(app)

@@ -4,12 +4,14 @@ The web app is the primary HTTP and operator surface for WayGate.
 
 It serves the server-rendered UI, initializes AuthTuna, mounts the shared webhook ingress app, and publishes a single OpenAPI surface that includes the mounted webhook routes.
 
+The current UI scope is intentionally small: a minimal control-plane dashboard plus shared auth and webhook ingress surfaces. It is not yet a full document management or workflow operations UI.
+
 ## What It Does
 
 - Boots the shared WayGate app context.
 - Validates that the configured communication plugin exists before serving requests.
 - Initializes AuthTuna for browser and API-oriented auth flows.
-- Includes the page routes that render the operator UI.
+- Includes the page routes that render the minimal control-plane UI.
 - Mounts the shared `waygate-webhooks` ingress app under `/webhooks`.
 - Merges webhook payload schemas into the parent OpenAPI document.
 
@@ -32,3 +34,4 @@ It serves the server-rendered UI, initializes AuthTuna, mounts the shared webhoo
 
 - Webhook handling is intentionally plugin-driven; adding a webhook plugin adds a route through `libs/webhooks` and makes it visible in the web app's OpenAPI output.
 - Auth routes and webhook routes share the same parent FastAPI host, so the web app is the primary ingress surface for local development and deployment.
+- The current server-rendered pages are an infrastructure MVP for the web surface; broader operator workflows are still future work.

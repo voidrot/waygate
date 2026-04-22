@@ -14,6 +14,9 @@ from waygate_webhooks import create_webhook_app, merge_mounted_webhook_openapi
 
 from .auth import configure_auth
 from .routes import page_router
+from .settings import WaygateWebRuntimeSettings
+
+web_settings = WaygateWebRuntimeSettings()
 
 
 @asynccontextmanager
@@ -25,9 +28,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="WayGate Web",
-    description="Unified WayGate web surface for UI, auth, and webhook ingress.",
-    version="0.1.0",
+    title=web_settings.title,
+    description=web_settings.description,
+    version=web_settings.version,
     lifespan=lifespan,
 )
 

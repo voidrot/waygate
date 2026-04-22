@@ -1,6 +1,7 @@
 from waygate_plugin_webhook_agent_session.plugin import AgentSessionWebhookPlugin
 from waygate_plugin_webhook_generic.plugin import GenericWebhookPlugin
 
+from waygate_webhooks.app import create_webhook_app
 from waygate_webhooks.handlers import create_webhook_router
 from waygate_webhooks.openapi import build_webhook_openapi_extra
 
@@ -41,7 +42,7 @@ def test_build_openapi_extra_includes_agent_session_payload_schema() -> None:
     )
 
 
-def test_webhook_router_registers_agent_session_route() -> None:
+def test_webhook_router_registers_known_routes() -> None:
     router = create_webhook_router()
 
     paths = {
@@ -51,3 +52,15 @@ def test_webhook_router_registers_agent_session_route() -> None:
     }
 
     assert "/agent-session" in paths
+    assert "/generic-webhook" in paths
+
+
+def test_create_webhook_app_openapi_includes_paths_and_component_schemas() -> None:
+    app = create_webhook_app()
+
+    schema = app.openapi()
+
+    assert "/agent-session" in schema["paths"]
+    assert "/generic-webhook" in schema["paths"]
+    assert "AgentSessionWebhookPayload" in schema["components"]["schemas"]
+    assert "GenericWebhookPayload" in schema["components"]["schemas"]

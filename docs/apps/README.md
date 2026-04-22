@@ -4,7 +4,7 @@ This section documents the runtime apps in the WayGate monorepo.
 
 ## Apps
 
-- [Web](web.md): Unified FastAPI host for the operator UI, auth flows, and mounted webhook ingress.
+- [Web](web.md): Unified FastAPI host for the minimal server-rendered control plane, auth flows, and mounted webhook ingress.
 - [Draft Worker](draft-worker.md): RQ worker that consumes draft workflow triggers.
 - [NATS Worker](nats-worker.md): JetStream worker that consumes durable workflow triggers.
 - [Scheduler](scheduler.md): APScheduler-based cron runner that dispatches recurring workflow triggers.
