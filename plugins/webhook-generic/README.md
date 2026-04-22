@@ -15,7 +15,7 @@ The plugin is discovered automatically via its entry point. No code changes are 
 - **Payload verification** — passes through without validation by default. Override `verify_webhook_request` in a subclass to add signature checking.
 - **Payload enrichment** — returns the payload unchanged by default. Override `enrich_webhook_payload` to add or transform fields before document creation.
 - **Payload validation** — validates incoming webhook JSON against a structured payload schema before conversion.
-- **Document creation** — maps each payload document to a `RawDocument` and returns the list to the API route for storage and dispatch.
+- **Document creation** — maps each payload document to a `RawDocument` and returns the list to the webhook ingress route for storage and dispatch.
 
 ## Payload Contract
 
@@ -87,7 +87,7 @@ curl -X POST http://127.0.0.1:8080/webhooks/generic-webhook \
 
 Expected behavior:
 
-- The API returns a success payload for the webhook request.
+- The web app returns a success payload for the webhook request.
 - Raw source artifacts are written to the configured storage backend.
 - A `draft.ready` workflow trigger is published through `communication-nats` by default.
 - The NATS worker either publishes a compiled markdown document or writes a human-review record.

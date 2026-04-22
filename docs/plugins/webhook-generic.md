@@ -2,7 +2,7 @@
 
 The generic webhook plugin is the reference implementation for inbound webhook ingestion in WayGate.
 
-It validates a structured JSON payload, converts each payload document into a `RawDocument`, and exposes an OpenAPI payload schema so the API can document the request body correctly.
+It validates a structured JSON payload, converts each payload document into a `RawDocument`, and exposes an OpenAPI payload schema so the mounted webhook ingress can document the request body correctly.
 
 ## What It Does
 
@@ -10,7 +10,7 @@ It validates a structured JSON payload, converts each payload document into a `R
 - Validates payloads against Pydantic models.
 - Merges top-level and per-document topics and tags with stable first-seen ordering.
 - Normalizes webhook timestamps to UTC.
-- Returns a list of `RawDocument` objects for the API route to store.
+- Returns a list of `RawDocument` objects for the webhook ingress route to store.
 
 ## Behavior
 
@@ -23,7 +23,7 @@ It validates a structured JSON payload, converts each payload document into a `R
 
 The plugin expects a payload with a top-level `metadata` object and a `documents` array.
 
-The included README contains the concrete example payload shape used by the tests and the current API route.
+The included README contains the concrete example payload shape used by the tests and the current webhook ingress route.
 
 ## Configuration
 
@@ -36,4 +36,4 @@ This plugin does not currently define config fields, but it still participates i
 ## Notes
 
 - This plugin is a reference implementation for custom webhook adapters.
-- It is the webhook plugin used by the current API route and OpenAPI schema merging logic.
+- It is the webhook plugin used by the current webhook ingress route and OpenAPI schema merging logic.

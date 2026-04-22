@@ -31,12 +31,12 @@ def parse_args() -> argparse.Namespace:
         "--timeout-seconds",
         type=float,
         default=900.0,
-        help="Maximum time to wait for API readiness and workflow output",
+        help="Maximum time to wait for the web app readiness and workflow output",
     )
     parser.add_argument(
         "--skip-model-pull",
         action="store_true",
-        help="Skip pulling Ollama models before starting API and worker",
+        help="Skip pulling Ollama models before starting the web app and worker",
     )
     parser.add_argument(
         "--keep-up",
@@ -190,7 +190,7 @@ def dump_failure_context(env_file: Path) -> None:
     project_name = os.environ.get("COMPOSE_PROJECT_NAME", "waygate")
     for args in (
         ["ps"],
-        ["logs", "--tail=200", "api", "nats-worker", "ollama", "nats"],
+        ["logs", "--tail=200", "web", "nats-worker", "ollama", "nats"],
     ):
         try:
             result = run_compose(
@@ -234,7 +234,7 @@ def run_smoke_test(options: argparse.Namespace) -> int:
                     )
 
             run_compose(
-                ["up", "-d", "--build", "api", "nats-worker"],
+                ["up", "-d", "--build", "web", "nats-worker"],
                 env_file=env_file,
                 project_name=project_name,
             )

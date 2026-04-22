@@ -6,12 +6,13 @@ WayGate is a modular platform for building **Generation-Augmented Retrieval (GAR
 
 ```text
 apps/
-  api/          — FastAPI HTTP server; exposes webhook endpoints and the OpenAPI schema
+  web/          — Unified FastAPI web app for UI, auth, and mounted webhook ingress
   scheduler/    — Background job runner for cron-style workflows
   draft-worker/ — RQ worker for queued draft workflow triggers
   nats-worker/  — JetStream worker for durable workflow trigger execution
 libs/
   core/         — Shared framework: plugin system, config registry, bootstrap, logging
+  webhooks/     — Mountable FastAPI webhook ingress app and OpenAPI helpers
   worker/       — Shared worker runtime helpers and JetStream consumer loop
   workflows/    — Shared workflow entrypoints executed by workers
 plugins/
@@ -39,8 +40,8 @@ Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
 # Install all packages
 uv sync --all-packages
 
-# Run the API server
-uv run waygate-api
+# Run the unified web app
+uv run waygate-web
 
 # Run the scheduler
 uv run waygate-scheduler
@@ -50,11 +51,11 @@ Copy `env.example` to `.env` and set values appropriate for your environment bef
 
 ## Docker Compose Smoke Test
 
-Use the Compose stack when you want to exercise the generic webhook -> API ->
+Use the Compose stack when you want to exercise the generic webhook -> web app ->
 JetStream -> nats-worker pipeline with the Ollama provider.
 
 The minimum path for that flow is `db`, `valkey`, `chromadb`, `nats`, `ollama`,
-`api`, and `nats-worker`. `scheduler` is not required for webhook-driven draft
+`web`, and `nats-worker`. `scheduler` is not required for webhook-driven draft
 runs.
 
 Use [env.compose.example](env.compose.example) as the template for your local
@@ -73,10 +74,10 @@ docker compose exec ollama ollama pull qwen3.5:9b
 docker compose exec ollama ollama pull hermes3:8b
 ```
 
-1. Start the API and NATS worker.
+1. Start the web app and NATS worker.
 
 ```bash
-docker compose up -d api nats-worker
+docker compose up -d web nats-worker
 ```
 
 1. Post the sample generic webhook payload.
@@ -104,10 +105,11 @@ Important runtime details:
 | Package                                                            | Description                               |
 | ------------------------------------------------------------------ | ----------------------------------------- |
 | [`waygate-core`](libs/core/)                                       | Plugin system, config registry, bootstrap |
-| [`waygate-api`](apps/api/)                                         | FastAPI HTTP server                       |
+| [`waygate-web`](apps/web/)                                         | Unified FastAPI web app                   |
 | [`waygate-scheduler`](apps/scheduler/)                             | Cron job runner                           |
 | [`waygate-draft-worker`](apps/draft-worker/)                       | RQ draft worker                           |
 | [`waygate-nats-worker`](apps/nats-worker/)                         | JetStream workflow worker                 |
+| [`waygate-webhooks`](libs/webhooks/)                               | Mountable webhook ingress app             |
 | [`waygate-worker`](libs/worker/)                                   | Shared worker runtime helpers             |
 | [`waygate-plugin-local-storage`](plugins/local-storage/)           | Filesystem storage plugin                 |
 | [`waygate-plugin-provider-ollama`](plugins/provider-ollama/)       | Ollama LLM provider plugin                |

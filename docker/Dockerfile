@@ -1,6 +1,6 @@
 # ARG must be declared before the first FROM to be available in all stages.
 # Override at build time: docker build --build-arg APP=scheduler ...
-ARG APP=api
+ARG APP=web
 ARG APP_UID=1000
 ARG APP_GID=1000
 
@@ -35,11 +35,12 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # 4. Copy every workspace member's pyproject.toml (preserving directory structure).
-COPY apps/api/pyproject.toml        apps/api/
+COPY apps/web/pyproject.toml        apps/web/
 COPY apps/scheduler/pyproject.toml  apps/scheduler/
 COPY apps/draft-worker/pyproject.toml apps/draft-worker/
 COPY apps/nats-worker/pyproject.toml apps/nats-worker/
 COPY libs/core/pyproject.toml       libs/core/
+COPY libs/webhooks/pyproject.toml   libs/webhooks/
 COPY libs/worker/pyproject.toml     libs/worker/
 COPY libs/workflows/pyproject.toml  libs/workflows/
 COPY plugins/communication-http/pyproject.toml plugins/communication-http/
@@ -47,6 +48,7 @@ COPY plugins/communication-nats/pyproject.toml plugins/communication-nats/
 COPY plugins/communication-rq/pyproject.toml plugins/communication-rq/
 COPY plugins/local-storage/pyproject.toml   plugins/local-storage/
 COPY plugins/provider-ollama/pyproject.toml plugins/provider-ollama/
+COPY plugins/webhook-agent-session/pyproject.toml plugins/webhook-agent-session/
 COPY plugins/webhook-generic/pyproject.toml plugins/webhook-generic/
 
 # 5. Install only the third-party PyPI dependencies for the target app.
@@ -105,6 +107,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 USER appuser
 
 # 12. Invoke the app's entry point script (defined in [project.scripts] in each
-#     app's pyproject.toml, e.g. waygate-api or waygate-scheduler).
+#     app's pyproject.toml, e.g. waygate-web or waygate-scheduler).
 #     exec replaces the shell process so the application receives OS signals directly.
 CMD ["/bin/sh", "-c", "exec waygate-${APP}"]

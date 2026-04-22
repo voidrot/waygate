@@ -12,7 +12,7 @@ shape.
 ```json
 {
   "event_type": "draft.ready",
-  "source": "waygate-api.webhooks",
+  "source": "waygate-web.webhooks",
   "document_paths": ["file://raw/01HXYZ-source.txt"],
   "idempotency_key": "optional-string",
   "metadata": {
@@ -99,5 +99,5 @@ Use the local mock endpoint for smoke testing:
    - `uv run python scripts/mock-worker.py`
 2. Ensure defaults point to mock worker:
    - `WAYGATE_COMMUNICATION_HTTP__ENDPOINT=http://127.0.0.1:8090/workflows/trigger`
-3. Start API or scheduler and trigger a workflow path.
+3. Start the web app or scheduler and trigger a workflow path.
 4. Confirm the mock worker logs received payloads and returns `202 Accepted`.

@@ -1,12 +1,12 @@
 # waygate-api
 
-FastAPI HTTP server for WayGate. Exposes webhook ingestion endpoints and serves the OpenAPI schema with per-plugin payload definitions merged in automatically.
+Legacy FastAPI webhook ingress for WayGate. This package is retained during the migration to `apps/web`, but it now delegates webhook route registration and OpenAPI schema helpers to `waygate-webhooks`.
 
 ## Responsibilities
 
 - Receives inbound webhook requests and routes them to the registered `WebhookPlugin` for the matched route.
 - Persists produced raw documents and submits the workflow trigger built by the matched webhook plugin through the configured communication client plugin.
-- Merges each webhook plugin's payload schema into the OpenAPI spec at startup so that `$ref` definitions resolve correctly in Swagger UI and ReDoc.
+- Reuses the shared webhook OpenAPI merge helpers from `waygate-webhooks` so the legacy ingress surface stays aligned with the new unified web app.
 - Bootstraps the WayGate application context (config + plugins) on startup via `waygate-core`.
 - Instruments the application with OpenTelemetry via `opentelemetry-instrumentation-fastapi`.
 
@@ -28,3 +28,5 @@ All `WAYGATE_*` environment variables are also read — see [`waygate-core`](../
 ## OpenAPI
 
 The schema is available at `/openapi.json`. Interactive docs are at `/docs` (Swagger UI) and `/redoc`.
+
+The long-term operator surface is `apps/web`, but `apps/api` remains available as a migration-era ingress-only app.

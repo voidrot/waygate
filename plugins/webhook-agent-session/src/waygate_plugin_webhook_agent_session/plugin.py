@@ -217,7 +217,7 @@ class AgentSessionWebhookPlugin(WebhookPlugin):
         session = payload["session"]
         return WorkflowTriggerMessage(
             event_type="draft.ready",
-            source="waygate-api.webhooks.agent-session",
+            source="waygate-web.webhooks.agent-session",
             document_paths=document_paths,
             idempotency_key=f"{payload['provider']}:{session['session_id']}",
             metadata={

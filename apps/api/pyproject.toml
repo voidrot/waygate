@@ -16,7 +16,9 @@ dependencies = [
   "waygate-plugin-communication-nats",
   "waygate-plugin-communication-rq",
   "waygate-plugin-local-storage",
+  "waygate-plugin-webhook-agent-session",
   "waygate-plugin-webhook-generic",
+  "waygate-webhooks",
 ]
 
 [dependency-groups]
@@ -30,12 +32,14 @@ requires      = ["uv_build>=0.11.7,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-waygate-core                      = { workspace = true }
-waygate-plugin-communication-http = { workspace = true }
-waygate-plugin-communication-nats = { workspace = true }
-waygate-plugin-communication-rq   = { workspace = true }
-waygate-plugin-local-storage      = { workspace = true }
-waygate-plugin-webhook-generic    = { workspace = true }
+waygate-core                         = { workspace = true }
+waygate-plugin-communication-http    = { workspace = true }
+waygate-plugin-communication-nats    = { workspace = true }
+waygate-plugin-communication-rq      = { workspace = true }
+waygate-plugin-local-storage         = { workspace = true }
+waygate-plugin-webhook-agent-session = { workspace = true }
+waygate-plugin-webhook-generic       = { workspace = true }
+waygate-webhooks                     = { workspace = true }
 
 [tool.fastapi]
 entrypoint = "waygate_api.server:app"

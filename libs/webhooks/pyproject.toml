@@ -1,0 +1,36 @@
+[project]
+name = "waygate-webhooks"
+version = "0.1.0"
+description = "Mountable FastAPI webhook ingress for WayGate"
+readme = "README.md"
+authors = [
+    { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi[standard]>=0.135.3",
+    "pydantic>=2.12.5",
+    "waygate-core",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
+
+[build-system]
+requires      = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+waygate-core = { workspace = true }
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+    "--cov=waygate_webhooks",
+    "--cov-report=term-missing",
+]

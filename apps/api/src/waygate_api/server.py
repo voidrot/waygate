@@ -1,12 +1,13 @@
-"""FastAPI application assembly for the WayGate API app."""
+"""FastAPI application assembly for the legacy WayGate API app."""
 
-from waygate_api.routes.webhooks.router import webhook_router
-from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from contextlib import asynccontextmanager
-from typing import Any
+
+from fastapi import FastAPI
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
 from waygate_core import get_app_context
+from waygate_webhooks.handlers import create_webhook_router
+from waygate_webhooks.openapi import build_webhook_openapi_schema
 
 
 @asynccontextmanager
@@ -20,45 +21,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="WayGate API",
-    description="API for WayGate",
+    description="Legacy WayGate webhook ingress service.",
     version="0.1.0",
     lifespan=lifespan,
 )
 
 
-def custom_openapi() -> dict[str, Any]:
-    """Build the OpenAPI schema with webhook payload definitions merged in."""
+def custom_openapi() -> dict[str, object]:
+    """Build the OpenAPI schema for the legacy API webhook surface."""
 
-    if app.openapi_schema:
-        return app.openapi_schema
-
-    schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-
-    # Merge each plugin's payload-schema definitions into components/schemas so
-    # that $ref values like "#/components/schemas/Foo" (produced by router.py
-    # via ref_template) resolve correctly in Swagger UI / ReDoc.
-    component_schemas: dict = schema.setdefault("components", {}).setdefault(
-        "schemas", {}
-    )
-    for plugin in get_app_context().plugins.webhooks.values():
-        payload_schema = plugin.openapi_payload_schema
-        if payload_schema is None:
-            continue
-        full = payload_schema.model_json_schema(
-            ref_template="#/components/schemas/{model}"
-        )
-        # $defs holds the nested-model definitions; hoist them to the top level.
-        defs: dict = full.pop("$defs", {})
-        component_schemas.update(defs)
-        component_schemas[payload_schema.__name__] = full
-
-    app.openapi_schema = schema
-    return schema
+    return build_webhook_openapi_schema(app)
 
 
 app.openapi = custom_openapi  # type: ignore[method-assign]  # ty:ignore[invalid-assignment]
@@ -66,4 +38,4 @@ app.openapi = custom_openapi  # type: ignore[method-assign]  # ty:ignore[invalid
 
 FastAPIInstrumentor().instrument_app(app)
 
-app.include_router(webhook_router)
+app.include_router(create_webhook_router(prefix="/webhooks"))

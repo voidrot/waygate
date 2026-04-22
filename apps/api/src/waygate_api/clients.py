@@ -1,3 +1,5 @@
+"""Compatibility helpers for the legacy API package."""
+
 from waygate_core import get_app_context
 from waygate_core.plugin import (
     CommunicationClientPlugin,
@@ -23,14 +25,7 @@ def _resolve_communication_client() -> CommunicationClientPlugin:
 
 
 async def send_draft_message(document_paths: list[str]) -> WorkflowDispatchResult:
-    """Submit a draft-ready workflow trigger for the given document paths.
-
-    Args:
-        document_paths: Storage-backed document paths to include in the trigger.
-
-    Returns:
-        The dispatch result returned by the communication client.
-    """
+    """Submit a draft-ready workflow trigger for the given document paths."""
 
     if not document_paths:
         return WorkflowDispatchResult(
@@ -48,14 +43,7 @@ async def send_draft_message(document_paths: list[str]) -> WorkflowDispatchResul
 async def send_workflow_message(
     message: WorkflowTriggerMessage,
 ) -> WorkflowDispatchResult:
-    """Submit an arbitrary workflow trigger via the configured transport.
-
-    Args:
-        message: The workflow trigger message to submit.
-
-    Returns:
-        The dispatch result returned by the communication client.
-    """
+    """Submit an arbitrary workflow trigger via the configured transport."""
 
     client = _resolve_communication_client()
     return await client.submit_workflow_trigger(message)

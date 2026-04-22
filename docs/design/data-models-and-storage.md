@@ -45,7 +45,7 @@ The current direction is to keep one explicit model per document artifact type i
 
 ## Raw Storage Artifact
 
-The API does not store a `RawDocument` as JSON. It renders the model into a text artifact with frontmatter and writes that artifact to storage.
+The webhook ingress app does not store a `RawDocument` as JSON. It renders the model into a text artifact with frontmatter and writes that artifact to storage.
 
 The compile workflow currently depends on these parsed fields when it reloads a raw artifact:
 
@@ -154,7 +154,7 @@ Base-relative URIs give storage plugins a stable handoff format that does not le
 
 That keeps three boundaries cleaner:
 
-- API and scheduler can hand work to workers without assuming a host path layout
+- web app and scheduler can hand work to workers without assuming a host path layout
 - tests can assert storage behavior without depending on absolute directories
 - future storage implementations can preserve the same high-level document reference shape even if the backing store changes
 

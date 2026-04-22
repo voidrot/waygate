@@ -26,6 +26,7 @@ members = [
     "apps/*",
     "plugins/*",
     "libs/core",
+    "libs/webhooks",
     "libs/worker",
     "libs/workflows",
 ]
@@ -38,8 +39,9 @@ addopts = [
     "-ra",
     "--strict-config",
     "--strict-markers",
-    "--cov=waygate_api",
     "--cov=waygate_core",
+    "--cov=waygate_web",
+    "--cov=waygate_webhooks",
     "--cov-report=term-missing",
 ]
 filterwarnings = [

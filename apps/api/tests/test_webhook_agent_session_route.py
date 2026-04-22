@@ -17,6 +17,10 @@ def test_build_openapi_extra_includes_agent_session_payload_schema() -> None:
 
 
 def test_webhook_router_registers_agent_session_route() -> None:
-    paths = {route.path for route in webhook_router.routes}
+    paths = {
+        path
+        for route in webhook_router.routes
+        if (path := getattr(route, "path", None)) is not None
+    }
 
     assert "/webhooks/agent-session" in paths

@@ -149,6 +149,6 @@ class WebhookPlugin(ABC):
 
         return WorkflowTriggerMessage(
             event_type="draft.ready",
-            source="waygate-api.webhooks",
+            source="waygate-web.webhooks",
             document_paths=document_paths,
         )

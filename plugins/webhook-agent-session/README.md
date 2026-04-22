@@ -79,7 +79,7 @@ The repository includes a fixture payload and helper scripts for a local end-to-
 /home/buck/src/voidrot/waygate/.venv/bin/python scripts/mock-worker.py
 ```
 
-1. Start the API with the HTTP communication plugin and unsigned local webhook uploads enabled:
+1. Start the web app with the HTTP communication plugin and unsigned local webhook uploads enabled:
 
 ```bash
 HOST=127.0.0.1 \
@@ -87,7 +87,7 @@ PORT=8081 \
 WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME=communication-http \
 WAYGATE_COMMUNICATION_HTTP__ENDPOINT=http://127.0.0.1:8090/workflows/trigger \
 WAYGATE_AGENT_SESSION__ALLOW_UNSIGNED=true \
-uv run --all-packages waygate-api
+uv run --all-packages waygate-web
 ```
 
 1. Post the fixture payload:
@@ -99,7 +99,7 @@ uv run --all-packages waygate-api
   --endpoint http://127.0.0.1:8081/webhooks/agent-session
 ```
 
-The API should return a success payload and the mock worker should log a `draft.ready` trigger whose metadata includes the session id, provider, surface, capture adapter, and schema version.
+The web app should return a success payload and the mock worker should log a `draft.ready` trigger whose metadata includes the session id, provider, surface, capture adapter, and schema version.
 
 ## Entry Point
 

@@ -4,7 +4,7 @@ This section documents the runtime apps in the WayGate monorepo.
 
 ## Apps
 
-- [API](api.md): FastAPI ingress service for webhook handling and trigger dispatch.
+- [Web](web.md): Unified FastAPI host for the operator UI, auth flows, and mounted webhook ingress.
 - [Draft Worker](draft-worker.md): RQ worker that consumes draft workflow triggers.
 - [NATS Worker](nats-worker.md): JetStream worker that consumes durable workflow triggers.
 - [Scheduler](scheduler.md): APScheduler-based cron runner that dispatches recurring workflow triggers.
@@ -17,7 +17,7 @@ That means they all rely on the same merged `WaygateRootSettings` object, the sa
 
 Each app then layers a different responsibility on top of that shared core:
 
-- the API turns inbound HTTP requests into raw documents and plugin-built workflow triggers
+- the web app turns inbound HTTP requests into raw documents and plugin-built workflow triggers
 - the draft worker executes queued workflow triggers from RQ
 - the NATS worker executes durable workflow triggers from JetStream
 - the scheduler emits cron-trigger messages for installed cron plugins

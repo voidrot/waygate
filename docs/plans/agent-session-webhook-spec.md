@@ -195,7 +195,7 @@ Recommended repo-local scripts:
 ## Implementation Plan
 
 1. Add this planning spec.
-2. Generalize the webhook dispatch seam in `apps/api` while preserving `draft.ready` as the default compile trigger.
+2. Generalize the legacy webhook dispatch seam while preserving `draft.ready` as the default compile trigger.
 3. Extend the webhook plugin contract with a default trigger builder.
 4. Create the `agent-session` webhook plugin package.
 5. Add fixture and helper scripts.

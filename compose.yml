@@ -1,10 +1,10 @@
 services:
-  api:
+  web:
     build:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        - APP=api
+        - APP=web
     ports:
       - "${API_PORT:-8080}:8080"
     env_file:
@@ -20,7 +20,7 @@ services:
       - wiki_data:/data/wiki
     develop:
       watch:
-        - path: apps/api
+        - path: apps/web
           action: rebuild
         - path: libs
           action: rebuild

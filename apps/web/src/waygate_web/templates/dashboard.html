@@ -1,0 +1,78 @@
+{% extends "base.html" %} {% block content %}
+<section class="hero overflow-hidden rounded-box bg-base-100 shadow-xl">
+  <div
+    class="hero-content flex-col items-start gap-8 px-8 py-12 lg:flex-row lg:items-center"
+  >
+    <div class="max-w-2xl space-y-4">
+      <span class="badge badge-primary badge-outline">Unified app</span>
+      <h1 class="text-4xl font-black tracking-tight">{{ page_title }}</h1>
+      <p class="text-base-content/70">
+        Server-rendered control plane for WayGate with mounted webhook ingress,
+        AuthTuna auth flows, and HTMX fragments for operator views.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <a class="btn btn-primary" href="/auth/login">Open auth flow</a>
+        <a class="btn btn-soft" href="/docs#tag/webhooks"
+          >Inspect webhook docs</a
+        >
+      </div>
+    </div>
+    <div class="card w-full max-w-md border border-base-300 bg-base-200">
+      <div class="card-body">
+        <h2 class="card-title">Mounted surfaces</h2>
+        <ul class="list gap-2">
+          {% for mount in mounts %}
+          <li class="list-row rounded-box bg-base-100 px-4 py-3">
+            <div class="list-col-grow">
+              <a class="link link-hover font-semibold" href="{{ mount.href }}"
+                >{{ mount.label }}</a
+              >
+              <p class="text-sm text-base-content/60">
+                {{ mount.description }}
+              </p>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  {% for label, value in plugin_counts.items() %}
+  <article
+    class="stat rounded-box border border-base-300 bg-base-100 shadow-sm"
+  >
+    <div class="stat-title capitalize">{{ label }}</div>
+    <div class="stat-value text-primary">{{ value }}</div>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <div
+      class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+    >
+      <div>
+        <h2 class="card-title">Runtime summary</h2>
+        <p class="text-sm text-base-content/60">
+          HTMX fragment rendered from the server using Jinja partials.
+        </p>
+      </div>
+      <button
+        class="btn btn-outline btn-sm"
+        hx-get="/partials/runtime"
+        hx-target="#runtime-summary"
+        hx-swap="innerHTML"
+      >
+        Refresh
+      </button>
+    </div>
+    <div id="runtime-summary" hx-get="/partials/runtime" hx-trigger="load">
+      <div class="skeleton h-28 w-full"></div>
+    </div>
+  </div>
+</section>
+{% endblock %}
