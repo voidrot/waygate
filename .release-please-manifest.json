@@ -2,7 +2,7 @@
   "apps/api": "0.1.0",
   "apps/scheduler": "0.1.0",
   "apps/draft-worker": "0.1.0",
-  "apps/nats-worker": "0.1.0",
+  "apps/nats-worker": "0.1.1",
   "libs/core": "0.1.0",
   "libs/worker": "0.1.0",
   "libs/workflows": "0.1.0",
