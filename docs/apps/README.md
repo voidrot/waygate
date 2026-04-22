@@ -16,7 +16,7 @@ That means they all rely on the same merged `WaygateRootSettings` object, the sa
 
 Each app then layers a different responsibility on top of that shared core:
 
-- the API turns inbound HTTP requests into raw documents and draft-ready triggers
+- the API turns inbound HTTP requests into raw documents and plugin-built workflow triggers
 - the draft worker executes queued workflow triggers from RQ
 - the scheduler emits cron-trigger messages for installed cron plugins
 

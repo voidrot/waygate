@@ -127,11 +127,17 @@ older unresolved mentions can be moved from `open` to `resolved`.
 
 ### Shared helpers
 
-- `tools.documents` parses source documents and derives `source_set_key`.
-- `tools.guidance` loads optional guidance text from the `agents` namespace.
-- `tools.publishing` renders the published document with frontmatter.
-- `tools.llm` resolves provider-backed model invocations.
-- `resolve_storage()` resolves the active storage plugin.
+- `tools.source_analysis` provides the LangChain-callable specialist tools used
+   by the document-analysis supervisor.
+- `content.documents` parses source documents and derives `source_set_key`.
+- `content.guidance` loads optional guidance text from the `agents`
+   namespace.
+- `content.publishing` renders the published document with frontmatter.
+- `runtime.llm` resolves provider-backed model invocations and worker startup
+   preflight checks.
+- `runtime.storage` resolves the active storage plugin.
+- `runtime.checkpoint` builds the LangGraph Postgres checkpoint connection
+   string.
 
 ## Trigger handling and outcomes
 
@@ -178,6 +184,11 @@ execution. In strict mode, unsupported common or provider-specific options
 raise `LLMConfigurationError` instead of being silently dropped. Structured
 output roles also fail fast when the active provider does not advertise
 structured-output support.
+
+For startup preflight, LLM-dependent worker roles can use the optional
+`LLMReadinessProbe` companion contract when a provider implements it. When the
+provider does not expose a dedicated readiness hook, the workflow layer falls
+back to constructing the configured stage clients so startup still fails fast.
 
 ```json
 {

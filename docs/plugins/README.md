@@ -7,7 +7,9 @@ This section documents the first-party plugins shipped with WayGate.
 - [Communication HTTP](communication-http.md): HTTP transport for workflow trigger messages.
 - [Communication RQ](communication-rq.md): RQ/Redis transport for queued workflow triggers.
 - [Local Storage](local-storage.md): Filesystem-backed storage implementation.
+- [Provider Featherless AI](provider-featherless-ai.md): Featherless-backed OpenAI-compatible LLM provider.
 - [Provider Ollama](provider-ollama.md): Ollama-backed LLM provider.
+- [Webhook Agent Session](webhook-agent-session.md): Dedicated completed agent-session ingestion plugin.
 - [Webhook Generic](webhook-generic.md): Generic webhook ingestion plugin.
 
 ## Common Model

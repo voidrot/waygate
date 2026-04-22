@@ -2,7 +2,7 @@
 
 The API app is the HTTP ingress boundary for WayGate.
 
-It uses FastAPI to expose one webhook route per discovered webhook plugin, writes produced raw documents to storage, and submits `draft.ready` trigger messages through the configured communication client.
+It uses FastAPI to expose one webhook route per discovered webhook plugin, writes produced raw documents to storage, and submits the workflow trigger built by the matched webhook plugin through the configured communication client.
 
 ## What It Does
 
@@ -20,7 +20,8 @@ It uses FastAPI to expose one webhook route per discovered webhook plugin, write
 3. `waygate_api.server` constructs the FastAPI app and instruments it with OpenTelemetry.
 4. Webhook plugins are discovered and registered under `/webhooks/<plugin-name>`.
 5. Requests are verified, enriched, converted into raw documents, and stored.
-6. Draft-ready trigger messages are submitted through the selected communication plugin.
+6. The matched webhook plugin builds the downstream `WorkflowTriggerMessage`.
+7. That trigger is submitted through the selected communication plugin. The default webhook behavior emits `draft.ready`.
 
 ## Configuration
 
@@ -40,3 +41,4 @@ The API also reads all `WAYGATE_*` settings from `waygate-core`.
 
 - OpenAPI payload schemas are merged at startup so plugin-specific request bodies resolve correctly in Swagger UI and ReDoc.
 - Webhook handling is intentionally plugin-driven; adding a plugin adds a route.
+- First-party webhook routes currently include the generic ingestion path and the dedicated agent-session path.

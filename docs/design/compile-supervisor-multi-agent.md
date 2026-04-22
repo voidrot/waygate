@@ -77,6 +77,11 @@ tools:
 3. grounded findings
 4. continuity inspection
 
+Those specialist tools now live under `waygate_workflows.tools` so the package
+name matches the LangChain tool concept. Supporting LLM, storage, checkpoint,
+and document-rendering helpers live under `waygate_workflows.runtime` and
+`waygate_workflows.content` instead of sharing the tool namespace.
+
 ## Durable State Versus Prompt Context
 
 The current implementation enforces the durable-versus-transient split from the migration
