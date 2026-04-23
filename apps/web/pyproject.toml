@@ -1,6 +1,6 @@
 [project]
 name = "waygate-web"
-version = "0.1.0"
+version = "0.1.1"
 description = "Unified WayGate web app with server-rendered UI and webhook ingress"
 readme = "README.md"
 authors = [
