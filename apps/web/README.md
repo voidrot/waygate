@@ -94,6 +94,8 @@ The wrapper preserves AuthTuna defaults unless noted here.
 - `WAYGATE_WEB_AUTH__DATABASE_POOL_RECYCLE`
 - `WAYGATE_WEB_AUTH__DATABASE_POOL_PRE_PING`
 
+When `WAYGATE_WEB_AUTH__AUTO_CREATE_DATABASE` is enabled, the web app now performs AuthTuna table creation during FastAPI startup instead of waiting for the first request that touches `db_manager.get_db()`.
+
 #### Session
 
 - `WAYGATE_WEB_AUTH__FINGERPRINT_HEADERS`

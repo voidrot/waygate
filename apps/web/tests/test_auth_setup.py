@@ -1,6 +1,13 @@
-from fastapi import FastAPI
+from types import SimpleNamespace
 
-from waygate_web.auth.setup import WaygateWebAuthSettings, configure_auth
+from fastapi import FastAPI
+import pytest
+
+from waygate_web.auth.setup import (
+    WaygateWebAuthSettings,
+    configure_auth,
+    initialize_auth_database,
+)
 
 
 def _clear_auth_env(monkeypatch) -> None:
@@ -102,3 +109,59 @@ def test_configure_auth_uses_resolved_settings(monkeypatch) -> None:
     assert calls["UI_ENABLED"] is True
     assert calls["dont_use_env"] is True
     assert calls["app"] is app
+
+
+@pytest.mark.anyio
+async def test_initialize_auth_database_bootstraps_tables_on_startup(
+    monkeypatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "waygate_web.auth.setup.init_settings",
+        lambda **kwargs: calls.update(kwargs),
+    )
+
+    async def fake_initialize_database() -> None:
+        calls["initialize_database"] = True
+
+    fake_db_manager = SimpleNamespace(
+        _initialized=False,
+        initialize_database=fake_initialize_database,
+    )
+    settings = WaygateWebAuthSettings(AUTO_CREATE_DATABASE=True)
+
+    await initialize_auth_database(settings=settings, _db_manager=fake_db_manager)
+
+    assert calls["dont_use_env"] is True
+    assert calls["AUTO_CREATE_DATABASE"] is True
+    assert calls["initialize_database"] is True
+    assert fake_db_manager._initialized is True
+
+
+@pytest.mark.anyio
+async def test_initialize_auth_database_skips_bootstrap_when_disabled(
+    monkeypatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "waygate_web.auth.setup.init_settings",
+        lambda **kwargs: calls.update(kwargs),
+    )
+
+    async def fake_initialize_database() -> None:
+        calls["initialize_database"] = True
+
+    fake_db_manager = SimpleNamespace(
+        _initialized=False,
+        initialize_database=fake_initialize_database,
+    )
+    settings = WaygateWebAuthSettings(AUTO_CREATE_DATABASE=False)
+
+    await initialize_auth_database(settings=settings, _db_manager=fake_db_manager)
+
+    assert calls["dont_use_env"] is True
+    assert calls["AUTO_CREATE_DATABASE"] is False
+    assert "initialize_database" not in calls
+    assert fake_db_manager._initialized is False

@@ -12,7 +12,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from waygate_core import get_app_context
 from waygate_webhooks import create_webhook_app, merge_mounted_webhook_openapi
 
-from .auth import configure_auth
+from .auth import configure_auth, initialize_auth_database
 from .routes import page_router
 from .settings import WaygateWebRuntimeSettings
 
@@ -23,6 +23,7 @@ web_settings = WaygateWebRuntimeSettings()
 async def lifespan(app: FastAPI):
     """Bootstrap shared runtime state before the app starts serving requests."""
 
+    await initialize_auth_database()
     get_app_context()
     yield
 
