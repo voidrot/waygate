@@ -1,6 +1,6 @@
 [project]
 name = "waygate-worker-app"
-version = "0.1.0"
+version = "0.1.1"
 description = "Single transport-agnostic worker app for WayGate workflow triggers"
 readme = "README.md"
 authors = [
