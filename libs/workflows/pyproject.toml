@@ -1,6 +1,6 @@
 [project]
 name = "waygate-workflows"
-version = "0.1.0"
+version = "0.1.1"
 description = "Default workflows for Waygate. These can be used as-is or serve as examples for building your own custom workflows."
 readme = "README.md"
 authors = [
