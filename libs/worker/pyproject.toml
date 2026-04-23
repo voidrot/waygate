@@ -1,6 +1,6 @@
 [project]
 name = "waygate-worker"
-version = "0.1.0"
+version = "0.1.1"
 description = "Shared worker runtime helpers for WayGate transports"
 readme = "README.md"
 authors = [
