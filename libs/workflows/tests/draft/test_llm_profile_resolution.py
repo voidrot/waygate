@@ -14,8 +14,10 @@ from waygate_workflows.agents.synthesis import synthesize_draft_with_specialist
 from waygate_workflows.runtime.llm import build_llm_request
 from waygate_workflows.runtime.llm import invoke_text_stage
 from waygate_workflows.runtime.llm import invoke_structured_stage
+from waygate_workflows.runtime.llm import recover_structured_result
 from waygate_workflows.runtime.llm import resolve_embeddings_model
 from waygate_workflows.runtime.llm import validate_compile_llm_readiness
+from waygate_workflows.schema import DocumentAnalysisResultModel
 from waygate_plugin_provider_featherless_ai.plugin import (
     FeatherlessAIProvider,
     FeatherlessAIProviderConfig,
@@ -541,6 +543,97 @@ def test_invoke_structured_stage_recovers_from_ollama_raw_tool_call_payload(
     assert result == _StructuredResult(summary="recovered draft")
 
 
+def test_recover_structured_result_recovers_from_raw_agent_message() -> None:
+    result = recover_structured_result(
+        _StructuredResult,
+        {
+            "messages": [
+                SimpleNamespace(
+                    tool_calls=None,
+                    additional_kwargs=None,
+                    content='{"summary": "recovered from agent"}',
+                )
+            ]
+        },
+    )
+
+    assert result == _StructuredResult(summary="recovered from agent")
+
+
+def test_recover_structured_result_normalizes_legacy_summary_narrative() -> None:
+    result = recover_structured_result(
+        DocumentAnalysisResultModel,
+        {
+            "messages": [
+                SimpleNamespace(
+                    tool_calls=None,
+                    additional_kwargs=None,
+                    content='{"uri":"file://raw/test.txt","metadata":{"tags":[],"topics":[],"people":[],"organizations":[],"projects":[]},"summary":{"narrative":"Recovered narrative","key_claims":["Claim A"],"defined_terms":["Term A"]},"findings":{"key_claims":["Claim A"],"defined_terms":["Term A"]},"continuity":{"referenced_entities":[],"unresolved_mentions":[]}}',
+                )
+            ]
+        },
+    )
+
+    assert result is not None
+    assert result.summary.summary == "Recovered narrative"
+    assert result.summary.key_claims == ["Claim A"]
+
+
+def test_recover_structured_result_normalizes_legacy_summary_text() -> None:
+    result = recover_structured_result(
+        DocumentAnalysisResultModel,
+        {
+            "messages": [
+                SimpleNamespace(
+                    tool_calls=None,
+                    additional_kwargs=None,
+                    content='{"uri":"file://raw/test.txt","metadata":{"tags":[],"topics":[],"people":[],"organizations":[],"projects":[]},"summary":{"text":"Recovered text summary","key_claims":["Claim A"],"defined_terms":["Term A"]},"findings":{"key_claims":["Claim A"],"defined_terms":["Term A"]},"continuity":{"referenced_entities":[],"unresolved_mentions":[]}}',
+                )
+            ]
+        },
+    )
+
+    assert result is not None
+    assert result.summary.summary == "Recovered text summary"
+    assert result.summary.key_claims == ["Claim A"]
+
+
+def test_recover_structured_result_normalizes_legacy_summary_string() -> None:
+    result = recover_structured_result(
+        DocumentAnalysisResultModel,
+        {
+            "messages": [
+                SimpleNamespace(
+                    tool_calls=None,
+                    additional_kwargs=None,
+                    content='{"uri":"file://raw/test.txt","metadata":{"tags":[],"topics":[],"people":[],"organizations":[],"projects":[]},"summary":"Recovered bare summary","findings":{"key_claims":["Claim A"],"defined_terms":["Term A"]},"continuity":{"referenced_entities":[],"unresolved_mentions":[]}}',
+                )
+            ]
+        },
+    )
+
+    assert result is not None
+    assert result.summary.summary == "Recovered bare summary"
+    assert result.summary.key_claims == []
+
+
+def test_recover_structured_result_ignores_unrelated_raw_agent_json() -> None:
+    result = recover_structured_result(
+        DocumentAnalysisResultModel,
+        {
+            "messages": [
+                SimpleNamespace(
+                    tool_calls=None,
+                    additional_kwargs=None,
+                    content='{"claims":[{"claim_ids":[]}],"unresolved_mentions_subset":[]}',
+                )
+            ]
+        },
+    )
+
+    assert result is None
+
+
 def test_invoke_text_stage_uses_active_featherless_provider_from_app_context(
     monkeypatch,
 ) -> None:
@@ -789,11 +882,15 @@ def test_validate_compile_llm_readiness_builds_all_compile_targets(monkeypatch) 
         ("compile.source-analysis.summary", "summary-override"),
         ("compile.source-analysis.findings", "draft-default"),
         ("compile.source-analysis.continuity", "draft-default"),
-        ("compile.source-analysis.supervisor", "draft-default"),
         ("compile.synthesis", "draft-default"),
     ]
     assert provider.structured_targets == [
-        ("compile.review", "review-override", "_PreflightStructuredSchema")
+        (
+            "compile.source-analysis.supervisor",
+            "draft-default",
+            "_PreflightStructuredSchema",
+        ),
+        ("compile.review", "review-override", "_PreflightStructuredSchema"),
     ]
 
 
@@ -898,11 +995,15 @@ def test_validate_compile_llm_readiness_uses_optional_readiness_probe(
         ("compile.source-analysis.summary", "draft-default"),
         ("compile.source-analysis.findings", "draft-default"),
         ("compile.source-analysis.continuity", "draft-default"),
-        ("compile.source-analysis.supervisor", "draft-default"),
         ("compile.synthesis", "draft-default"),
     ]
     assert provider.structured_targets == [
-        ("compile.review", "review-default", "_PreflightStructuredSchema")
+        (
+            "compile.source-analysis.supervisor",
+            "draft-default",
+            "_PreflightStructuredSchema",
+        ),
+        ("compile.review", "review-default", "_PreflightStructuredSchema"),
     ]
 
 

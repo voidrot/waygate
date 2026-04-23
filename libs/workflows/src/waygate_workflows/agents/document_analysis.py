@@ -7,6 +7,7 @@ from langchain.agents.structured_output import ToolStrategy
 from waygate_core.logging import get_logger
 
 from waygate_workflows.runtime.llm import invoke_structured_stage
+from waygate_workflows.runtime.llm import recover_structured_result
 from waygate_workflows.runtime.llm import resolve_chat_model
 from waygate_workflows.runtime.text import preview_text
 from waygate_workflows.schema import ContinuityExtractionModel
@@ -96,28 +97,6 @@ def _build_document_prompt(
     )
 
 
-def _coerce_model(
-    schema: type[MetadataExtractionModel]
-    | type[SummaryExtractionModel]
-    | type[FindingsExtractionModel]
-    | type[ContinuityExtractionModel]
-    | type[DocumentAnalysisResultModel],
-    value: object,
-):
-    """Coerce provider output into the expected structured response model.
-
-    Args:
-        schema: Expected Pydantic model type.
-        value: Raw provider output.
-
-    Returns:
-        Parsed model instance.
-    """
-    if isinstance(value, schema):
-        return value
-    return schema.model_validate(value)
-
-
 def _extract_structured_response(
     result: dict[str, object],
     schema: type[MetadataExtractionModel]
@@ -128,10 +107,7 @@ def _extract_structured_response(
 ):
     """Return a validated structured response when the agent produced one."""
 
-    structured = result.get("structured_response")
-    if structured is None:
-        return None
-    return _coerce_model(schema, structured)
+    return recover_structured_result(schema, result)
 
 
 def _invoke_specialist_agent(

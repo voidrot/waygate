@@ -131,14 +131,25 @@ def _build_database_url() -> str:
     driver name.
     """
 
+    def _setting(*names: str, default: str) -> str:
+        for name in names:
+            value = getenv(name)
+            if value is not None and value.strip():
+                return value.strip()
+        return default
+
     driver = getenv("PG_DRIVER", "psycopg").strip() or "psycopg"
     return URL.create(
         drivername=f"postgresql+{driver}",
-        username=getenv("PG_USER", "postgres"),
-        password=getenv("PG_PASSWORD", "postgres"),
-        host=getenv("PG_HOST", "localhost"),
-        port=int(getenv("PG_PORT", "5432")),
-        database=getenv("PG_DB", "postgres"),
+        username=_setting("WAYGATE_CORE__PG_USER", "PG_USER", default="postgres"),
+        password=_setting(
+            "WAYGATE_CORE__PG_PASSWORD",
+            "PG_PASSWORD",
+            default="postgres",
+        ),
+        host=_setting("WAYGATE_CORE__PG_HOST", "PG_HOST", default="localhost"),
+        port=int(_setting("WAYGATE_CORE__PG_PORT", "PG_PORT", default="5432")),
+        database=_setting("WAYGATE_CORE__PG_DB", "PG_DB", default="postgres"),
     ).render_as_string(hide_password=False)
 
 

@@ -6,13 +6,6 @@ services:
       target: migrations
     env_file:
       - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
-    environment:
-      PG_DRIVER: ${PG_DRIVER:-psycopg}
-      PG_HOST: ${WAYGATE_CORE__PG_HOST:-db}
-      PG_PORT: ${WAYGATE_CORE__PG_PORT:-5432}
-      PG_USER: ${WAYGATE_CORE__PG_USER:-postgres}
-      PG_PASSWORD: ${WAYGATE_CORE__PG_PASSWORD:-postgres}
-      PG_DB: ${WAYGATE_CORE__PG_DB:-postgres}
     depends_on:
       db:
         condition: service_healthy
@@ -51,7 +44,6 @@ services:
         - path: plugins
           action: rebuild
   scheduler:
-    profiles: [ "scheduler" ]
     build:
       context: .
       dockerfile: docker/Dockerfile

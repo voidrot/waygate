@@ -2602,6 +2602,7 @@ dependencies = [
     { name = "waygate-plugin-communication-nats" },
     { name = "waygate-plugin-communication-rq" },
     { name = "waygate-plugin-local-storage" },
+    { name = "waygate-plugin-provider-featherless-ai" },
     { name = "waygate-plugin-provider-ollama" },
     { name = "waygate-worker" },
 ]
@@ -2618,6 +2619,7 @@ requires-dist = [
     { name = "waygate-plugin-communication-nats", editable = "plugins/communication-nats" },
     { name = "waygate-plugin-communication-rq", editable = "plugins/communication-rq" },
     { name = "waygate-plugin-local-storage", editable = "plugins/local-storage" },
+    { name = "waygate-plugin-provider-featherless-ai", editable = "plugins/provider-featherless-ai" },
     { name = "waygate-plugin-provider-ollama", editable = "plugins/provider-ollama" },
     { name = "waygate-worker", editable = "libs/worker" },
 ]

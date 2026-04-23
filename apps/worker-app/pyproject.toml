@@ -4,25 +4,27 @@ version = "0.1.0"
 description = "Single transport-agnostic worker app for WayGate workflow triggers"
 readme = "README.md"
 authors = [
-    { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
+  { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "waygate-plugin-communication-http",
-    "waygate-plugin-communication-nats",
-    "waygate-plugin-communication-rq",
-    "waygate-plugin-local-storage",
-    "waygate-plugin-provider-ollama",
-    "waygate-worker",
+  "waygate-plugin-communication-http",
+  "waygate-plugin-communication-nats",
+  "waygate-plugin-communication-rq",
+  "waygate-plugin-local-storage",
+  "waygate-plugin-provider-ollama",
+  "waygate-plugin-provider-featherless-ai",
+  "waygate-worker",
 ]
 
 [tool.uv.sources]
-waygate-plugin-communication-http = { workspace = true }
-waygate-plugin-communication-nats = { workspace = true }
-waygate-plugin-communication-rq   = { workspace = true }
-waygate-plugin-local-storage      = { workspace = true }
-waygate-plugin-provider-ollama    = { workspace = true }
-waygate-worker                    = { workspace = true }
+waygate-plugin-communication-http      = { workspace = true }
+waygate-plugin-communication-nats      = { workspace = true }
+waygate-plugin-communication-rq        = { workspace = true }
+waygate-plugin-local-storage           = { workspace = true }
+waygate-plugin-provider-ollama         = { workspace = true }
+waygate-plugin-provider-featherless_ai = { workspace = true }
+waygate-worker                         = { workspace = true }
 
 [dependency-groups]
 dev = ["pytest>=9.0.3", "pytest-cov>=7.1.0"]
@@ -39,9 +41,9 @@ minversion = "8.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = [
-    "-ra",
-    "--strict-config",
-    "--strict-markers",
-    "--cov=waygate_worker_app",
-    "--cov-report=term-missing",
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=waygate_worker_app",
+  "--cov-report=term-missing",
 ]
