@@ -45,7 +45,13 @@
           {% for value, label in sort_options %}
           <option
             value="{{ value }}"
-            {% if filters.sort == value %}selected{% endif %}
+            {%
+            if
+            filters.sort=""
+            ="value"
+            %}selected{%
+            endif
+            %}
           >
             {{ label }}
           </option>
