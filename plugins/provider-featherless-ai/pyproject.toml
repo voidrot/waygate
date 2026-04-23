@@ -1,6 +1,6 @@
 [project]
 name = "waygate-plugin-provider-featherless-ai"
-version = "0.1.0"
+version = "0.1.1"
 description = "Featherless AI-backed LLM provider plugin for WayGate"
 readme = "README.md"
 authors = [
