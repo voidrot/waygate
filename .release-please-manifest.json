@@ -9,7 +9,7 @@
   "plugins/local-storage": "0.1.0",
   "plugins/communication-http": "0.1.0",
   "plugins/communication-nats": "0.1.0",
-  "plugins/communication-rq": "0.1.0",
+  "plugins/communication-rq": "0.1.1",
   "plugins/provider-featherless-ai": "0.1.0",
   "plugins/provider-ollama": "0.1.0",
   "plugins/webhook-agent-session": "0.1.0",
