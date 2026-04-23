@@ -1,26 +1,20 @@
-"""Server-rendered page and HTMX fragment routes for the web UI."""
+"""Public control-plane pages and HTMX fragments."""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from fasthx.jinja import Jinja
 from fastapi import APIRouter
-from fastapi.templating import Jinja2Templates
 
 from waygate_core import get_app_context
 
-_templates = Jinja2Templates(
-    directory=str(Path(__file__).resolve().parents[1] / "templates")
-)
-_jinja = Jinja(_templates)
+from .shared import page_jinja
 
-page_router = APIRouter(tags=["pages"])
+router = APIRouter()
 
 
-@page_router.get("/")
-@_jinja.page("dashboard.html")
+@router.get("/")
+@page_jinja.page("dashboard.html")
 async def dashboard() -> dict[str, Any]:
     """Render the main operator dashboard shell."""
 
@@ -49,8 +43,8 @@ async def dashboard() -> dict[str, Any]:
     }
 
 
-@page_router.get("/partials/runtime")
-@_jinja.hx("partials/runtime_summary.html")
+@router.get("/partials/runtime")
+@page_jinja.hx("partials/runtime_summary.html")
 async def runtime_summary() -> dict[str, Any]:
     """Render a small HTMX fragment summarizing the current runtime."""
 

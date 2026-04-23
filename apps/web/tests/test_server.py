@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
+from jinja2 import Environment, FileSystemLoader
 
 from waygate_web.server import app
 
@@ -42,6 +45,35 @@ def test_auth_routes_are_registered_on_parent_app() -> None:
     }
 
     assert "/auth/login" in auth_paths
+
+
+def test_team_index_route_is_registered_on_parent_app() -> None:
+    ui_paths = {
+        path
+        for route in app.routes
+        if (path := getattr(route, "path", "")).startswith("/ui")
+    }
+
+    assert "/ui/teams" in ui_paths
+
+
+def test_account_shell_teams_link_targets_team_index() -> None:
+    template_root = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "waygate_web"
+        / "templates"
+        / "authtuna"
+        / "user"
+    )
+    env = Environment(loader=FileSystemLoader(str(template_root)))
+
+    rendered = env.get_template("account_shell.html").render(
+        page_title="Account",
+        active_page="teams",
+    )
+
+    assert 'href="/ui/teams"' in rendered
 
 
 def test_parent_openapi_includes_mounted_webhook_paths() -> None:
