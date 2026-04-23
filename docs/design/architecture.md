@@ -8,8 +8,8 @@ WayGate is a Python monorepo for building Generation-Augmented Retrieval workflo
 
 The repository is organized into three layers.
 
-- `apps`: `web`, `scheduler`, `draft-worker`, `nats-worker`
-  Responsibility: long-running processes that expose the operator UI, HTTP ingress, schedule recurring jobs, or execute workflow work over RQ or JetStream.
+- `apps`: `web`, `scheduler`, `worker-app`
+  Responsibility: long-running processes that expose the operator UI, HTTP ingress, schedule recurring jobs, or execute workflow work through a shared worker app.
 - `libs`: `core`, `webhooks`, `worker`, `workflows`
   Responsibility: shared runtime primitives, worker execution helpers, plugin contracts, configuration, and workflow implementation.
 - `plugins`: `local-storage`, `provider-ollama`, `provider-featherless-ai`, `communication-http`, `communication-nats`, `communication-rq`, `webhook-generic`, `webhook-agent-session`
@@ -39,20 +39,12 @@ The repository is organized into three layers.
 - Loads installed cron plugins and schedules them with APScheduler.
 - Dispatches `cron.tick` messages through the same communication client contract used by the web app.
 
-### apps/draft-worker
+### apps/worker-app
 
-- RQ worker runtime for queued workflow execution.
-- Depends on `waygate-workflows` for importable job entrypoints.
-- Consumes the RQ communication plugin configuration and listens on the configured draft queue.
-- Preflights the active compile-workflow LLM provider before polling Redis so provider-construction errors fail at startup.
-- The concrete worker-side workflow entrypoint currently resolves to `waygate_workflows.draft.jobs.process_workflow_trigger`.
-
-### apps/nats-worker
-
-- JetStream worker runtime for durable workflow execution.
-- Consumes the `draft.ready` and `cron.tick` subjects configured by `communication-nats`.
-- Uses the shared helpers in `libs/worker` to extend ACK leases while long-running workflow steps execute.
-- Preflights the active compile-workflow LLM provider before polling JetStream so provider-construction errors fail at startup.
+- Primary transport-agnostic worker app.
+- Resolves the worker-side transport companion from `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME`.
+- Handles HTTP receive mode directly and reuses the shared RQ and JetStream worker helpers for queue-backed transports.
+- Preflights the active compile-workflow LLM provider before accepting work.
 
 ### libs/core
 
@@ -62,8 +54,9 @@ The repository is organized into three layers.
 
 ### libs/worker
 
-- Holds worker-runtime helpers shared across transport-specific worker apps.
-- Currently ships the JetStream consumer loop used by `apps/nats-worker`.
+- Holds worker-runtime helpers shared across the transport-agnostic worker app.
+- Owns the generic worker bootstrap path that resolves the worker-side transport companion for the configured communication plugin.
+- Ships the JetStream and RQ runtime helpers used by communication plugins to implement listener loops.
 - Keeps workflow execution concerns separate from transport configuration and settlement mechanics.
 
 ### libs/workflows
@@ -106,6 +99,8 @@ The current implementation does not treat a search index, vector store, static s
 ### Transport-agnostic workflow dispatch
 
 The web app and scheduler do not know whether work is being delivered over HTTP, JetStream, or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
+
+The worker side is now moving to the same rule: worker apps bootstrap one shared runtime, then resolve the worker-side transport companion from the configured communication plugin instead of hardcoding Redis or JetStream startup in each app.
 
 ### Workflow logic separate from worker runtime
 
@@ -152,7 +147,7 @@ Implemented in this repo today:
 - RQ worker support for queued draft work
 - LangGraph compile, review, publish, and human-review interruption flow
 - storage-backed raw, review, and published document artifacts
-- HTTP transport as a communication client contract plus a local mock worker for smoke testing
+- HTTP transport as both a communication client contract and a first-party worker listener companion
 
 Not implemented in this repo today:
 
@@ -163,7 +158,6 @@ Not implemented in this repo today:
 - static-site publishing pipeline
 - publish-triggered deployment hooks
 - cryptographic provenance receipts
-- a first-party HTTP worker service that executes the workflow contract end to end
 - worker-side handling for `cron.tick`
 
 ## Legacy Mapping
@@ -179,4 +173,4 @@ Several legacy docs described the right long-term direction, but with names that
 
 Use the current names when writing new documentation or code.
 
-In the current repository, "worker apps" means `apps/draft-worker` for the legacy RQ path or `apps/nats-worker` for the JetStream-backed path.
+In the current repository, `apps/worker-app` is the worker process.

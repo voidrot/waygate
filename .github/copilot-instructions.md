@@ -28,7 +28,7 @@ Use the current repository layout and names when reasoning about changes.
 
 - `apps/web` is the unified FastAPI host for the operator UI, AuthTuna auth flows, and mounted webhook ingress.
 - `apps/scheduler` emits scheduled workflow triggers.
-- `apps/draft-worker` and `apps/nats-worker` execute workflow triggers over different transports.
+- `apps/worker-app` is the transport-agnostic worker process for workflow execution.
 - `libs/core` owns bootstrap, plugin hooks, config, logging, and shared schema types.
 - `libs/webhooks` owns the mountable FastAPI webhook ingress app and webhook-specific OpenAPI helpers.
 - `libs/worker` contains shared worker runtime helpers.
