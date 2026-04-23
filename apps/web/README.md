@@ -11,9 +11,19 @@ Unified FastAPI application for WayGate.
 
 ## MVP Scope
 
-The current package is an infrastructure-level MVP for the web surface, not a full operator product UI.
+The current package is still an infrastructure-level MVP for the web surface, not a finished operator product UI.
 
-Today it provides a small control-plane dashboard, mounted auth flows, mounted webhook ingress, and a unified OpenAPI surface. Document browsing, review workflows, retrieval surfaces, and broader operator tooling remain outside this package's current scope.
+Today it provides:
+
+- an anonymous control-plane splash page
+- an authenticated wiki landing page
+- stub operator pages for documents, jobs, and human review
+- an admin-only runtime summary page
+- mounted auth flows
+- mounted webhook ingress
+- a unified OpenAPI surface
+
+The new operator pages currently reserve route, template, and action contracts. They do not yet provide full database-backed browsing or workflow-resume behavior.
 
 ## Running
 
