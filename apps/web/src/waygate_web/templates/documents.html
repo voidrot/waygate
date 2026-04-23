@@ -8,51 +8,26 @@
         <span>Search</span>
       </label>
       <label class="floating-label">
-        <input
-          class="input input-bordered"
-          name="document_type"
-          value="{{ filters.document_type }}"
-        />
+        <input class="input input-bordered" name="document_type" value="{{ filters.document_type }}" />
         <span>Document type</span>
       </label>
       <label class="floating-label">
-        <input
-          class="input input-bordered"
-          name="visibility"
-          value="{{ filters.visibility }}"
-        />
+        <input class="input input-bordered" name="visibility" value="{{ filters.visibility }}" />
         <span>Visibility</span>
       </label>
       <label class="floating-label">
-        <input
-          class="input input-bordered"
-          name="metadata_key"
-          value="{{ filters.metadata_key }}"
-        />
+        <input class="input input-bordered" name="metadata_key" value="{{ filters.metadata_key }}" />
         <span>Metadata key</span>
       </label>
       <label class="floating-label">
-        <input
-          class="input input-bordered"
-          name="metadata_value"
-          value="{{ filters.metadata_value }}"
-        />
+        <input class="input input-bordered" name="metadata_value" value="{{ filters.metadata_value }}" />
         <span>Metadata value</span>
       </label>
       <label class="fieldset">
         <legend class="fieldset-legend">Sort</legend>
         <select class="select select-bordered" name="sort">
           {% for value, label in sort_options %}
-          <option
-            value="{{ value }}"
-            {%
-            if
-            filters.sort=""
-            ="value"
-            %}selected{%
-            endif
-            %}
-          >
+          <option value="{{ value }}" {% if filters.sort==value %}selected{% endif %}>
             {{ label }}
           </option>
           {% endfor %}
@@ -90,11 +65,7 @@
               <span class="badge badge-outline">{{ document.visibility }}</span>
             </td>
             <td>
-              <a
-                class="btn btn-ghost btn-sm"
-                href="/documents/{{ document.id }}"
-                >Open</a
-              >
+              <a class="btn btn-ghost btn-sm" href="/documents/{{ document.id }}">Open</a>
             </td>
           </tr>
           {% endfor %}
