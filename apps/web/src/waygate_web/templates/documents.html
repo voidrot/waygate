@@ -1,0 +1,97 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <h2 class="card-title">Filter contract</h2>
+    <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-3" method="get">
+      <label class="floating-label">
+        <input class="input input-bordered" name="q" value="{{ filters.q }}" />
+        <span>Search</span>
+      </label>
+      <label class="floating-label">
+        <input
+          class="input input-bordered"
+          name="document_type"
+          value="{{ filters.document_type }}"
+        />
+        <span>Document type</span>
+      </label>
+      <label class="floating-label">
+        <input
+          class="input input-bordered"
+          name="visibility"
+          value="{{ filters.visibility }}"
+        />
+        <span>Visibility</span>
+      </label>
+      <label class="floating-label">
+        <input
+          class="input input-bordered"
+          name="metadata_key"
+          value="{{ filters.metadata_key }}"
+        />
+        <span>Metadata key</span>
+      </label>
+      <label class="floating-label">
+        <input
+          class="input input-bordered"
+          name="metadata_value"
+          value="{{ filters.metadata_value }}"
+        />
+        <span>Metadata value</span>
+      </label>
+      <label class="fieldset">
+        <legend class="fieldset-legend">Sort</legend>
+        <select class="select select-bordered" name="sort">
+          {% for value, label in sort_options %}
+          <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <p class="text-sm text-base-content/60">{{ visibility_policy }}</p>
+  </div>
+</section>
+
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <h2 class="card-title">Document browser stub</h2>
+    <div class="overflow-x-auto">
+      <table class="table table-zebra">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Artifact kind</th>
+            <th>Visibility</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for document in stub_documents %}
+          <tr>
+            <td>
+              <div class="font-semibold">{{ document.title }}</div>
+              <div class="text-xs text-base-content/60">
+                {{ document.summary }}
+              </div>
+            </td>
+            <td>{{ document.artifact_kind }}</td>
+            <td>
+              <span class="badge badge-outline">{{ document.visibility }}</span>
+            </td>
+            <td>
+              <a
+                class="btn btn-ghost btn-sm"
+                href="/documents/{{ document.id }}"
+                >Open</a
+              >
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

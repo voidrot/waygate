@@ -1,0 +1,80 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  {% for label, value in plugin_counts.items() %}
+  <article
+    class="stat rounded-box border border-base-300 bg-base-100 shadow-sm"
+  >
+    <div class="stat-title capitalize">{{ label }}</div>
+    <div class="stat-value text-primary">{{ value }}</div>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+  <div class="flex flex-col gap-6">
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div>
+          <h2 class="card-title">Published wiki views</h2>
+          <p class="text-sm text-base-content/60">
+            This landing page will assemble itself from published document
+            metadata.
+          </p>
+        </div>
+        <div class="grid gap-4 md:grid-cols-3">
+          {% for section in published_sections %}
+          <div class="rounded-box border border-base-300 bg-base-200 p-4">
+            <h3 class="font-semibold">{{ section.title }}</h3>
+            <p class="mt-2 text-sm text-base-content/65">
+              {{ section.description }}
+            </p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-3">
+        <h2 class="card-title">Coming next</h2>
+        <ul class="list gap-2">
+          <li class="list-row rounded-box bg-base-200 px-4 py-3">
+            <div class="list-col-grow">
+              <p class="font-semibold">Metadata-driven landing cards</p>
+              <p class="text-sm text-base-content/60">
+                Recent publishes, topic clusters, and people or project slices
+                will surface here.
+              </p>
+            </div>
+          </li>
+          <li class="list-row rounded-box bg-base-200 px-4 py-3">
+            <div class="list-col-grow">
+              <p class="font-semibold">Visibility-aware browsing</p>
+              <p class="text-sm text-base-content/60">
+                {{ visibility_policy }}
+              </p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </article>
+  </div>
+
+  <aside class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Operator shortcuts</h2>
+      <div class="flex flex-col gap-3">
+        <a class="btn btn-primary justify-start" href="/documents"
+          >Browse documents</a
+        >
+        <a class="btn btn-soft justify-start" href="/jobs"
+          >Inspect workflow jobs</a
+        >
+        <a class="btn btn-soft justify-start" href="/reviews"
+          >Open human review queue</a
+        >
+      </div>
+    </div>
+  </aside>
+</section>
+{% endblock %}

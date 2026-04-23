@@ -1,0 +1,25 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <h2 class="card-title">Human review queue</h2>
+    <ul class="list gap-2">
+      {% for review in review_queue %}
+      <li class="list-row rounded-box bg-base-200 px-4 py-3">
+        <div class="list-col-grow">
+          <p class="font-semibold">{{ review.source_set_key }}</p>
+          <p class="text-sm text-base-content/60">
+            {{ review.status }} · revisions {{ review.revision_count }} ·
+            feedback {{ review.feedback_count }}
+          </p>
+        </div>
+        <a
+          class="btn btn-primary btn-sm"
+          href="/reviews/{{ review.source_set_key }}"
+          >Open review</a
+        >
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}

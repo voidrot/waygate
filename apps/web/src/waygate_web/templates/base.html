@@ -18,6 +18,49 @@
       <div class="navbar-start">
         <a class="btn btn-ghost text-lg font-semibold" href="/">WayGate</a>
       </div>
+      <div class="navbar-center hidden lg:flex">
+        {% if user is defined and user %}
+        <ul class="menu menu-horizontal gap-1 px-1">
+          <li>
+            <a
+              class="{{ 'menu-active' if active_page == 'wiki' else '' }}"
+              href="/"
+              >Wiki</a
+            >
+          </li>
+          <li>
+            <a
+              class="{{ 'menu-active' if active_page == 'documents' else '' }}"
+              href="/documents"
+              >Documents</a
+            >
+          </li>
+          <li>
+            <a
+              class="{{ 'menu-active' if active_page == 'jobs' else '' }}"
+              href="/jobs"
+              >Jobs</a
+            >
+          </li>
+          <li>
+            <a
+              class="{{ 'menu-active' if active_page == 'reviews' else '' }}"
+              href="/reviews"
+              >Review</a
+            >
+          </li>
+          {% if user_is_admin is defined and user_is_admin %}
+          <li>
+            <a
+              class="{{ 'menu-active' if active_page == 'runtime' else '' }}"
+              href="/ui/runtime"
+              >Runtime</a
+            >
+          </li>
+          {% endif %}
+        </ul>
+        {% endif %}
+      </div>
       <div class="navbar-end gap-2">
         <a class="btn btn-ghost btn-sm" href="/docs">API Docs</a>
         {% if user is defined and user %}
