@@ -1,0 +1,29 @@
+{% extends "base.html" %} {% block content %}
+<section class="flex min-h-[calc(100vh-12rem)] items-center justify-center">
+  <article
+    class="card w-full max-w-lg border border-base-300 bg-base-100 shadow-xl"
+  >
+    <div class="card-body gap-6 p-8 sm:p-10">
+      <header class="space-y-4 text-center">
+        <span class="badge badge-primary badge-outline mx-auto"
+          >{{ auth_badge or "WayGate Auth" }}</span
+        >
+        <div class="avatar avatar-placeholder mx-auto">
+          <div
+            class="bg-primary text-primary-content w-16 rounded-full text-3xl font-black"
+          >
+            <span>{{ auth_icon or "W" }}</span>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h1 class="text-3xl font-black tracking-tight">{{ auth_title }}</h1>
+          <p class="mx-auto max-w-md text-sm text-base-content/70">
+            {{ auth_subtitle }}
+          </p>
+        </div>
+      </header>
+      {% block auth_content %}{% endblock %}
+    </div>
+  </article>
+</section>
+{% endblock %}

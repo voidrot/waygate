@@ -1,0 +1,50 @@
+{% extends "auth_shell.html" %} {% set page_title = "Authorize action" %} {% set
+auth_title = "Confirm this sensitive action" %} {% set auth_subtitle = "WayGate
+is asking for one more confirmation before the requested action can continue."
+%} {% set auth_icon = "!" %} {% block auth_content %}
+<div id="authorize-message" class="alert hidden text-sm" role="status"></div>
+
+<form id="authorize-form" class="space-y-4">
+  <button class="btn btn-primary btn-block" type="submit">
+    Authorize action
+  </button>
+  <a class="btn btn-ghost btn-block" href="/ui/dashboard">Cancel</a>
+</form>
+{% endblock %} {% block body_end %}
+<script>
+  const authorizeForm = document.getElementById("authorize-form");
+  const authorizeMessage = document.getElementById("authorize-message");
+  const authorizeToken = new URLSearchParams(window.location.search).get("authorize_token") || {{ authorize_token|default('', true)|tojson }};
+
+  function showAuthorizeMessage(kind, text) {
+    authorizeMessage.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    authorizeMessage.textContent = text;
+    authorizeMessage.classList.remove("hidden");
+  }
+
+  authorizeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = authorizeForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    try {
+      const response = await fetch("/auth/authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: authorizeToken }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Authorization failed.");
+      }
+      showAuthorizeMessage("success", data.message || "Action authorized.");
+      window.setTimeout(() => {
+        window.location.href = "/ui/dashboard";
+      }, 600);
+    } catch (error) {
+      showAuthorizeMessage("error", error.message || "Authorization failed.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

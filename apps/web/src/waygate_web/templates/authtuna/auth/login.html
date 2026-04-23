@@ -1,0 +1,225 @@
+{% extends "auth_shell.html" %} {% set page_title = "Sign in" %} {% set
+auth_title = "Welcome back" %} {% set auth_subtitle = "Use your WayGate account,
+a magic link, or a passkey to get back to work." %} {% set auth_icon = "→" %} {%
+block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+{% endblock %} {% block auth_content %}
+<div id="login-message" class="alert hidden text-sm" role="status"></div>
+
+<form id="login-form" class="space-y-4" novalidate>
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Username or email</legend>
+    <input
+      id="username_or_email"
+      class="input input-bordered w-full"
+      type="text"
+      autocomplete="username"
+      required
+    />
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Password</legend>
+    <input
+      id="password"
+      class="input input-bordered w-full"
+      type="password"
+      autocomplete="current-password"
+      required
+    />
+    <p class="label justify-end">
+      <a class="link link-hover" href="/auth/forgot-password"
+        >Forgot password?</a
+      >
+    </p>
+  </fieldset>
+
+  <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+</form>
+
+<div class="divider">Other ways in</div>
+
+<div class="space-y-3">
+  {% if passwordless_login_enabled %}
+  <button id="passwordless-button" class="btn btn-soft btn-block" type="button">
+    Email me a sign-in link
+  </button>
+  {% endif %} {% if google_login_enabled %}
+  <a class="btn btn-outline btn-block" href="/auth/social/google/login"
+    >Continue with Google</a
+  >
+  {% endif %} {% if github_login_enabled %}
+  <a class="btn btn-outline btn-block" href="/auth/social/github/login"
+    >Continue with GitHub</a
+  >
+  {% endif %}
+
+  <button
+    id="passkey-login-button"
+    class="btn btn-ghost btn-block hidden"
+    type="button"
+  >
+    Use a passkey
+  </button>
+</div>
+
+<p class="text-center text-sm text-base-content/70">
+  Need an account?
+  <a class="link link-primary" href="/auth/signup">Create one</a>
+</p>
+{% endblock %} {% block body_end %}
+<script>
+  const loginForm = document.getElementById("login-form");
+  const loginMessage = document.getElementById("login-message");
+  const passkeyLoginButton = document.getElementById("passkey-login-button");
+  const passwordlessButton = document.getElementById("passwordless-button");
+
+  function setCookie(name, value, minutes) {
+    const expires = new Date(Date.now() + minutes * 60 * 1000).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+  }
+
+  function getCookie(name) {
+    const prefix = `${name}=`;
+    for (const chunk of document.cookie.split(";")) {
+      const trimmed = chunk.trim();
+      if (trimmed.startsWith(prefix)) {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      }
+    }
+    return null;
+  }
+
+  function clearCookie(name) {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+  }
+
+  function showLoginMessage(kind, text) {
+    loginMessage.className = `alert ${kind === "error" ? "alert-error" : kind === "success" ? "alert-success" : "alert-info"} text-sm`;
+    loginMessage.textContent = text;
+    loginMessage.classList.remove("hidden");
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    const returnUrl = new URLSearchParams(window.location.search).get(
+      "return_url",
+    );
+    if (returnUrl) {
+      setCookie("waygate-return-url", returnUrl, 10);
+    }
+
+    if (
+      window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable
+    ) {
+      const available =
+        await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (available) {
+        passkeyLoginButton.classList.remove("hidden");
+      }
+    }
+  });
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = loginForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    loginMessage.classList.add("hidden");
+
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username_or_email: document.getElementById("username_or_email").value,
+          password: document.getElementById("password").value,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Sign-in failed.");
+      }
+      if (data.mfa_required && data.mfa_token) {
+        window.location.href = `/mfa/challenge?mfa_token=${encodeURIComponent(data.mfa_token)}`;
+        return;
+      }
+      showLoginMessage("success", data.message || "Signed in.");
+      const returnUrl = getCookie("waygate-return-url");
+      clearCookie("waygate-return-url");
+      window.setTimeout(() => {
+        window.location.href = returnUrl || "/ui/dashboard";
+      }, 600);
+    } catch (error) {
+      showLoginMessage("error", error.message || "Network error.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  if (passwordlessButton) {
+    passwordlessButton.addEventListener("click", async () => {
+      const email = window.prompt(
+        "Enter the email address that should receive the sign-in link:",
+      );
+      if (!email) {
+        return;
+      }
+      passwordlessButton.disabled = true;
+      showLoginMessage("info", "Sending sign-in link...");
+      try {
+        const response = await fetch("/auth/passwordless/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to send magic link.");
+        }
+        showLoginMessage("success", data.message || "Check your inbox.");
+      } catch (error) {
+        showLoginMessage(
+          "error",
+          error.message || "Unable to send magic link.",
+        );
+      } finally {
+        passwordlessButton.disabled = false;
+      }
+    });
+  }
+
+  passkeyLoginButton.addEventListener("click", async () => {
+    passkeyLoginButton.disabled = true;
+    showLoginMessage("info", "Waiting for your passkey...");
+    try {
+      const optionsResponse = await fetch("/passkeys/login-options", {
+        method: "POST",
+      });
+      const options = await optionsResponse.json();
+      if (!optionsResponse.ok) {
+        throw new Error(options.detail || "Unable to start passkey login.");
+      }
+      const assertion =
+        await SimpleWebAuthnBrowser.startAuthentication(options);
+      const verifyResponse = await fetch("/passkeys/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: assertion }),
+      });
+      const data = await verifyResponse.json();
+      if (!verifyResponse.ok) {
+        throw new Error(data.detail || "Passkey login failed.");
+      }
+      showLoginMessage("success", data.message || "Signed in.");
+      const returnUrl = getCookie("waygate-return-url");
+      clearCookie("waygate-return-url");
+      window.setTimeout(() => {
+        window.location.href = returnUrl || "/ui/dashboard";
+      }, 600);
+    } catch (error) {
+      showLoginMessage("error", error.message || "Passkey login failed.");
+    } finally {
+      passkeyLoginButton.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

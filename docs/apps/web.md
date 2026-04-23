@@ -11,6 +11,7 @@ The current UI scope is intentionally small: a minimal control-plane dashboard p
 - Boots the shared WayGate app context.
 - Validates that the configured communication plugin exists before serving requests.
 - Initializes AuthTuna for browser and API-oriented auth flows.
+- Serves WayGate-owned replacements for the AuthTuna HTML auth, account, organization, team, and email templates.
 - Includes the page routes that render the minimal control-plane UI.
 - Mounts the shared `waygate-webhooks` ingress app under `/webhooks`.
 - Merges webhook payload schemas into the parent OpenAPI document.
@@ -34,4 +35,5 @@ The current UI scope is intentionally small: a minimal control-plane dashboard p
 
 - Webhook handling is intentionally plugin-driven; adding a webhook plugin adds a route through `libs/webhooks` and makes it visible in the web app's OpenAPI output.
 - Auth routes and webhook routes share the same parent FastAPI host, so the web app is the primary ingress surface for local development and deployment.
+- `apps/web` keeps AuthTuna's backend route surface but replaces the default upstream templates with WayGate-owned Jinja pages and self-contained HTML email templates. Those templates are grouped by purpose under `waygate_web/templates/authtuna/auth`, `waygate_web/templates/authtuna/user`, and `waygate_web/templates/authtuna/email`, and the package-relative defaults are normalized to filesystem paths during startup.
 - The current server-rendered pages are an infrastructure MVP for the web surface; broader operator workflows are still future work.

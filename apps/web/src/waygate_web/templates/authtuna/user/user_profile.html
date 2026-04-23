@@ -1,0 +1,67 @@
+{% extends "account_shell.html" %} {% set active_page = "profile" %} {% set
+page_title = "Profile" %} {% set page_intro = "Update the user-facing details on
+your WayGate account." %} {% block account_content %}
+<article class="card max-w-2xl border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <div id="profile-message" class="alert hidden text-sm" role="status"></div>
+    <form id="profile-form" class="space-y-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Email</legend>
+        <input
+          class="input input-bordered w-full"
+          type="email"
+          value="{{ user.get_email() }}"
+          disabled
+        />
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Username</legend>
+        <input
+          id="profile-username"
+          class="input input-bordered w-full"
+          type="text"
+          value="{{ user.username }}"
+          minlength="3"
+          required
+        />
+      </fieldset>
+      <button class="btn btn-primary" type="submit">Save changes</button>
+    </form>
+  </div>
+</article>
+{% endblock %} {% block body_end %}
+<script>
+  const profileForm = document.getElementById("profile-form");
+  const profileMessage = document.getElementById("profile-message");
+
+  function showProfileMessage(kind, text) {
+    profileMessage.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    profileMessage.textContent = text;
+    profileMessage.classList.remove("hidden");
+  }
+
+  profileForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = profileForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    try {
+      const response = await fetch("/ui/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("profile-username").value,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to update profile.");
+      }
+      showProfileMessage("success", data.message || "Profile updated.");
+    } catch (error) {
+      showProfileMessage("error", error.message || "Unable to update profile.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

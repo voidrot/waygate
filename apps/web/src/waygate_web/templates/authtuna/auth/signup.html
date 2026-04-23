@@ -1,0 +1,98 @@
+{% extends "auth_shell.html" %} {% set page_title = "Create account" %} {% set
+auth_title = "Create your WayGate account" %} {% set auth_subtitle = "Sign up
+once and keep the same operator experience across the whole control plane." %}
+{% set auth_icon = "+" %} {% block auth_content %}
+<div id="signup-message" class="alert hidden text-sm" role="status"></div>
+
+<form id="signup-form" class="space-y-4">
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Username</legend>
+    <input
+      id="username"
+      class="input input-bordered w-full"
+      type="text"
+      autocomplete="username"
+      minlength="3"
+      required
+    />
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Email</legend>
+    <input
+      id="email"
+      class="input input-bordered w-full"
+      type="email"
+      autocomplete="email"
+      required
+    />
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Password</legend>
+    <input
+      id="password"
+      class="input input-bordered w-full"
+      type="password"
+      autocomplete="new-password"
+      minlength="8"
+      required
+    />
+  </fieldset>
+
+  <button class="btn btn-primary btn-block" type="submit">
+    Create account
+  </button>
+</form>
+
+<p class="text-center text-sm text-base-content/70">
+  Already registered?
+  <a class="link link-primary" href="/auth/login">Sign in</a>
+</p>
+{% endblock %} {% block body_end %}
+<script>
+  const signupForm = document.getElementById("signup-form");
+  const signupMessage = document.getElementById("signup-message");
+
+  function showSignupMessage(kind, text) {
+    signupMessage.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    signupMessage.textContent = text;
+    signupMessage.classList.remove("hidden");
+  }
+
+  signupForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = signupForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    signupMessage.classList.add("hidden");
+
+    try {
+      const response = await fetch("/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("username").value,
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to create account.");
+      }
+      showSignupMessage("success", data.message || "Account created.");
+      if (response.status === 202) {
+        signupForm.classList.add("hidden");
+      } else {
+        window.setTimeout(() => {
+          window.location.href = "/auth/login";
+        }, 900);
+      }
+    } catch (error) {
+      showSignupMessage("error", error.message || "Unable to create account.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

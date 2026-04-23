@@ -1,0 +1,17 @@
+{% extends "auth_shell.html" %} {% set page_title = "Invite accepted" %} {% set
+auth_title = "Invitation accepted" %} {% set auth_subtitle = "You now have
+access to " ~ name ~ ". Jump directly into the relevant workspace below." %} {%
+set auth_icon = "✓" %} {% block auth_content %}
+<div class="space-y-3">
+  {% if type == "organization" %}
+  <a class="btn btn-primary btn-block" href="/ui/organizations/{{ org_id }}"
+    >Open organization</a
+  >
+  {% elif type == "team" %}
+  <a class="btn btn-primary btn-block" href="/ui/teams/{{ team_id }}"
+    >Open team</a
+  >
+  {% endif %}
+  <a class="btn btn-ghost btn-block" href="/ui/dashboard">Go to dashboard</a>
+</div>
+{% endblock %}

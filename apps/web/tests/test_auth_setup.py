@@ -1,10 +1,12 @@
 from types import SimpleNamespace
+from pathlib import Path
 
 from fastapi import FastAPI
 import pytest
 
 from waygate_web.auth.setup import (
     WaygateWebAuthSettings,
+    _resolve_template_directory,
     configure_auth,
     initialize_auth_database,
 )
@@ -32,12 +34,19 @@ def _clear_auth_env(monkeypatch) -> None:
 def test_auth_settings_use_local_defaults_when_env_is_missing(monkeypatch) -> None:
     _clear_auth_env(monkeypatch)
 
-    settings = WaygateWebAuthSettings()
+    settings = WaygateWebAuthSettings(_env_file=None)
 
     assert settings.API_BASE_URL == "http://localhost:8080"
     assert settings.APP_NAME == "WayGate"
     assert settings.STRATEGY == "AUTO"
+    assert settings.UI_ENABLED is True
+    assert settings.ADMIN_ROUTES_ENABLED is False
     assert settings.SESSION_SECURE is False
+    assert settings.HTML_TEMPLATE_DIR.endswith("waygate_web/templates/authtuna/auth")
+    assert settings.DASHBOARD_AND_USER_INFO_PAGES_TEMPLATE_DIR.endswith(
+        "waygate_web/templates/authtuna/user"
+    )
+    assert settings.EMAIL_TEMPLATE_DIR.endswith("waygate_web/templates/authtuna/email")
 
 
 def test_auth_settings_ignore_unprefixed_authtuna_env_vars(monkeypatch) -> None:
@@ -45,7 +54,7 @@ def test_auth_settings_ignore_unprefixed_authtuna_env_vars(monkeypatch) -> None:
     monkeypatch.setenv("API_BASE_URL", "https://raw-authtuna.example.test")
     monkeypatch.setenv("JWT_SECRET_KEY", "raw-authtuna-secret")
 
-    settings = WaygateWebAuthSettings()
+    settings = WaygateWebAuthSettings(_env_file=None)
 
     assert settings.API_BASE_URL == "http://localhost:8080"
     assert (
@@ -64,7 +73,7 @@ def test_auth_settings_accept_canonical_waygate_prefixed_env_vars(monkeypatch) -
     monkeypatch.setenv("WAYGATE_WEB_AUTH__THEME__MODE", "single")
     monkeypatch.setenv("WAYGATE_WEB_AUTH__FERNET_KEYS", '["prefixed-fernet"]')
 
-    settings = WaygateWebAuthSettings()
+    settings = WaygateWebAuthSettings(_env_file=None)
 
     assert settings.API_BASE_URL == "https://web.example.test"
     assert settings.APP_NAME == "WayGate Console"
@@ -75,6 +84,19 @@ def test_auth_settings_accept_canonical_waygate_prefixed_env_vars(monkeypatch) -
     assert [key.get_secret_value() for key in settings.FERNET_KEYS] == [
         "prefixed-fernet"
     ]
+
+
+def test_resolve_template_directory_normalizes_package_relative_defaults() -> None:
+    resolved = Path(_resolve_template_directory("waygate_web/templates/authtuna/email"))
+
+    assert resolved.is_absolute()
+    assert resolved.as_posix().endswith("waygate_web/templates/authtuna/email")
+
+
+def test_resolve_template_directory_passes_through_absolute_paths() -> None:
+    absolute_path = Path("/tmp/waygate-test-templates")
+
+    assert _resolve_template_directory(str(absolute_path)) == str(absolute_path)
 
 
 def test_configure_auth_uses_resolved_settings(monkeypatch) -> None:
@@ -93,6 +115,7 @@ def test_configure_auth_uses_resolved_settings(monkeypatch) -> None:
 
     app = FastAPI()
     settings = WaygateWebAuthSettings(
+        _env_file=None,
         API_BASE_URL="https://web.example.test",
         STRATEGY="BEARER",
         JWT_SECRET_KEY="jwt-secret",
@@ -111,6 +134,11 @@ def test_configure_auth_uses_resolved_settings(monkeypatch) -> None:
     assert calls["SESSION_SECURE"] is True
     assert calls["ADMIN_ROUTES_ENABLED"] is False
     assert calls["UI_ENABLED"] is True
+    assert calls["HTML_TEMPLATE_DIR"].endswith("waygate_web/templates/authtuna/auth")
+    assert calls["DASHBOARD_AND_USER_INFO_PAGES_TEMPLATE_DIR"].endswith(
+        "waygate_web/templates/authtuna/user"
+    )
+    assert calls["EMAIL_TEMPLATE_DIR"].endswith("waygate_web/templates/authtuna/email")
     assert calls["dont_use_env"] is True
     assert calls["app"] is app
 
@@ -133,7 +161,7 @@ async def test_initialize_auth_database_bootstraps_tables_on_startup(
         _initialized=False,
         initialize_database=fake_initialize_database,
     )
-    settings = WaygateWebAuthSettings(AUTO_CREATE_DATABASE=True)
+    settings = WaygateWebAuthSettings(_env_file=None, AUTO_CREATE_DATABASE=True)
 
     await initialize_auth_database(settings=settings, _db_manager=fake_db_manager)
 
@@ -161,7 +189,7 @@ async def test_initialize_auth_database_skips_bootstrap_when_disabled(
         _initialized=False,
         initialize_database=fake_initialize_database,
     )
-    settings = WaygateWebAuthSettings(AUTO_CREATE_DATABASE=False)
+    settings = WaygateWebAuthSettings(_env_file=None, AUTO_CREATE_DATABASE=False)
 
     await initialize_auth_database(settings=settings, _db_manager=fake_db_manager)
 

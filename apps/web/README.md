@@ -36,12 +36,23 @@ The auth configuration initializes AuthTuna with `dont_use_env=True`. That means
 
 The wrapper preserves AuthTuna defaults unless noted here.
 
-| Setting          | WayGate default                  | AuthTuna default  |
-| ---------------- | -------------------------------- | ----------------- |
-| `APP_NAME`       | `WayGate`                        | `AuthTuna`        |
-| `API_BASE_URL`   | `http://localhost:8080`          | required upstream |
-| `FERNET_KEYS`    | one local-development Fernet key | empty list        |
-| `SESSION_SECURE` | `false`                          | `true`            |
+| Setting                | WayGate default                  | AuthTuna default  |
+| ---------------------- | -------------------------------- | ----------------- |
+| `APP_NAME`             | `WayGate`                        | `AuthTuna`        |
+| `API_BASE_URL`         | `http://localhost:8080`          | required upstream |
+| `FERNET_KEYS`          | one local-development Fernet key | empty list        |
+| `SESSION_SECURE`       | `false`                          | `true`            |
+| `UI_ENABLED`           | `true`                           | upstream-defined  |
+| `ADMIN_ROUTES_ENABLED` | `false`                          | upstream-defined  |
+
+The web package now owns the AuthTuna-facing templates that operators actually see:
+
+- Auth pages live under `waygate_web/templates/authtuna/auth`.
+- User and organization pages live under `waygate_web/templates/authtuna/user`.
+- Email templates live under `waygate_web/templates/authtuna/email`.
+- Package-relative template defaults are resolved to real filesystem paths in code before AuthTuna initializes, so local development does not need absolute template paths.
+
+This keeps AuthTuna's existing handlers and JSON endpoints in place while letting WayGate control the rendered look and feel.
 
 ### Value Encoding
 

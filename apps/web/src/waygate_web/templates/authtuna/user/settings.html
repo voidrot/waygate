@@ -1,0 +1,590 @@
+{% extends "account_shell.html" %} {% set active_page = "settings" %} {% set
+page_title = "Settings" %} {% set page_intro = "Manage passwords, MFA, passkeys,
+API keys, and the active sessions tied to your account." %} {% block extra_head
+%}
+<script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+{% endblock %} {% block account_content %}
+<section class="grid gap-6">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Change password</h2>
+      <div
+        id="password-settings-message"
+        class="alert hidden text-sm"
+        role="status"
+      ></div>
+      <form id="password-settings-form" class="grid gap-4 md:grid-cols-3">
+        <input
+          id="current-password"
+          class="input input-bordered w-full"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Current password"
+          required
+        />
+        <input
+          id="new-password"
+          class="input input-bordered w-full"
+          type="password"
+          autocomplete="new-password"
+          placeholder="New password"
+          minlength="8"
+          required
+        />
+        <input
+          id="confirm-password"
+          class="input input-bordered w-full"
+          type="password"
+          autocomplete="new-password"
+          placeholder="Confirm password"
+          minlength="8"
+          required
+        />
+        <button
+          class="btn btn-primary md:col-span-3 md:justify-self-start"
+          type="submit"
+        >
+          Update password
+        </button>
+      </form>
+    </div>
+  </article>
+
+  <section class="grid gap-6 xl:grid-cols-2">
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <h2 class="card-title">Multi-factor authentication</h2>
+        <p class="text-sm text-base-content/70">
+          {% if user.mfa_enabled %} MFA is active for this account. {% else %}
+          Add an authenticator app to require a second factor when signing in.
+          {% endif %}
+        </p>
+        <div
+          id="mfa-settings-message"
+          class="alert hidden text-sm"
+          role="status"
+        ></div>
+        {% if user.mfa_enabled %}
+        <button
+          id="disable-mfa-button"
+          class="btn btn-error justify-self-start"
+          type="button"
+        >
+          Disable MFA
+        </button>
+        {% else %}
+        <a class="btn btn-primary justify-self-start" href="/mfa/setup"
+          >Set up MFA</a
+        >
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title">Passkeys</h2>
+          <button
+            id="add-passkey-button"
+            class="btn btn-primary btn-sm"
+            type="button"
+          >
+            Add passkey
+          </button>
+        </div>
+        <div
+          id="passkey-message"
+          class="alert hidden text-sm"
+          role="status"
+        ></div>
+        <div id="passkey-list" class="flex flex-col gap-3"></div>
+      </div>
+    </article>
+  </section>
+
+  <section class="grid gap-6 xl:grid-cols-2">
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title">API keys</h2>
+        </div>
+        <div
+          id="api-key-message"
+          class="alert hidden text-sm"
+          role="status"
+        ></div>
+        <form id="api-key-form" class="grid gap-4">
+          <input
+            id="api-key-name"
+            class="input input-bordered w-full"
+            type="text"
+            placeholder="Key name"
+            required
+          />
+          <select id="api-key-type" class="select select-bordered w-full">
+            <option value="secret">Secret</option>
+            <option value="master">Master</option>
+            <option value="public">Public</option>
+            <option value="test">Test</option>
+          </select>
+          <textarea
+            id="api-key-scopes"
+            class="textarea textarea-bordered w-full"
+            placeholder="Optional scopes, comma-separated"
+          ></textarea>
+          <select id="api-key-expiry" class="select select-bordered w-full">
+            <option value="2592000">30 days</option>
+            <option value="7776000">90 days</option>
+            <option value="31536000" selected>1 year</option>
+            <option value="63072000">2 years</option>
+          </select>
+          <button class="btn btn-primary justify-self-start" type="submit">
+            Create API key
+          </button>
+        </form>
+        <div
+          id="api-key-created"
+          class="hidden rounded-box border border-success/30 bg-success/10 p-4 text-sm"
+        >
+          <p class="font-semibold text-success">
+            Copy this key now. It will not be shown again.
+          </p>
+          <div class="mt-3 flex flex-col gap-2">
+            <input
+              id="api-key-plaintext"
+              class="input input-bordered w-full font-mono text-xs"
+              readonly
+            />
+            <button
+              id="copy-api-key-button"
+              class="btn btn-outline btn-sm justify-self-start"
+              type="button"
+            >
+              Copy key
+            </button>
+          </div>
+        </div>
+        <div id="api-key-list" class="flex flex-col gap-3"></div>
+      </div>
+    </article>
+
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title">Active sessions</h2>
+          <button
+            id="terminate-all-sessions-button"
+            class="btn btn-error btn-sm"
+            type="button"
+          >
+            Terminate all others
+          </button>
+        </div>
+        <div
+          id="session-message"
+          class="alert hidden text-sm"
+          role="status"
+        ></div>
+        <div id="session-list" class="flex flex-col gap-3"></div>
+      </div>
+    </article>
+  </section>
+</section>
+{% endblock %} {% block body_end %}
+<script>
+  const passwordSettingsMessage = document.getElementById(
+    "password-settings-message",
+  );
+  const mfaSettingsMessage = document.getElementById("mfa-settings-message");
+  const passkeyMessage = document.getElementById("passkey-message");
+  const apiKeyMessage = document.getElementById("api-key-message");
+  const sessionMessage = document.getElementById("session-message");
+  const passkeyList = document.getElementById("passkey-list");
+  const apiKeyList = document.getElementById("api-key-list");
+  const sessionList = document.getElementById("session-list");
+
+  function showAlert(node, kind, text) {
+    node.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    node.textContent = text;
+    node.classList.remove("hidden");
+  }
+
+  function formatTimestamp(value) {
+    if (!value) {
+      return "Never";
+    }
+    return new Date(value * 1000).toLocaleString();
+  }
+
+  async function loadPasskeys() {
+    passkeyList.innerHTML = "<div class='skeleton h-16 w-full'></div>";
+    try {
+      const response = await fetch("/passkeys/");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to load passkeys.");
+      }
+      if (!data.length) {
+        passkeyList.innerHTML =
+          "<p class='text-sm text-base-content/60'>No passkeys registered.</p>";
+        return;
+      }
+      passkeyList.innerHTML = data
+        .map(
+          (item) => `
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold">${item.name}</p>
+              <p class="text-xs text-base-content/60">Credential ${item.id}</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" data-passkey-id="${item.id}">Remove</button>
+          </div>
+        </div>`,
+        )
+        .join("");
+    } catch (error) {
+      passkeyList.innerHTML = "";
+      showAlert(
+        passkeyMessage,
+        "error",
+        error.message || "Unable to load passkeys.",
+      );
+    }
+  }
+
+  async function loadApiKeys() {
+    apiKeyList.innerHTML = "<div class='skeleton h-16 w-full'></div>";
+    try {
+      const response = await fetch("/ui/settings/api-keys");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to load API keys.");
+      }
+      if (!data.length) {
+        apiKeyList.innerHTML =
+          "<p class='text-sm text-base-content/60'>No API keys created yet.</p>";
+        return;
+      }
+      apiKeyList.innerHTML = data
+        .map(
+          (item) => `
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="font-semibold">${item.name}</p>
+              <p class="text-xs text-base-content/60">${item.key_type} key</p>
+              <p class="text-xs text-base-content/60">Expires ${formatTimestamp(item.expires_at)}</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" data-api-key-id="${item.id}">Delete</button>
+          </div>
+        </div>`,
+        )
+        .join("");
+    } catch (error) {
+      apiKeyList.innerHTML = "";
+      showAlert(
+        apiKeyMessage,
+        "error",
+        error.message || "Unable to load API keys.",
+      );
+    }
+  }
+
+  async function loadSessions() {
+    sessionList.innerHTML = "<div class='skeleton h-16 w-full'></div>";
+    try {
+      const response = await fetch("/ui/settings/sessions");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to load sessions.");
+      }
+      if (!data.length) {
+        sessionList.innerHTML =
+          "<p class='text-sm text-base-content/60'>No active sessions found.</p>";
+        return;
+      }
+      sessionList.innerHTML = data
+        .map(
+          (item) => `
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="font-semibold">${item.device || "Unknown device"}${item.is_current ? " · current" : ""}</p>
+              <p class="text-xs text-base-content/60">Region ${item.region || "unknown"}</p>
+              <p class="text-xs text-base-content/60">Last active ${formatTimestamp(item.mtime)}</p>
+            </div>
+            ${item.is_current ? "<span class='badge badge-primary'>Current</span>" : `<button class='btn btn-ghost btn-sm' type='button' data-session-id='${item.session_id}'>Terminate</button>`}
+          </div>
+        </div>`,
+        )
+        .join("");
+    } catch (error) {
+      sessionList.innerHTML = "";
+      showAlert(
+        sessionMessage,
+        "error",
+        error.message || "Unable to load sessions.",
+      );
+    }
+  }
+
+  document
+    .getElementById("password-settings-form")
+    .addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const newPassword = document.getElementById("new-password").value;
+      if (newPassword !== document.getElementById("confirm-password").value) {
+        showAlert(passwordSettingsMessage, "error", "Passwords do not match.");
+        return;
+      }
+      try {
+        const response = await fetch("/auth/change-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            current_password: document.getElementById("current-password").value,
+            new_password: newPassword,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to update password.");
+        }
+        showAlert(
+          passwordSettingsMessage,
+          "success",
+          data.message || "Password updated.",
+        );
+        event.target.reset();
+      } catch (error) {
+        showAlert(
+          passwordSettingsMessage,
+          "error",
+          error.message || "Unable to update password.",
+        );
+      }
+    });
+
+  const disableMfaButton = document.getElementById("disable-mfa-button");
+  if (disableMfaButton) {
+    disableMfaButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch("/mfa/disable", { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to disable MFA.");
+        }
+        showAlert(
+          mfaSettingsMessage,
+          "success",
+          data.message || "MFA disabled.",
+        );
+        window.setTimeout(() => window.location.reload(), 800);
+      } catch (error) {
+        showAlert(
+          mfaSettingsMessage,
+          "error",
+          error.message || "Unable to disable MFA.",
+        );
+      }
+    });
+  }
+
+  document
+    .getElementById("add-passkey-button")
+    .addEventListener("click", async () => {
+      try {
+        const optionsResponse = await fetch("/passkeys/register-options", {
+          method: "POST",
+        });
+        const options = await optionsResponse.json();
+        if (!optionsResponse.ok) {
+          throw new Error(options.detail || "Unable to start passkey setup.");
+        }
+        const registration =
+          await SimpleWebAuthnBrowser.startRegistration(options);
+        const name = window.prompt(
+          "Name this passkey",
+          `Passkey ${new Date().toLocaleDateString()}`,
+        );
+        if (!name) {
+          return;
+        }
+        const response = await fetch("/passkeys/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, registration_response: registration }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to save passkey.");
+        }
+        showAlert(passkeyMessage, "success", "Passkey added.");
+        await loadPasskeys();
+      } catch (error) {
+        showAlert(
+          passkeyMessage,
+          "error",
+          error.message || "Unable to add passkey.",
+        );
+      }
+    });
+
+  passkeyList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-passkey-id]");
+    if (!button) {
+      return;
+    }
+    try {
+      const response = await fetch(`/passkeys/${button.dataset.passkeyId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok && response.status !== 204) {
+        const data = await response.json();
+        throw new Error(data.detail || "Unable to remove passkey.");
+      }
+      showAlert(passkeyMessage, "success", "Passkey removed.");
+      await loadPasskeys();
+    } catch (error) {
+      showAlert(
+        passkeyMessage,
+        "error",
+        error.message || "Unable to remove passkey.",
+      );
+    }
+  });
+
+  document
+    .getElementById("api-key-form")
+    .addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const response = await fetch("/ui/settings/api-keys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: document.getElementById("api-key-name").value,
+            key_type: document.getElementById("api-key-type").value,
+            scopes: document
+              .getElementById("api-key-scopes")
+              .value.split(",")
+              .map((item) => item.trim())
+              .filter(Boolean),
+            valid_seconds: Number(
+              document.getElementById("api-key-expiry").value,
+            ),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to create API key.");
+        }
+        showAlert(apiKeyMessage, "success", data.message || "API key created.");
+        document.getElementById("api-key-form").reset();
+        document.getElementById("api-key-created").classList.remove("hidden");
+        document.getElementById("api-key-plaintext").value =
+          data.api_key.plaintext;
+        await loadApiKeys();
+      } catch (error) {
+        showAlert(
+          apiKeyMessage,
+          "error",
+          error.message || "Unable to create API key.",
+        );
+      }
+    });
+
+  document
+    .getElementById("copy-api-key-button")
+    .addEventListener("click", async () => {
+      await navigator.clipboard.writeText(
+        document.getElementById("api-key-plaintext").value,
+      );
+    });
+
+  apiKeyList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-api-key-id]");
+    if (!button) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `/ui/settings/api-keys/${button.dataset.apiKeyId}`,
+        { method: "DELETE" },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to delete API key.");
+      }
+      showAlert(apiKeyMessage, "success", data.message || "API key deleted.");
+      await loadApiKeys();
+    } catch (error) {
+      showAlert(
+        apiKeyMessage,
+        "error",
+        error.message || "Unable to delete API key.",
+      );
+    }
+  });
+
+  sessionList.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-session-id]");
+    if (!button) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `/ui/settings/sessions/${button.dataset.sessionId}/terminate`,
+        { method: "POST" },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to terminate session.");
+      }
+      showAlert(
+        sessionMessage,
+        "success",
+        data.message || "Session terminated.",
+      );
+      await loadSessions();
+    } catch (error) {
+      showAlert(
+        sessionMessage,
+        "error",
+        error.message || "Unable to terminate session.",
+      );
+    }
+  });
+
+  document
+    .getElementById("terminate-all-sessions-button")
+    .addEventListener("click", async () => {
+      try {
+        const response = await fetch("/ui/settings/sessions/terminate-all", {
+          method: "POST",
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to terminate sessions.");
+        }
+        showAlert(
+          sessionMessage,
+          "success",
+          data.message || "Other sessions terminated.",
+        );
+        await loadSessions();
+      } catch (error) {
+        showAlert(
+          sessionMessage,
+          "error",
+          error.message || "Unable to terminate sessions.",
+        );
+      }
+    });
+
+  loadPasskeys();
+  loadApiKeys();
+  loadSessions();
+</script>
+{% endblock %}
