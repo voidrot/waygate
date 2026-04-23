@@ -10,6 +10,7 @@ It sends `WorkflowTriggerMessage` payloads to a worker endpoint and translates H
 - Posts trigger messages as JSON to the configured worker endpoint.
 - Retries transient failures with exponential backoff.
 - Maps request validation and transport failures into explicit dispatch error kinds.
+- Exposes the worker-side HTTP listener companion used by `waygate-worker-app`.
 
 ## Behavior
 
@@ -28,6 +29,9 @@ It sends `WorkflowTriggerMessage` payloads to a worker endpoint and translates H
 | `WAYGATE_COMMUNICATION_HTTP__RETRY_BACKOFF_SECONDS` | `0.25`                                    | Base delay for exponential backoff.                 |
 | `WAYGATE_COMMUNICATION_HTTP__AUTH_TOKEN`            | unset                                     | Optional auth token header value.                   |
 | `WAYGATE_COMMUNICATION_HTTP__AUTH_HEADER`           | `Authorization`                           | Header name used when an auth token is configured.  |
+| `WAYGATE_COMMUNICATION_HTTP__WORKER_HOST`           | `0.0.0.0`                                 | Bind host for the worker-side HTTP listener.        |
+| `WAYGATE_COMMUNICATION_HTTP__WORKER_PORT`           | `8090`                                    | Bind port for the worker-side HTTP listener.        |
+| `WAYGATE_COMMUNICATION_HTTP__WORKER_ENDPOINT_PATH`  | `/workflows/trigger`                      | Path exposed by the worker-side HTTP listener.      |
 
 ## Entry Point
 
@@ -35,5 +39,5 @@ It sends `WorkflowTriggerMessage` payloads to a worker endpoint and translates H
 
 ## Notes
 
-- This plugin is transport-only; it does not execute workflows itself.
-- It is suitable when an HTTP worker service is available behind the configured endpoint.
+- The registered worker transport companion serves the configured endpoint inside `waygate-worker-app`.
+- Producers and the worker can share the auth header/token settings when you need authenticated internal dispatch.

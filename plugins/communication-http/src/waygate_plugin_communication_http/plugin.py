@@ -7,12 +7,15 @@ import httpx
 from pydantic import BaseModel, Field
 from waygate_core.plugin import (
     CommunicationClientPlugin,
+    CommunicationWorkerTransportPlugin,
     DispatchErrorKind,
     PluginConfigRegistration,
+    WorkflowTriggerRunner,
     WorkflowDispatchResult,
     WorkflowTriggerMessage,
 )
 from waygate_core.plugin.hooks import hookimpl
+from waygate_worker import HTTPWorkerConfig, run_http_worker
 
 PLUGIN_NAME = "communication-http"
 
@@ -26,6 +29,9 @@ class CommunicationHttpConfig(BaseModel):
     retry_backoff_seconds: float = Field(default=0.25, gt=0)
     auth_token: str | None = Field(default=None)
     auth_header: str = Field(default="Authorization")
+    worker_host: str = Field(default="0.0.0.0")
+    worker_port: int = Field(default=8090, ge=1, le=65535)
+    worker_endpoint_path: str = Field(default="/workflows/trigger")
 
 
 class CommunicationHttpPlugin(CommunicationClientPlugin):
@@ -76,6 +82,13 @@ class CommunicationHttpPlugin(CommunicationClientPlugin):
             name=PLUGIN_NAME,
             config=CommunicationHttpConfig,
         )
+
+    @staticmethod
+    @hookimpl
+    def waygate_worker_transport_plugin() -> type["CommunicationHttpWorkerTransport"]:
+        """Register the HTTP worker transport companion."""
+
+        return CommunicationHttpWorkerTransport
 
     async def submit_workflow_trigger(
         self,
@@ -170,3 +183,31 @@ class CommunicationHttpPlugin(CommunicationClientPlugin):
             detail="Submitted workflow trigger message",
             error_kind=None,
         )
+
+
+class CommunicationHttpWorkerTransport(CommunicationWorkerTransportPlugin):
+    """Serve workflow trigger requests over HTTP."""
+
+    plugin_name = PLUGIN_NAME
+
+    def __init__(self, config: CommunicationHttpConfig | None = None) -> None:
+        self._config = config or CommunicationHttpConfig()
+
+    @property
+    def name(self) -> str:
+        return PLUGIN_NAME
+
+    async def run(
+        self,
+        runner: WorkflowTriggerRunner,
+        *,
+        stop_event: asyncio.Event | None = None,
+    ) -> None:
+        config = HTTPWorkerConfig(
+            host=self._config.worker_host,
+            port=self._config.worker_port,
+            endpoint_path=self._config.worker_endpoint_path,
+            auth_token=self._config.auth_token,
+            auth_header=self._config.auth_header,
+        )
+        await run_http_worker(config, runner=runner, stop_event=stop_event)

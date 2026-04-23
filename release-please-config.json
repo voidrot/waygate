@@ -23,21 +23,12 @@
         }
       ]
     },
-    "apps/draft-worker": {
-      "package-name": "waygate-draft-worker",
+    "apps/worker-app": {
+      "package-name": "waygate-worker-app",
       "extra-files": [
         {
           "type": "generic",
-          "path": "apps/draft-worker/src/waygate_draft_worker/__init__.py"
-        }
-      ]
-    },
-    "apps/nats-worker": {
-      "package-name": "waygate-nats-worker",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "apps/nats-worker/src/waygate_nats_worker/__init__.py"
+          "path": "apps/worker-app/src/waygate_worker_app/__init__.py"
         }
       ]
     },

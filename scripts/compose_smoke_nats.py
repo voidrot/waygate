@@ -20,6 +20,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENV_EXAMPLE = REPO_ROOT / "env.compose.example"
 FIXTURE_PATH = REPO_ROOT / "scripts" / "fixtures" / "generic-webhook.sample.json"
+COMPOSE_FILE = REPO_ROOT / "compose.prod.yml"
+COMPOSE_PROFILES = ("nats", "chroma", "ollama")
 SMOKE_MODEL_NAME = "qwen2.5:0.5b"
 
 
@@ -134,7 +136,14 @@ def run_compose(
     env["COMPOSE_PROJECT_NAME"] = project_name
     env.update(parse_env_lines(env_file.read_text().splitlines()))
     return subprocess.run(
-        ["docker", "compose", *args],
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(COMPOSE_FILE),
+            *(item for profile in COMPOSE_PROFILES for item in ("--profile", profile)),
+            *args,
+        ],
         cwd=REPO_ROOT,
         env=env,
         check=check,
@@ -190,7 +199,7 @@ def dump_failure_context(env_file: Path) -> None:
     project_name = os.environ.get("COMPOSE_PROJECT_NAME", "waygate")
     for args in (
         ["ps"],
-        ["logs", "--tail=200", "web", "nats-worker", "ollama", "nats"],
+        ["logs", "--tail=200", "web", "worker", "ollama", "nats"],
     ):
         try:
             result = run_compose(
@@ -234,7 +243,7 @@ def run_smoke_test(options: argparse.Namespace) -> int:
                     )
 
             run_compose(
-                ["up", "-d", "--build", "web", "nats-worker"],
+                ["up", "-d", "--build", "web", "worker"],
                 env_file=env_file,
                 project_name=project_name,
             )

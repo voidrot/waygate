@@ -48,7 +48,7 @@ class NatsWorkerConfig(BaseSettings):
     cron_subject: str = Field(default="waygate.workflow.cron")
     draft_consumer_name: str = Field(default="waygate-draft")
     cron_consumer_name: str = Field(default="waygate-cron")
-    client_name: str = Field(default="waygate-nats-worker")
+    client_name: str = Field(default="waygate-worker")
     connect_timeout_seconds: float = Field(default=2.0, gt=0)
     js_api_timeout_seconds: float = Field(default=5.0, gt=0)
     fetch_batch_size: int = Field(default=1, ge=1)

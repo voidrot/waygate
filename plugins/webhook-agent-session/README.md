@@ -73,10 +73,10 @@ This plugin intentionally emits `draft.ready` rather than a custom workflow even
 
 The repository includes a fixture payload and helper scripts for a local end-to-end check:
 
-1. Start the mock worker:
+1. Start the shared worker app:
 
 ```bash
-/home/buck/src/voidrot/waygate/.venv/bin/python scripts/mock-worker.py
+uv run waygate-worker-app
 ```
 
 1. Start the web app with the HTTP communication plugin and unsigned local webhook uploads enabled:

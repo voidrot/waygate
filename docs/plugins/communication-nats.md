@@ -35,5 +35,5 @@ and returns a publish acknowledgement identifier in the dispatch result.
 
 ## Notes
 
-- This transport is designed to be paired with `waygate-nats-worker`.
-- The worker can create the JetStream stream for local development and simple deployments.
+- This transport is designed to be paired with `waygate-worker-app`.
+- The shared worker runtime can create the JetStream stream for local development and simple deployments.

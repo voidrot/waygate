@@ -49,7 +49,9 @@ The HTTP communication plugin submits the trigger payload to a worker endpoint.
 
 ### Response body
 
-An HTTP worker should return an acceptance response with a stable message identifier.
+The shared `waygate-worker-app` HTTP transport accepts the request, schedules the
+workflow handoff in the worker process, and returns an acceptance response with a
+stable message identifier.
 
 ```json
 {
@@ -63,7 +65,7 @@ An HTTP worker should return an acceptance response with a stable message identi
 The RQ communication plugin enqueues the trigger payload as a job argument for an
 importable Python function.
 
-- Default job function: `waygate_workflows.draft.jobs.process_workflow_trigger`
+- Default job function: `waygate_worker.rq.process_rq_workflow_trigger`
 - Default draft queue: `draft`
 - Default cron queue: `cron`
 - Job ID: derived from `idempotency_key` when present and valid for RQ
@@ -83,7 +85,7 @@ The NATS communication plugin publishes the same trigger payload to JetStream.
 - Default cron subject: `waygate.workflow.cron`
 - Publish dedupe header: `Nats-Msg-Id` derived from `event_type` and `idempotency_key` when present
 
-The `waygate-nats-worker` app consumes those JetStream subjects with explicit
+The primary `waygate-worker-app` service consumes those JetStream subjects with explicit
 ACKs and periodic `in_progress()` heartbeats so long-running compile jobs do
 not redeliver solely because a fixed worker timeout elapsed.
 
@@ -91,13 +93,11 @@ During the current phased rollout, `ready.integrate` is published to the same
 draft subject as `draft.ready` so existing workers can accept and ignore it
 until the integration workflow is implemented.
 
-## Local mock worker
+## Local HTTP worker
 
-Use the local mock endpoint for smoke testing:
+Use the shared worker app for HTTP transport smoke testing:
 
-1. Start mock worker:
-   - `uv run python scripts/mock-worker.py`
-2. Ensure defaults point to mock worker:
-   - `WAYGATE_COMMUNICATION_HTTP__ENDPOINT=http://127.0.0.1:8090/workflows/trigger`
-3. Start the web app or scheduler and trigger a workflow path.
-4. Confirm the mock worker logs received payloads and returns `202 Accepted`.
+1. Set `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME=communication-http`.
+1. Start the worker app with `uv run waygate-worker-app`.
+1. Ensure producers target `WAYGATE_COMMUNICATION_HTTP__ENDPOINT=http://127.0.0.1:8090/workflows/trigger`.
+1. Start the web app or scheduler and trigger a workflow path.

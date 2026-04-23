@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from waygate_core.plugin.communication import CommunicationClientPlugin
+from waygate_core.plugin.communication import CommunicationWorkerTransportPlugin
 from waygate_core.plugin.llm import LLMProviderPlugin
 from waygate_core.plugin.cron import CronPlugin
 from waygate_core.plugin.storage import StoragePlugin
@@ -67,6 +68,20 @@ class WayGatePluginSpec:
         Returns:
             A communication client class or instance, or ``None`` when not
             provided.
+        """
+
+    @hookspec
+    def waygate_worker_transport_plugin(
+        self,
+    ) -> (
+        type[CommunicationWorkerTransportPlugin]
+        | CommunicationWorkerTransportPlugin
+        | None
+    ):
+        """Return a worker transport implementation for a communication plugin.
+
+        Returns:
+            A worker transport class or instance, or ``None`` when not provided.
         """
 
     @hookspec

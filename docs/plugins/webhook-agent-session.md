@@ -26,7 +26,9 @@ The repository ships helper utilities for building and posting completed session
 - `scripts/post-agent-session.py`
 - `scripts/fixtures/agent-session.completed.json`
 
-For a local smoke test, run the web app with `communication-http`, point it at `scripts/mock-worker.py`, and post the fixture payload through `scripts/post-agent-session.py`.
+For a local smoke test, run the web app with `communication-http`, start
+`waygate-worker-app`, and post the fixture payload through
+`scripts/post-agent-session.py`.
 
 ## Notes
 

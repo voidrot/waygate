@@ -37,8 +37,7 @@ COPY pyproject.toml uv.lock ./
 # 4. Copy every workspace member's pyproject.toml (preserving directory structure).
 COPY apps/web/pyproject.toml        apps/web/
 COPY apps/scheduler/pyproject.toml  apps/scheduler/
-COPY apps/draft-worker/pyproject.toml apps/draft-worker/
-COPY apps/nats-worker/pyproject.toml apps/nats-worker/
+COPY apps/worker-app/pyproject.toml apps/worker-app/
 COPY libs/core/pyproject.toml       libs/core/
 COPY libs/webhooks/pyproject.toml   libs/webhooks/
 COPY libs/worker/pyproject.toml     libs/worker/
@@ -75,6 +74,58 @@ COPY plugins/ plugins/
 # — the runtime stage only needs to copy .venv, not the source tree.
 RUN --mount=type=cache,target=/root/.cache/uv \
   uv sync --frozen --no-dev --no-editable --package "waygate-${APP}"
+
+# =============================================================================
+# Stage 1b: migrations
+# Installs Alembic tooling plus the first-party core package so migrations can
+# run against the repository's root migration config inside Compose.
+# =============================================================================
+FROM python:3.14-slim AS migrations
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
+WORKDIR /app
+
+# Copy the root config, lockfile, and workspace member metadata so uv can
+# resolve the workspace consistently before source files are present.
+COPY pyproject.toml uv.lock alembic.ini ./
+COPY migrations/ migrations/
+COPY apps/web/pyproject.toml           apps/web/
+COPY apps/scheduler/pyproject.toml     apps/scheduler/
+COPY apps/worker-app/pyproject.toml    apps/worker-app/
+COPY libs/core/pyproject.toml          libs/core/
+COPY libs/webhooks/pyproject.toml      libs/webhooks/
+COPY libs/worker/pyproject.toml        libs/worker/
+COPY libs/workflows/pyproject.toml     libs/workflows/
+COPY plugins/communication-http/pyproject.toml plugins/communication-http/
+COPY plugins/communication-nats/pyproject.toml plugins/communication-nats/
+COPY plugins/communication-rq/pyproject.toml   plugins/communication-rq/
+COPY plugins/local-storage/pyproject.toml      plugins/local-storage/
+COPY plugins/provider-ollama/pyproject.toml    plugins/provider-ollama/
+COPY plugins/webhook-agent-session/pyproject.toml plugins/webhook-agent-session/
+COPY plugins/webhook-generic/pyproject.toml    plugins/webhook-generic/
+
+# Install the root development group, which carries the pinned Alembic runtime.
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv sync --frozen --group dev --no-install-project
+
+# Copy the workspace source tree so Alembic can import first-party packages
+# through migrations/env.py when it prepends the member src paths.
+COPY apps/ apps/
+COPY libs/ libs/
+COPY plugins/ plugins/
+
+# Install the first-party core package and preserve the previously installed
+# Alembic tooling in the environment.
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv sync --frozen --package waygate-core --no-dev --no-editable --inexact
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["alembic", "upgrade", "head"]
 
 # =============================================================================
 # Stage 2: runtime

@@ -107,7 +107,14 @@ The runtime fails fast when a configured communication plugin is missing. It doe
 ### Communication HTTP, NATS, and RQ
 
 - Implement the same `submit_workflow_trigger()` contract.
-- Let producers dispatch work without knowing whether delivery is an HTTP POST or an RQ enqueue operation.
+- Let producers dispatch work without knowing whether delivery is an HTTP POST, JetStream publish, or RQ enqueue operation.
+- NATS and RQ can also expose an optional worker-side companion through `waygate_worker_transport_plugin` so worker processes can resolve the matching listener from the configured communication plugin name.
+
+The worker-side companion keeps consumer startup aligned with the producer transport choice:
+
+- the shared worker runtime in `libs/worker` owns bootstrap, LLM preflight, and workflow handoff
+- the communication plugin owns transport-specific listener behavior such as queue polling, stream subscription, and settlement semantics
+- the worker app no longer needs to branch on transport-specific startup logic
 
 ### Ollama and Featherless providers
 
