@@ -1,6 +1,6 @@
 [project]
 name = "waygate-plugin-webhook-agent-session"
-version = "0.1.0"
+version = "0.1.1"
 description = "Dedicated completed agent-session webhook plugin for WayGate"
 readme = "README.md"
 authors = [
