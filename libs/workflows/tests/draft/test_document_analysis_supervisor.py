@@ -11,9 +11,35 @@ from waygate_workflows.schema import MetadataExtractionModel
 from waygate_workflows.schema import SummaryExtractionModel
 
 
+class _RecordingLogger:
+    def __init__(self) -> None:
+        self.records: list[dict[str, object]] = []
+
+    def debug(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "debug", "event": event, **kwargs})
+
+    def info(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "info", "event": event, **kwargs})
+
+    def warning(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "warning", "event": event, **kwargs})
+
+    def error(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "error", "event": event, **kwargs})
+
+    def has_event(self, level: str, event: str) -> bool:
+        return any(
+            record["level"] == level and record["event"] == event
+            for record in self.records
+        )
+
+
 def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
     monkeypatch,
 ) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
     create_agent_calls: list[dict[str, object]] = []
     invoked_payloads: list[tuple[str, str]] = []
     resolved_models: list[tuple[str, str, str | None]] = []
@@ -200,12 +226,17 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
         ("compile", "draft-model", "compile.source-analysis.findings"),
         ("compile", "draft-model", "compile.source-analysis.continuity"),
     ]
+    assert logger.has_event("info", "Starting document analysis supervisor run")
+    assert logger.has_event("info", "Completed document analysis supervisor run")
 
 
 def test_analyze_document_with_supervisor_falls_back_when_supervisor_lacks_structured_response(
     monkeypatch,
 ) -> None:
     invoked_kinds: list[str] = []
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
     document = {
         "uri": "file://raw/fallback.md",
         "content": "Document fallback content referencing Beta",
@@ -288,3 +319,7 @@ def test_analyze_document_with_supervisor_falls_back_when_supervisor_lacks_struc
         "compile.source-analysis.findings",
         "compile.source-analysis.continuity",
     ]
+    assert logger.has_event(
+        "warning",
+        "Document analysis supervisor returned no structured response; falling back to direct specialists",
+    )

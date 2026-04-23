@@ -3,8 +3,34 @@ from waygate_core.plugin import WorkflowDispatchResult
 from waygate_workflows.draft.jobs import process_workflow_trigger
 
 
+class _RecordingLogger:
+    def __init__(self) -> None:
+        self.records: list[dict[str, object]] = []
+
+    def debug(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "debug", "event": event, **kwargs})
+
+    def info(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "info", "event": event, **kwargs})
+
+    def warning(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "warning", "event": event, **kwargs})
+
+    def error(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "error", "event": event, **kwargs})
+
+    def has_event(self, level: str, event: str) -> bool:
+        return any(
+            record["level"] == level and record["event"] == event
+            for record in self.records
+        )
+
+
 def test_process_workflow_trigger_returns_completed_result(monkeypatch) -> None:
     document_uri = "file://staging/drafts/source.md"
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.router.logger", logger)
 
     monkeypatch.setattr(
         "waygate_workflows.router._invoke_compile_workflow",
@@ -43,6 +69,9 @@ def test_process_workflow_trigger_returns_completed_result(monkeypatch) -> None:
     assert result["compiled_document_uri"] == "file://compiled/compiled-abc.md"
     assert result["compiled_document_id"] == "compiled-abc"
     assert result["compiled_document_hash"] == "compiled-abc"
+    assert logger.has_event("info", "Received workflow trigger")
+    assert logger.has_event("info", "Processing draft.ready workflow trigger")
+    assert logger.has_event("info", "Compile workflow completed successfully")
 
 
 def test_process_workflow_trigger_returns_human_review(monkeypatch) -> None:
@@ -74,7 +103,10 @@ def test_process_workflow_trigger_returns_human_review(monkeypatch) -> None:
     assert result["interrupts"] == [{"value": {"type": "compile_human_review"}}]
 
 
-def test_process_workflow_trigger_ignores_unknown_event_type() -> None:
+def test_process_workflow_trigger_ignores_unknown_event_type(monkeypatch) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.router.logger", logger)
     result = process_workflow_trigger(
         {
             "event_type": "unknown.event",
@@ -86,6 +118,7 @@ def test_process_workflow_trigger_ignores_unknown_event_type() -> None:
 
     assert result["status"] == "ignored"
     assert result["event_type"] == "unknown.event"
+    assert logger.has_event("warning", "Ignoring unsupported workflow trigger event")
 
 
 def test_process_workflow_trigger_ignores_ready_integrate_until_implemented() -> None:
@@ -103,6 +136,10 @@ def test_process_workflow_trigger_ignores_ready_integrate_until_implemented() ->
 
 
 def test_process_workflow_trigger_returns_failed_config_result(monkeypatch) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.router.logger", logger)
+
     def raise_config_error(message) -> tuple[str, dict[str, object]]:
         raise LLMConfigurationError(
             "Unsupported LLM options for provider OllamaProvider"
@@ -130,10 +167,14 @@ def test_process_workflow_trigger_returns_failed_config_result(monkeypatch) -> N
     assert result["document_paths"] == ["file://raw/source.md"]
     assert result["metadata"] == {"origin": "unit-test"}
     assert "Unsupported LLM options" in result["detail"]
+    assert logger.has_event("error", "Compile workflow configuration failed")
 
 
 def test_process_workflow_trigger_rejects_empty_draft_ready(monkeypatch) -> None:
     invoked = {"called": False}
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.router.logger", logger)
 
     def fail_if_called(message) -> tuple[str, dict[str, object]]:
         invoked["called"] = True
@@ -162,3 +203,6 @@ def test_process_workflow_trigger_rejects_empty_draft_ready(monkeypatch) -> None
     assert result["document_paths"] == []
     assert result["metadata"] == {"origin": "unit-test"}
     assert "at least one document path" in result["detail"]
+    assert logger.has_event(
+        "error", "Rejecting draft.ready workflow trigger with no documents"
+    )
