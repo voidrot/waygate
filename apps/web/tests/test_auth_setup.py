@@ -26,6 +26,8 @@ def _clear_auth_env(monkeypatch) -> None:
     ):
         monkeypatch.delenv(name, raising=False)
 
+    monkeypatch.setenv("WAYGATE_WEB_AUTH__APP_NAME", "WayGate")
+
 
 def test_auth_settings_use_local_defaults_when_env_is_missing(monkeypatch) -> None:
     _clear_auth_env(monkeypatch)
@@ -76,6 +78,8 @@ def test_auth_settings_accept_canonical_waygate_prefixed_env_vars(monkeypatch) -
 
 
 def test_configure_auth_uses_resolved_settings(monkeypatch) -> None:
+    _clear_auth_env(monkeypatch)
+
     calls: dict[str, object] = {}
 
     monkeypatch.setattr(
