@@ -25,6 +25,27 @@ def normalize_string_list(values: object) -> list[str]:
     return normalized
 
 
+def preview_text(value: object, *, limit: int = 240) -> str:
+    """Return a compact preview of free-form text for debug logging.
+
+    Args:
+        value: Arbitrary text-like value.
+        limit: Maximum preview length.
+
+    Returns:
+        Whitespace-normalized preview truncated to the requested size.
+    """
+    if value is None:
+        return ""
+
+    text = " ".join(str(value).split())
+    if len(text) <= limit:
+        return text
+    if limit <= 3:
+        return text[:limit]
+    return f"{text[: limit - 3]}..."
+
+
 def extract_final_text(result: dict[str, object]) -> str:
     """Extract final text content from a LangChain agent response.
 

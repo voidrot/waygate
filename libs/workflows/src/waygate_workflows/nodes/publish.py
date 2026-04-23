@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from waygate_core.logging import get_logger
 from waygate_core.files import compute_content_hash
 from waygate_core.plugin import StorageNamespace
 
 from waygate_workflows.agents.publish import render_publish_artifact
 from waygate_workflows.runtime.storage import resolve_storage
 from waygate_workflows.schema import DraftGraphState, DraftWorkflowStatus
+
+logger = get_logger(__name__)
 
 
 def publish_draft(state: DraftGraphState) -> dict[str, object]:
@@ -22,8 +25,15 @@ def publish_draft(state: DraftGraphState) -> dict[str, object]:
     """
     source_set_key = state.get("source_set_key")
     if not source_set_key:
+        logger.error("Publish requires a source_set_key")
         raise ValueError("Publish requires a source_set_key")
 
+    logger.info(
+        "Publishing approved draft",
+        source_set_key=source_set_key,
+        revision_count=state["revision_count"],
+        draft_length=len(state["current_draft"]),
+    )
     compiled_document_hash = compute_content_hash(state["current_draft"])
     storage = resolve_storage()
     document_path = storage.build_namespaced_path(
@@ -36,6 +46,12 @@ def publish_draft(state: DraftGraphState) -> dict[str, object]:
             state,
             compiled_document_id=compiled_document_hash,
         ),
+    )
+    logger.info(
+        "Published compiled artifact",
+        source_set_key=source_set_key,
+        compiled_document_id=compiled_document_hash,
+        compiled_document_uri=document_uri,
     )
     return {
         "compiled_document_id": compiled_document_hash,

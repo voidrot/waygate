@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from waygate_core import get_app_context
+from waygate_core.logging import get_logger
 
 from waygate_workflows.agents.source_analysis import analyze_source_document
 from waygate_workflows.schema import ClaimLedgerEntry
@@ -15,7 +16,9 @@ from waygate_workflows.schema import ProcessedDocumentBrief
 from waygate_workflows.schema import ReferenceIndexEntry
 from waygate_workflows.schema import claim_id_for_text, normalize_key
 from waygate_workflows.content.guidance import load_agent_guidance_instructions
-from waygate_workflows.runtime.text import normalize_string_list
+from waygate_workflows.runtime.text import normalize_string_list, preview_text
+
+logger = get_logger(__name__)
 
 
 def _supporting_source_uris(
@@ -717,11 +720,34 @@ def compile_source_document(state: DraftGraphState) -> dict[str, object]:
     """
     document = state.get("active_document")
     if document is None:
+        logger.error(
+            "Compile source document node requires an active document",
+            source_set_key=state.get("source_set_key"),
+            document_cursor=state.get("document_cursor"),
+        )
         raise ValueError("Compile worker requires an active source document")
+
+    logger.info(
+        "Starting source document analysis",
+        source_set_key=state.get("source_set_key"),
+        document_uri=document["uri"],
+        document_cursor=state["document_cursor"],
+        total_documents=len(state["source_documents"]),
+    )
 
     # Prompt context is rebuilt from durable state each pass so retries and
     # resumes do not depend on transient in-memory data.
     prompt_context = build_document_analysis_prompt_context(state, document)
+    logger.debug(
+        "Built document analysis prompt context",
+        source_set_key=state.get("source_set_key"),
+        document_uri=document["uri"],
+        prior_brief_count=len(prompt_context["prior_briefs_subset"]),
+        glossary_count=len(prompt_context["glossary_subset"]),
+        entity_count=len(prompt_context["entity_subset"]),
+        claim_count=len(prompt_context["claim_subset"]),
+        guidance_count=len(prompt_context["prompt_instructions"]),
+    )
     core_settings = get_app_context().config.core
     analysis = analyze_source_document(
         document,
@@ -749,6 +775,22 @@ def compile_source_document(state: DraftGraphState) -> dict[str, object]:
         "key_claims": key_claims,
         "defined_terms": defined_terms,
     }
+    if not summary["summary"]:
+        logger.warning(
+            "Source document analysis returned an empty summary",
+            source_set_key=state.get("source_set_key"),
+            document_uri=document["uri"],
+        )
+    logger.debug(
+        "Source document analysis summary",
+        source_set_key=state.get("source_set_key"),
+        document_uri=document["uri"],
+        summary_preview=preview_text(summary["summary"]),
+        topic_count=len(metadata["topics"]),
+        tag_count=len(metadata["tags"]),
+        key_claim_count=len(summary["key_claims"]),
+        defined_term_count=len(summary["defined_terms"]),
+    )
     supporting_source_uris = _supporting_source_uris(
         str(document["uri"]),
         document.get("source_uri"),
@@ -854,6 +896,16 @@ def compile_source_document(state: DraftGraphState) -> dict[str, object]:
         if next_cursor < len(state["source_documents"])
         else None
     )
+    logger.info(
+        "Completed source document analysis",
+        source_set_key=state.get("source_set_key"),
+        document_uri=document["uri"],
+        next_document_uri=next_document["uri"] if next_document else None,
+        processed_document_count=len(prior_document_briefs),
+        unresolved_open_count=sum(
+            1 for entry in unresolved_mentions if entry.get("status") == "open"
+        ),
+    )
     return {
         "document_cursor": next_cursor,
         "active_document": next_document,
@@ -889,5 +941,16 @@ def route_compile_source_document(state: DraftGraphState) -> str:
         otherwise ``synthesis``.
     """
     if state.get("active_document") is None:
+        logger.info(
+            "Source document loop completed; routing to synthesis",
+            source_set_key=state.get("source_set_key"),
+            processed_document_count=len(state["document_summaries"]),
+        )
         return "synthesis"
+    logger.debug(
+        "Routing to next source document analysis pass",
+        source_set_key=state.get("source_set_key"),
+        next_document_uri=state["active_document"]["uri"],
+        document_cursor=state["document_cursor"],
+    )
     return "compile_source_document"

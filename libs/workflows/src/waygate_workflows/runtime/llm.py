@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from waygate_core import get_app_context
+from waygate_core.logging import get_logger
 from waygate_core.plugin import (
     LLMCommonOptions,
     LLMConfigurationError,
@@ -16,6 +17,9 @@ from waygate_core.plugin import (
     LLMReadinessProbe,
     resolve_invocation_options,
 )
+from waygate_workflows.runtime.text import preview_text
+
+logger = get_logger(__name__)
 
 
 COMPILE_TARGET_LEGACY_PROFILE_KEYS: dict[str, str] = {
@@ -59,12 +63,23 @@ def resolve_llm_provider() -> tuple[object, object]:
     """
     app_context = get_app_context()
     provider_name = app_context.config.core.llm_plugin_name
+    logger.debug("Resolving LLM provider", provider_name=provider_name)
     provider = app_context.plugins.llm.get(provider_name)
     if provider is None:
         available = ", ".join(sorted(app_context.plugins.llm.keys()))
+        logger.error(
+            "Configured LLM provider is unavailable",
+            provider_name=provider_name,
+            available_providers=available,
+        )
         raise RuntimeError(
             f"Configured LLM provider '{provider_name}' is unavailable. Installed providers: {available}"
         )
+    logger.debug(
+        "Resolved LLM provider",
+        provider_name=provider_name,
+        provider_type=type(provider).__name__,
+    )
     return provider, app_context.config.core
 
 
@@ -85,7 +100,7 @@ def build_llm_request(
     model_name = (
         profile.model_name if profile and profile.model_name else fallback_model_name
     )
-    return LLMInvocationRequest(
+    request = LLMInvocationRequest(
         workflow_name=workflow_name,
         target_name=target_name,
         model_name=model_name,
@@ -93,6 +108,15 @@ def build_llm_request(
         provider_options=provider_options,
         option_policy=option_policy,
     )
+    logger.debug(
+        "Built LLM request",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        model_name=model_name,
+        used_profile=profile is not None,
+        option_policy=option_policy.value,
+    )
+    return request
 
 
 def validate_llm_request(
@@ -106,6 +130,12 @@ def validate_llm_request(
     target_label = request.target_name or request.workflow_name
 
     if requires_structured_output and not capabilities.supports_structured_output:
+        logger.error(
+            "LLM provider does not support required structured output",
+            provider_name=capabilities.provider_name,
+            target_name=target_label,
+            model_name=request.model_name,
+        )
         raise LLMConfigurationError(
             "Configured LLM provider "
             f"'{capabilities.provider_name}' does not support structured output "
@@ -113,6 +143,13 @@ def validate_llm_request(
         )
 
     resolve_invocation_options(request, capabilities)
+    logger.debug(
+        "Validated LLM request",
+        provider_name=capabilities.provider_name,
+        target_name=target_label,
+        model_name=request.model_name,
+        requires_structured_output=requires_structured_output,
+    )
 
 
 def resolve_chat_model(
@@ -227,12 +264,20 @@ def validate_compile_llm_readiness(
     if provider is None or core_settings is None:
         provider, core_settings = resolve_llm_provider()
 
+    logger.info("Starting compile LLM readiness validation")
+
     for (
         target_name,
         fallback_attr,
         requires_structured_output,
     ) in COMPILE_LLM_PREFLIGHT_TARGETS:
         fallback_model_name = getattr(core_settings, fallback_attr)
+        logger.debug(
+            "Validating compile LLM target",
+            target_name=target_name,
+            fallback_model_name=fallback_model_name,
+            requires_structured_output=requires_structured_output,
+        )
         request = build_llm_request(
             "compile",
             fallback_model_name,
@@ -248,6 +293,7 @@ def validate_compile_llm_readiness(
             _probe_structured_readiness(provider, _PreflightStructuredSchema, request)
         else:
             _probe_text_readiness(provider, request)
+    logger.info("Compile LLM readiness validation completed")
 
 
 def resolve_embeddings_model(
@@ -418,10 +464,19 @@ def _coerce_structured_stage_result(schema: type[TModel], result: object) -> TMo
 
         recovered = _recover_structured_output_from_raw_message(result.get("raw"))
         if recovered is not None:
+            logger.warning(
+                "Recovered structured output from raw provider message",
+                schema_name=schema.__name__,
+            )
             return schema.model_validate(recovered)
 
         parsing_error = result.get("parsing_error")
         if isinstance(parsing_error, BaseException):
+            logger.error(
+                "Structured output parsing failed",
+                schema_name=schema.__name__,
+                detail=str(parsing_error),
+            )
             raise parsing_error
 
     return schema.model_validate(result)
@@ -437,6 +492,19 @@ def invoke_structured_stage(
     user_prompt: str,
 ) -> TModel:
     """Invoke a structured LLM stage and coerce the response into a schema."""
+    logger.info(
+        "Invoking structured LLM stage",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        schema_name=schema.__name__,
+        prompt_length=len(user_prompt),
+    )
+    logger.debug(
+        "Structured LLM stage prompt preview",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        prompt_preview=preview_text(user_prompt),
+    )
     provider, core_settings = resolve_llm_provider()
     request = build_llm_request(
         workflow_name,
@@ -456,7 +524,15 @@ def invoke_structured_stage(
             HumanMessage(content=user_prompt),
         ]
     )
-    return _coerce_structured_stage_result(schema, result)
+    coerced = _coerce_structured_stage_result(schema, result)
+    logger.info(
+        "Structured LLM stage completed",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        schema_name=schema.__name__,
+        result_type=type(coerced).__name__,
+    )
+    return coerced
 
 
 def invoke_text_stage(
@@ -468,6 +544,18 @@ def invoke_text_stage(
     user_prompt: str,
 ) -> str:
     """Invoke a text-generating LLM stage."""
+    logger.info(
+        "Invoking text LLM stage",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        prompt_length=len(user_prompt),
+    )
+    logger.debug(
+        "Text LLM stage prompt preview",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        prompt_preview=preview_text(user_prompt),
+    )
     provider, core_settings = resolve_llm_provider()
     request = build_llm_request(
         workflow_name,
@@ -485,5 +573,13 @@ def invoke_text_stage(
     )
     content = getattr(result, "content", result)
     if isinstance(content, list):
-        return "\n".join(str(item) for item in content).strip()
-    return str(content).strip()
+        text = "\n".join(str(item) for item in content).strip()
+    else:
+        text = str(content).strip()
+    logger.info(
+        "Text LLM stage completed",
+        workflow_name=workflow_name,
+        target_name=target_name,
+        response_length=len(text),
+    )
+    return text
