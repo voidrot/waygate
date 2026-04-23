@@ -1,0 +1,63 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="card-title">{{ review_record.source_set_key }}</h2>
+        <span class="badge badge-warning badge-outline"
+          >Pending human review</span
+        >
+      </div>
+      <div class="rounded-box bg-base-200 p-4">
+        <p class="text-xs uppercase text-base-content/50">
+          Current draft excerpt
+        </p>
+        <p class="mt-2 text-sm text-base-content/80">
+          {{ review_record.current_draft }}
+        </p>
+      </div>
+      <div>
+        <p class="mb-2 text-xs uppercase text-base-content/50">
+          Review feedback
+        </p>
+        <ul class="list gap-2">
+          {% for feedback in review_record.review_feedback %}
+          <li class="list-row rounded-box bg-base-200 px-4 py-3">
+            <div class="list-col-grow text-sm">{{ feedback }}</div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </article>
+
+  <aside class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Decision contract</h2>
+      <p class="text-sm text-base-content/65">
+        These buttons already preserve the workflow action names used by the
+        compile graph.
+      </p>
+      <div id="review-action-status" class="min-h-16"></div>
+      <form class="flex flex-col gap-3">
+        {% for action in review_record.resume_options %}
+        <button
+          class="btn {% if action == 'resume_to_publish' %}btn-primary{% else %}btn-soft{% endif %}"
+          hx-post="/reviews/{{ review_record.source_set_key }}/decision"
+          hx-target="#review-action-status"
+          hx-swap="innerHTML"
+          name="action"
+          value="{{ action }}"
+          type="submit"
+        >
+          {{ action }}
+        </button>
+        {% endfor %}
+      </form>
+      <div class="text-sm text-base-content/60">
+        Revision count: {{ review_record.revision_count }}
+      </div>
+    </div>
+  </aside>
+</section>
+{% endblock %}

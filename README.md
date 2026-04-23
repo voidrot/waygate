@@ -6,12 +6,12 @@ WayGate is a modular platform for building **Generation-Augmented Retrieval (GAR
 
 ```text
 apps/
-  api/          — FastAPI HTTP server; exposes webhook endpoints and the OpenAPI schema
+  web/          — Unified FastAPI web app for UI, auth, and mounted webhook ingress
   scheduler/    — Background job runner for cron-style workflows
-  draft-worker/ — RQ worker for queued draft workflow triggers
-  nats-worker/  — JetStream worker for durable workflow trigger execution
+  worker-app/   — Single transport-agnostic worker app for workflow execution
 libs/
   core/         — Shared framework: plugin system, config registry, bootstrap, logging
+  webhooks/     — Mountable FastAPI webhook ingress app and OpenAPI helpers
   worker/       — Shared worker runtime helpers and JetStream consumer loop
   workflows/    — Shared workflow entrypoints executed by workers
 plugins/
@@ -39,8 +39,8 @@ Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
 # Install all packages
 uv sync --all-packages
 
-# Run the API server
-uv run waygate-api
+# Run the unified web app
+uv run waygate-web
 
 # Run the scheduler
 uv run waygate-scheduler
@@ -48,35 +48,80 @@ uv run waygate-scheduler
 
 Copy `env.example` to `.env` and set values appropriate for your environment before starting.
 
-## Docker Compose Smoke Test
-
-Use the Compose stack when you want to exercise the generic webhook -> API ->
-JetStream -> nats-worker pipeline with the Ollama provider.
-
-The minimum path for that flow is `db`, `valkey`, `chromadb`, `nats`, `ollama`,
-`api`, and `nats-worker`. `scheduler` is not required for webhook-driven draft
-runs.
+## Docker Compose
 
 Use [env.compose.example](env.compose.example) as the template for your local
-`.env.compose` file before starting the stack.
+`.env.compose` file before starting either Compose workflow.
 
-1. Start the infrastructure and Ollama service.
+### Development Compose
+
+The default [compose.yml](compose.yml) is the local development path. It builds
+the images from the workspace, keeps `web` and `worker` on the default
+stack, and runs a one-shot migration container before application services
+start.
 
 ```bash
-docker compose up -d db valkey chromadb nats ollama
+docker compose up -d
+```
+
+Optional development-only profiles:
+
+- `scheduler` adds the scheduler process.
+- switch `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME` to `communication-rq` or
+  `communication-http` when you want the single `worker` service to listen on a
+  different transport.
+
+### Production-Style Compose
+
+Use [compose.prod.yml](compose.prod.yml) when you want an explicit runtime shape
+selected via profiles.
+
+NATS-backed runtime with local Ollama and Chroma:
+
+```bash
+docker compose -f compose.prod.yml --profile nats --profile chroma --profile ollama up -d web worker
+```
+
+RQ-backed runtime with local Ollama and Chroma:
+
+```bash
+# First set WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME=communication-rq in .env.compose
+docker compose -f compose.prod.yml --profile rq --profile chroma --profile ollama up -d web worker
+```
+
+Add `--profile scheduler` to either production-style command when you want the
+cron scheduler in the stack.
+
+Important runtime details:
+
+- [env.compose.example](env.compose.example) defaults to `communication-nats`, so the `nats` profile is the matching production-style transport unless you change the env file.
+- [env.compose.example](env.compose.example) also points `WAYGATE_WEB_AUTH__DEFAULT_DATABASE_URI` at the Compose Postgres service so AuthTuna does not fall back to an in-container SQLite path.
+- [env.compose.example](env.compose.example) includes `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://ollama:11434`, so the `ollama` profile is required unless you point that setting at an external provider.
+- The one-shot `migrate` service now runs `alembic upgrade head` before the web app and workers start.
+
+## Docker Compose Smoke Test
+
+Use the profiled production-style Compose stack when you want to exercise the
+generic webhook -> web app -> JetStream -> worker pipeline with the Ollama
+provider.
+
+1. Start the profiled smoke stack.
+
+```bash
+docker compose -f compose.prod.yml --profile nats --profile chroma --profile ollama up -d db valkey chromadb nats ollama
 ```
 
 1. Pull the models required by the local smoke test before starting the worker.
 
 ```bash
-docker compose exec ollama ollama pull qwen3.5:9b
-docker compose exec ollama ollama pull hermes3:8b
+docker compose -f compose.prod.yml --profile nats --profile chroma --profile ollama exec ollama ollama pull qwen3.5:9b
+docker compose -f compose.prod.yml --profile nats --profile chroma --profile ollama exec ollama ollama pull hermes3:8b
 ```
 
-1. Start the API and NATS worker.
+1. Start the web app and worker service. The migration service runs automatically.
 
 ```bash
-docker compose up -d api nats-worker
+docker compose -f compose.prod.yml --profile nats --profile chroma --profile ollama up -d web worker
 ```
 
 1. Post the sample generic webhook payload.
@@ -93,21 +138,18 @@ Raw webhook artifacts are written under `./wiki/raw/`. Successful compile runs
 write published markdown under `./wiki/published/`. If the workflow stops for a
 human decision, the review record is written under `./wiki/review/`.
 
-Important runtime details:
-
-- [env.compose.example](env.compose.example) includes `WAYGATE_OLLAMAPROVIDER__BASE_URL=http://ollama:11434` so containers reach the Compose Ollama service instead of their own loopback interface.
-- The NATS worker validates the configured compile models at startup. If you change `WAYGATE_CORE__METADATA_MODEL_NAME`, `WAYGATE_CORE__DRAFT_MODEL_NAME`, or `WAYGATE_CORE__REVIEW_MODEL_NAME`, pull those models into Ollama before restarting the worker.
-- `mise run test:compose:nats-smoke` runs the same workflow in an isolated Compose project using a lightweight Ollama smoke-model profile so end-to-end verification completes faster.
+- The worker validates the configured compile models at startup. If you change `WAYGATE_CORE__METADATA_MODEL_NAME`, `WAYGATE_CORE__DRAFT_MODEL_NAME`, or `WAYGATE_CORE__REVIEW_MODEL_NAME`, pull those models into Ollama before restarting it.
+- `mise run test:compose:nats-smoke` runs the same workflow in an isolated Compose project using the profiled production-style stack and a lightweight Ollama smoke-model profile so end-to-end verification completes faster.
 
 ## Packages
 
 | Package                                                            | Description                               |
 | ------------------------------------------------------------------ | ----------------------------------------- |
 | [`waygate-core`](libs/core/)                                       | Plugin system, config registry, bootstrap |
-| [`waygate-api`](apps/api/)                                         | FastAPI HTTP server                       |
+| [`waygate-web`](apps/web/)                                         | Unified FastAPI web app                   |
 | [`waygate-scheduler`](apps/scheduler/)                             | Cron job runner                           |
-| [`waygate-draft-worker`](apps/draft-worker/)                       | RQ draft worker                           |
-| [`waygate-nats-worker`](apps/nats-worker/)                         | JetStream workflow worker                 |
+| [`waygate-worker-app`](apps/worker-app/)                           | Primary transport-agnostic worker app     |
+| [`waygate-webhooks`](libs/webhooks/)                               | Mountable webhook ingress app             |
 | [`waygate-worker`](libs/worker/)                                   | Shared worker runtime helpers             |
 | [`waygate-plugin-local-storage`](plugins/local-storage/)           | Filesystem storage plugin                 |
 | [`waygate-plugin-provider-ollama`](plugins/provider-ollama/)       | Ollama LLM provider plugin                |

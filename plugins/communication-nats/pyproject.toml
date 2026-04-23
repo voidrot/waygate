@@ -7,10 +7,16 @@ authors = [
     { name = "Buck Brady", email = "22723438+voidrot@users.noreply.github.com" },
 ]
 requires-python = ">=3.14"
-dependencies = ["nats-py>=2.11.0", "pydantic>=2.13.2", "waygate-core"]
+dependencies = [
+    "nats-py>=2.11.0",
+    "pydantic>=2.13.2",
+    "waygate-core",
+    "waygate-worker",
+]
 
 [tool.uv.sources]
-waygate-core = { workspace = true }
+waygate-core   = { workspace = true }
+waygate-worker = { workspace = true }
 
 [project.entry-points."waygate.plugins.communication"]
 communication_nats = "waygate_plugin_communication_nats.plugin:CommunicationNatsPlugin"

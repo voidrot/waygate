@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Annotated
@@ -14,12 +15,15 @@ from pydantic_settings import NoDecode
 
 from waygate_core.plugin import (
     CommunicationClientPlugin,
+    CommunicationWorkerTransportPlugin,
     DispatchErrorKind,
     PluginConfigRegistration,
+    WorkflowTriggerRunner,
     WorkflowDispatchResult,
     WorkflowTriggerMessage,
 )
 from waygate_core.plugin.hooks import hookimpl
+from waygate_worker import NatsWorkerConfig, run_nats_worker
 
 PLUGIN_NAME = "communication-nats"
 _NATS_MESSAGE_ID_PATTERN = re.compile(r"[^a-zA-Z0-9._:-]+")
@@ -35,8 +39,24 @@ class CommunicationNatsConfig(BaseModel):
     draft_subject: str = Field(default="waygate.workflow.draft")
     cron_subject: str = Field(default="waygate.workflow.cron")
     client_name: str = Field(default="waygate-communication-nats")
+    worker_client_name: str = Field(default="waygate-worker")
     connect_timeout_seconds: float = Field(default=2.0, gt=0)
     publish_timeout_seconds: float = Field(default=5.0, gt=0)
+    js_api_timeout_seconds: float = Field(default=5.0, gt=0)
+    draft_consumer_name: str = Field(default="waygate-draft")
+    cron_consumer_name: str = Field(default="waygate-cron")
+    fetch_batch_size: int = Field(default=1, ge=1)
+    fetch_timeout_seconds: float = Field(default=5.0, gt=0)
+    fetch_heartbeat_seconds: float = Field(default=1.0, gt=0)
+    idle_sleep_seconds: float = Field(default=1.0, ge=0)
+    in_progress_heartbeat_seconds: float = Field(default=15.0, gt=0)
+    ack_wait_seconds: float = Field(default=30.0, gt=0)
+    max_deliver: int = Field(default=3, ge=1)
+    max_ack_pending: int = Field(default=1, ge=1)
+    backoff_seconds: Annotated[list[float], NoDecode] = Field(
+        default_factory=lambda: [10.0, 30.0, 60.0]
+    )
+    duplicate_window_seconds: float = Field(default=120.0, gt=0)
 
     @field_validator("servers", mode="before")
     @classmethod
@@ -46,6 +66,19 @@ class CommunicationNatsConfig(BaseModel):
         if isinstance(value, list):
             return [str(item).strip() for item in value if str(item).strip()]
         raise TypeError("servers must be a list[str] or comma-delimited string")
+
+    @field_validator("backoff_seconds", mode="before")
+    @classmethod
+    def _normalize_backoff(cls, value: object) -> list[float]:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                decoded = json.loads(stripped)
+                return [float(item) for item in decoded]
+            return [float(item.strip()) for item in stripped.split(",") if item.strip()]
+        if isinstance(value, list):
+            return [float(item) for item in value]
+        raise TypeError("backoff_seconds must be a list[float] or string")
 
 
 class CommunicationNatsPlugin(CommunicationClientPlugin):
@@ -71,6 +104,13 @@ class CommunicationNatsPlugin(CommunicationClientPlugin):
         return PluginConfigRegistration(
             name=PLUGIN_NAME, config=CommunicationNatsConfig
         )
+
+    @staticmethod
+    @hookimpl
+    def waygate_worker_transport_plugin() -> type["CommunicationNatsWorkerTransport"]:
+        """Register the NATS worker transport companion."""
+
+        return CommunicationNatsWorkerTransport
 
     async def submit_workflow_trigger(
         self,
@@ -195,3 +235,35 @@ class CommunicationNatsPlugin(CommunicationClientPlugin):
         if status_code in {500, 503}:
             return DispatchErrorKind.TRANSIENT
         return DispatchErrorKind.PERMANENT
+
+
+class CommunicationNatsWorkerTransport(CommunicationWorkerTransportPlugin):
+    """Run the JetStream worker loop for the configured workflow transport."""
+
+    plugin_name = PLUGIN_NAME
+
+    def __init__(self, config: CommunicationNatsConfig | None = None) -> None:
+        self._config = config or CommunicationNatsConfig()
+
+    @property
+    def name(self) -> str:
+        return PLUGIN_NAME
+
+    async def run(
+        self,
+        runner: WorkflowTriggerRunner,
+        *,
+        stop_event: asyncio.Event | None = None,
+    ) -> None:
+        config_data = self._config.model_dump(mode="python")
+        worker_config = NatsWorkerConfig.model_validate(
+            {
+                **config_data,
+                "client_name": self._config.worker_client_name,
+            }
+        )
+        await run_nats_worker(
+            config=worker_config,
+            runner=runner,
+            stop_event=stop_event,
+        )

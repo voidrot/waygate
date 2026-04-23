@@ -1,0 +1,258 @@
+{% extends "account_shell.html" %} {% set active_page = "organizations" %} {%
+set page_title = org.name %} {% set page_intro = "Manage membership, teams, and
+organization-level access." %} {% block account_content %}
+<section class="grid gap-6">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="card-title">Organization details</h2>
+          <p class="text-sm text-base-content/60">
+            Created {{ org_created_at }} · ID {{ org.id }}
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          {% if is_owner %}
+          <button
+            class="btn btn-error btn-sm"
+            id="delete-org-button"
+            type="button"
+          >
+            Delete organization
+          </button>
+          {% elif can_manage %}
+          <button
+            class="btn btn-warning btn-sm"
+            id="leave-org-button"
+            type="button"
+          >
+            Leave organization
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <section class="grid gap-6 xl:grid-cols-2">
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="card-title">Members</h2>
+          {% if can_manage %}
+          <span class="badge badge-primary badge-outline">Manageable</span>
+          {% endif %}
+        </div>
+        {% if can_manage %}
+        <form
+          id="org-invite-form"
+          class="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
+        >
+          <input
+            class="input input-bordered w-full"
+            id="org-invite-email"
+            placeholder="Invitee email"
+            required
+            type="email"
+          />
+          <select class="select select-bordered w-full" id="org-invite-role">
+            <option value="OrgMember">Org member</option>
+            <option value="OrgAdmin">Org admin</option>
+          </select>
+          <button class="btn btn-primary" type="submit">Invite</button>
+        </form>
+        <div
+          id="org-invite-message"
+          class="alert hidden text-sm"
+          role="status"
+        ></div>
+        {% endif %}
+        <div class="flex flex-col gap-3">
+          {% for member in members %}
+          <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="font-semibold">{{ member.username }}</p>
+                <p class="text-xs text-base-content/60">
+                  {{ member.email }} · joined {{ member.joined_at }}
+                </p>
+              </div>
+              {% if can_manage and member.user_id != org.owner_id %}
+              <button
+                class="btn btn-ghost btn-sm"
+                data-member-id="{{ member.user_id }}"
+                data-member-email="{{ member.email }}"
+                type="button"
+              >
+                Remove
+              </button>
+              {% else %}
+              <span class="badge badge-ghost"
+                >{{ 'Owner' if member.user_id == org.owner_id else 'Member'
+                }}</span
+              >
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="card-title">Teams</h2>
+          {% if can_manage %}
+          <form id="org-team-form" class="flex flex-wrap gap-3">
+            <input
+              class="input input-bordered w-full max-w-xs"
+              id="org-team-name"
+              placeholder="New team name"
+              required
+              type="text"
+            />
+            <button class="btn btn-primary" type="submit">Create team</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if can_manage %}
+        <div
+          id="org-team-message"
+          class="alert hidden text-sm"
+          role="status"
+        ></div>
+        {% endif %} {% if teams %}
+        <div class="flex flex-col gap-3">
+          {% for team in teams %}
+          <a
+            class="rounded-box border border-base-300 bg-base-200 px-4 py-3 transition hover:border-primary"
+            href="/ui/teams/{{ team.id }}"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="font-semibold">{{ team.name }}</p>
+                <p class="text-xs text-base-content/60">
+                  Created {{ team.created_at_human if team.created_at_human else
+                  team.created_at }}
+                </p>
+              </div>
+              <span class="btn btn-ghost btn-sm">Open</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-base-content/60">No teams created yet.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+</section>
+{% endblock %} {% block body_end %}
+<script>
+  const orgId = {{ org.id|tojson }};
+  const orgInviteForm = document.getElementById("org-invite-form");
+  const orgTeamForm = document.getElementById("org-team-form");
+  const orgInviteMessage = document.getElementById("org-invite-message");
+  const orgTeamMessage = document.getElementById("org-team-message");
+
+  function showOrgMessage(node, kind, text) {
+    node.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    node.textContent = text;
+    node.classList.remove("hidden");
+  }
+
+  if (orgInviteForm) {
+    orgInviteForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const response = await fetch(`/ui/organizations/${orgId}/invite`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("org-invite-email").value,
+            role_name: document.getElementById("org-invite-role").value,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to send organization invite.");
+        }
+        showOrgMessage(orgInviteMessage, "success", data.message || "Invitation sent.");
+        orgInviteForm.reset();
+      } catch (error) {
+        showOrgMessage(orgInviteMessage, "error", error.message || "Unable to send organization invite.");
+      }
+    });
+  }
+
+  if (orgTeamForm) {
+    orgTeamForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const response = await fetch(`/ui/organizations/${orgId}/teams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: document.getElementById("org-team-name").value }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to create team.");
+        }
+        showOrgMessage(orgTeamMessage, "success", data.message || "Team created.");
+        window.setTimeout(() => window.location.reload(), 600);
+      } catch (error) {
+        showOrgMessage(orgTeamMessage, "error", error.message || "Unable to create team.");
+      }
+    });
+  }
+
+  document.querySelectorAll("[data-member-id]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/ui/organizations/${orgId}/members/${button.dataset.memberId}`, { method: "DELETE" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || `Unable to remove ${button.dataset.memberEmail}.`);
+        }
+        window.location.reload();
+      } catch (error) {
+        window.alert(error.message || `Unable to remove ${button.dataset.memberEmail}.`);
+      }
+    });
+  });
+
+  const deleteOrgButton = document.getElementById("delete-org-button");
+  if (deleteOrgButton) {
+    deleteOrgButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/ui/organizations/${orgId}`, { method: "DELETE" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to delete organization.");
+        }
+        window.location.href = "/ui/organizations";
+      } catch (error) {
+        window.alert(error.message || "Unable to delete organization.");
+      }
+    });
+  }
+
+  const leaveOrgButton = document.getElementById("leave-org-button");
+  if (leaveOrgButton) {
+    leaveOrgButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/ui/organizations/${orgId}/leave`, { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to leave organization.");
+        }
+        window.location.href = "/ui/organizations";
+      } catch (error) {
+        window.alert(error.message || "Unable to leave organization.");
+      }
+    });
+  }
+</script>
+{% endblock %}

@@ -24,7 +24,7 @@ The old docs also assumed a larger product surface than the current repository c
 
 Those assumptions should not be carried forward as if they already exist:
 
-- there is no operator UI in this repo
+- there is no full operator UI in this repo beyond the minimal server-rendered control plane in `apps/web`
 - there is no retrieval SDK or MCP server package in this repo
 - there is no static-site publishing pipeline in this repo
 - publish does not currently write to PostgreSQL, pgvector, or any other secondary system
@@ -91,7 +91,7 @@ This theme consolidates the older thematic synthesis, operator metadata view, st
 ### Presentation baseline in this repo
 
 - the system already writes published markdown with useful frontmatter
-- there is no human-facing site builder or operator UI
+- the repo includes a minimal server-rendered control plane in `apps/web`, but there is no human-facing site builder or richer operator workflow UI
 - there is no downstream hook consumer for publish events
 
 ### Presentation direction to retain

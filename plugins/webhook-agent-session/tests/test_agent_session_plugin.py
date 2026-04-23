@@ -238,7 +238,7 @@ def test_build_workflow_trigger_uses_draft_ready_with_session_metadata() -> None
 
     assert trigger == WorkflowTriggerMessage(
         event_type="draft.ready",
-        source="waygate-api.webhooks.agent-session",
+        source="waygate-web.webhooks.agent-session",
         document_paths=["file://raw/session-123.txt"],
         idempotency_key="github-copilot-chat:session-123",
         metadata={

@@ -5,12 +5,12 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "packages": {
-    "apps/api": {
-      "package-name": "waygate-api",
+    "apps/web": {
+      "package-name": "waygate-web",
       "extra-files": [
         {
           "type": "generic",
-          "path": "apps/api/src/waygate_api/__init__.py"
+          "path": "apps/web/src/waygate_web/__init__.py"
         }
       ]
     },
@@ -23,21 +23,12 @@
         }
       ]
     },
-    "apps/draft-worker": {
-      "package-name": "waygate-draft-worker",
+    "apps/worker-app": {
+      "package-name": "waygate-worker-app",
       "extra-files": [
         {
           "type": "generic",
-          "path": "apps/draft-worker/src/waygate_draft_worker/__init__.py"
-        }
-      ]
-    },
-    "apps/nats-worker": {
-      "package-name": "waygate-nats-worker",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "apps/nats-worker/src/waygate_nats_worker/__init__.py"
+          "path": "apps/worker-app/src/waygate_worker_app/__init__.py"
         }
       ]
     },
@@ -47,6 +38,15 @@
         {
           "type": "generic",
           "path": "libs/core/src/waygate_core/__init__.py"
+        }
+      ]
+    },
+    "libs/webhooks": {
+      "package-name": "waygate-webhooks",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "libs/webhooks/src/waygate_webhooks/__init__.py"
         }
       ]
     },

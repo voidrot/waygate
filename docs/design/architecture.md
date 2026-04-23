@@ -8,43 +8,43 @@ WayGate is a Python monorepo for building Generation-Augmented Retrieval workflo
 
 The repository is organized into three layers.
 
-- `apps`: `api`, `scheduler`, `draft-worker`, `nats-worker`
-  Responsibility: long-running processes that expose HTTP ingress, schedule recurring jobs, or execute workflow work over RQ or JetStream.
-- `libs`: `core`, `worker`, `workflows`
+- `apps`: `web`, `scheduler`, `worker-app`
+  Responsibility: long-running processes that expose the operator UI, HTTP ingress, schedule recurring jobs, or execute workflow work through a shared worker app.
+- `libs`: `core`, `webhooks`, `worker`, `workflows`
   Responsibility: shared runtime primitives, worker execution helpers, plugin contracts, configuration, and workflow implementation.
 - `plugins`: `local-storage`, `provider-ollama`, `provider-featherless-ai`, `communication-http`, `communication-nats`, `communication-rq`, `webhook-generic`, `webhook-agent-session`
   Responsibility: first-party implementations of the plugin interfaces defined in `waygate-core`.
 
 ## Package Boundaries
 
-### apps/api
+### apps/web
 
-- FastAPI ingress service.
-- Discovers webhook plugins and mounts one route per plugin under `/webhooks/<plugin-name>`.
+- Unified FastAPI host for the server-rendered operator UI.
+- Initializes AuthTuna for browser and API-oriented auth flows.
+- Mounts the reusable webhook ingress app from `libs/webhooks` under `/webhooks`.
+- Merges mounted webhook OpenAPI endpoints into the parent docs so the web app is the primary API surface.
+
+### libs/webhooks
+
+- Owns the mountable FastAPI webhook ingress sub-application.
+- Discovers webhook plugins and registers one route per plugin.
 - Persists normalized raw documents through the configured storage plugin.
 - Asks the matched webhook plugin to build the downstream workflow trigger after storage writes complete.
 - Dispatches that workflow trigger through the configured communication plugin. The default webhook behavior still emits `draft.ready`.
+- Owns webhook-specific OpenAPI helpers so mounted routes can still appear in the parent app's docs.
 
 ### apps/scheduler
 
-- Bootstraps the same app context as the API.
+- Bootstraps the same app context as the web app.
 - Loads installed cron plugins and schedules them with APScheduler.
-- Dispatches `cron.tick` messages through the same communication client contract used by the API.
+- Dispatches `cron.tick` messages through the same communication client contract used by the web app.
 
-### apps/draft-worker
+### apps/worker-app
 
-- RQ worker runtime for queued workflow execution.
-- Depends on `waygate-workflows` for importable job entrypoints.
-- Consumes the RQ communication plugin configuration and listens on the configured draft queue.
-- Preflights the active compile-workflow LLM provider before polling Redis so provider-construction errors fail at startup.
-- The concrete worker-side workflow entrypoint currently resolves to `waygate_workflows.draft.jobs.process_workflow_trigger`.
-
-### apps/nats-worker
-
-- JetStream worker runtime for durable workflow execution.
-- Consumes the `draft.ready` and `cron.tick` subjects configured by `communication-nats`.
-- Uses the shared helpers in `libs/worker` to extend ACK leases while long-running workflow steps execute.
-- Preflights the active compile-workflow LLM provider before polling JetStream so provider-construction errors fail at startup.
+- Primary transport-agnostic worker app.
+- Resolves the worker-side transport companion from `WAYGATE_CORE__COMMUNICATION_PLUGIN_NAME`.
+- Handles HTTP receive mode directly and reuses the shared RQ and JetStream worker helpers for queue-backed transports.
+- Preflights the active compile-workflow LLM provider before accepting work.
 
 ### libs/core
 
@@ -54,8 +54,9 @@ The repository is organized into three layers.
 
 ### libs/worker
 
-- Holds worker-runtime helpers shared across transport-specific worker apps.
-- Currently ships the JetStream consumer loop used by `apps/nats-worker`.
+- Holds worker-runtime helpers shared across the transport-agnostic worker app.
+- Owns the generic worker bootstrap path that resolves the worker-side transport companion for the configured communication plugin.
+- Ships the JetStream and RQ runtime helpers used by communication plugins to implement listener loops.
 - Keeps workflow execution concerns separate from transport configuration and settlement mechanics.
 
 ### libs/workflows
@@ -91,15 +92,19 @@ The durable artifacts in the current repository are storage-backed files:
 - published compiled markdown
 - metadata/templates/agents content for storage plugins that provide those namespaces
 
+The repository may also persist relational secondary indexes in Postgres for document metadata, workflow jobs, job transitions, document/job edit history, and vector references. Those tables are reconstructable operational indexes and do not replace the storage-backed artifacts as the source of truth.
+
 The current implementation does not treat a search index, vector store, static site, or UI layer as a source of truth.
 
 ### Transport-agnostic workflow dispatch
 
-The API and scheduler do not know whether work is being delivered over HTTP, JetStream, or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
+The web app and scheduler do not know whether work is being delivered over HTTP, JetStream, or RQ. They both send a `WorkflowTriggerMessage` and rely on communication plugins to handle the transport-specific details.
+
+The worker side is now moving to the same rule: worker apps bootstrap one shared runtime, then resolve the worker-side transport companion from the configured communication plugin instead of hardcoding Redis or JetStream startup in each app.
 
 ### Workflow logic separate from worker runtime
 
-Compile behavior lives in `libs/workflows`, not in the API or the worker process itself. This makes the workflow reusable across transports and easier to test in isolation.
+Compile behavior lives in `libs/workflows`, not in the web app or the worker process itself. This makes the workflow reusable across transports and easier to test in isolation.
 
 ## Planned Workflow Evolution
 
@@ -119,10 +124,10 @@ The planned target design is documented in [docs/design/compile-supervisor-multi
 
 The current repo supports this main path:
 
-1. A webhook request reaches `apps/api`.
+1. A webhook request reaches the mounted webhook surface in `apps/web`.
 2. The selected webhook plugin verifies, enriches, and converts the payload into `RawDocument` objects.
-3. The API writes those raw documents into storage.
-4. The API asks the webhook plugin to build the downstream workflow trigger for the written document URIs.
+3. The webhook ingress app writes those raw documents into storage.
+4. The ingress app asks the webhook plugin to build the downstream workflow trigger for the written document URIs.
 5. In the default case, that trigger is still `draft.ready`; dedicated webhook plugins can attach metadata, stable idempotency keys, or skip dispatch entirely.
 6. A worker consumes the trigger and runs the compile workflow from `libs/workflows`.
 7. The workflow writes a published markdown document or, on repeated review failure, a human-review record.
@@ -142,18 +147,17 @@ Implemented in this repo today:
 - RQ worker support for queued draft work
 - LangGraph compile, review, publish, and human-review interruption flow
 - storage-backed raw, review, and published document artifacts
-- HTTP transport as a communication client contract plus a local mock worker for smoke testing
+- HTTP transport as both a communication client contract and a first-party worker listener companion
 
 Not implemented in this repo today:
 
-- a dedicated operator UI
+- a dedicated browser client separate from the server-rendered FastAPI web app
 - a retrieval SDK or MCP server package
 - hybrid lexical/vector retrieval infrastructure
 - graph traversal over published content
 - static-site publishing pipeline
 - publish-triggered deployment hooks
 - cryptographic provenance receipts
-- a first-party HTTP worker service that executes the workflow contract end to end
 - worker-side handling for `cron.tick`
 
 ## Legacy Mapping
@@ -162,11 +166,11 @@ Several legacy docs described the right long-term direction, but with names that
 
 | Legacy term  | Current repo term                                        |
 | ------------ | -------------------------------------------------------- |
-| receiver     | `apps/api`                                               |
+| receiver     | `apps/web` mounted with `libs/webhooks`                  |
 | compiler app | `libs/workflows` plus RQ and JetStream worker processes. |
 | live wiki    | `published` storage namespace                            |
 | meta         | `metadata`, `templates`, and `agents` storage namespaces |
 
 Use the current names when writing new documentation or code.
 
-In the current repository, "worker apps" means `apps/draft-worker` for the legacy RQ path or `apps/nats-worker` for the JetStream-backed path.
+In the current repository, `apps/worker-app` is the worker process.

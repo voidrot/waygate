@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 
@@ -12,12 +13,16 @@ from rq import Queue, Retry
 from rq.exceptions import DuplicateJobError
 from waygate_core.plugin import (
     CommunicationClientPlugin,
+    CommunicationWorkerTransportPlugin,
     DispatchErrorKind,
     PluginConfigRegistration,
+    WorkflowTriggerRunner,
     WorkflowDispatchResult,
     WorkflowTriggerMessage,
 )
 from waygate_core.plugin.hooks import hookimpl
+from waygate_workflows.router import process_workflow_trigger
+from waygate_worker import RQWorkerConfig, run_rq_worker
 
 PLUGIN_NAME = "communication-rq"
 _DEFAULT_REDIS_URL = "redis://localhost:6379/0"
@@ -30,9 +35,7 @@ class CommunicationRQConfig(BaseModel):
     redis_url: str | None = Field(default=None)
     draft_queue_name: str = Field(default="draft")
     cron_queue_name: str = Field(default="cron")
-    job_function: str = Field(
-        default="waygate_workflows.draft.jobs.process_workflow_trigger"
-    )
+    job_function: str = Field(default="waygate_worker.rq.process_rq_workflow_trigger")
     job_timeout: int | str = Field(default="5m")
     result_ttl: int = Field(default=500)
     failure_ttl: int = Field(default=31_536_000)
@@ -86,6 +89,13 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         """
 
         return PluginConfigRegistration(name=PLUGIN_NAME, config=CommunicationRQConfig)
+
+    @staticmethod
+    @hookimpl
+    def waygate_worker_transport_plugin() -> type["CommunicationRQWorkerTransport"]:
+        """Register the RQ worker transport companion."""
+
+        return CommunicationRQWorkerTransport
 
     async def submit_workflow_trigger(
         self,
@@ -194,19 +204,7 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
             The Redis connection URL to use.
         """
 
-        if self._config.redis_url:
-            return self._config.redis_url
-
-        for env_name in (
-            "WAYGATE_COMMUNICATION_RQ__REDIS_URL",
-            "WAYGATE_CORE__REDIS_DSN",
-            "WAYGATE_CORE__REDIS_URL",
-        ):
-            value = os.getenv(env_name)
-            if value:
-                return value
-
-        return _DEFAULT_REDIS_URL
+        return _resolve_redis_url_from_config(self._config)
 
     def _build_retry(self) -> Retry | None:
         """Build an RQ retry policy from the plugin configuration.
@@ -218,7 +216,9 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         if self._config.retry_max <= 0:
             return None
 
-        intervals = self._config.retry_intervals or None
+        intervals = self._config.retry_intervals
+        if not intervals:
+            return Retry(max=self._config.retry_max)
         return Retry(max=self._config.retry_max, interval=intervals)
 
     def _build_job_id(self, message: WorkflowTriggerMessage) -> str | None:
@@ -238,3 +238,52 @@ class CommunicationRQPlugin(CommunicationClientPlugin):
         if not sanitized:
             return None
         return f"{message.event_type}-{sanitized}"
+
+
+class CommunicationRQWorkerTransport(CommunicationWorkerTransportPlugin):
+    """Run the RQ worker loop for the configured workflow transport."""
+
+    plugin_name = PLUGIN_NAME
+
+    def __init__(self, config: CommunicationRQConfig | None = None) -> None:
+        self._config = config or CommunicationRQConfig()
+
+    @property
+    def name(self) -> str:
+        return PLUGIN_NAME
+
+    async def run(
+        self,
+        runner: WorkflowTriggerRunner,
+        *,
+        stop_event: asyncio.Event | None = None,
+    ) -> None:
+        if runner is not process_workflow_trigger:
+            raise RuntimeError(
+                "communication-rq only supports the default workflow trigger runner"
+            )
+        if stop_event is not None:
+            raise RuntimeError("communication-rq does not support asyncio stop events")
+
+        worker_config = RQWorkerConfig(
+            redis_url=_resolve_redis_url_from_config(self._config),
+            draft_queue_name=self._config.draft_queue_name,
+            cron_queue_name=self._config.cron_queue_name,
+        )
+        await asyncio.to_thread(run_rq_worker, worker_config)
+
+
+def _resolve_redis_url_from_config(config: CommunicationRQConfig) -> str:
+    if config.redis_url:
+        return config.redis_url
+
+    for env_name in (
+        "WAYGATE_COMMUNICATION_RQ__REDIS_URL",
+        "WAYGATE_CORE__REDIS_DSN",
+        "WAYGATE_CORE__REDIS_URL",
+    ):
+        value = os.getenv(env_name)
+        if value:
+            return value
+
+    return _DEFAULT_REDIS_URL

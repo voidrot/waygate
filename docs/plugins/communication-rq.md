@@ -41,4 +41,4 @@ It enqueues serialized `WorkflowTriggerMessage` payloads into named RQ queues an
 ## Notes
 
 - Redis URL fallback order is plugin config, then core Redis DSN, then the legacy core Redis URL alias, then localhost.
-- The plugin is designed to work with the worker router provided by `waygate-workflows`.
+- The plugin is designed to work with the shared worker runtime in `waygate-worker`.

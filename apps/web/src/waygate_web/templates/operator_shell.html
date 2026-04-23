@@ -1,0 +1,22 @@
+{% extends "base.html" %} {% block content %}
+<section class="flex flex-col gap-6">
+  <header class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3 p-6">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="badge badge-primary badge-outline">Operator surface</span>
+        {% if user_is_admin %}
+        <span class="badge badge-secondary badge-outline">Admin</span>
+        {% endif %}
+      </div>
+      <div class="space-y-2">
+        <h1 class="text-3xl font-black tracking-tight">{{ page_title }}</h1>
+        {% if page_intro %}
+        <p class="max-w-3xl text-sm text-base-content/70">{{ page_intro }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  {% block operator_content %}{% endblock %}
+</section>
+{% endblock %}

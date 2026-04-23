@@ -31,7 +31,7 @@ If you are new to the repo, start in this order:
 
 ## Scope Notes
 
-- These docs describe the repository at its current structure: `apps/api`, `apps/scheduler`, `apps/draft-worker`, `apps/nats-worker`, `libs/core`, `libs/worker`, `libs/workflows`, and the plugins under `plugins/`.
+- These docs describe the repository at its current structure: `apps/web`, `apps/scheduler`, `apps/worker-app`, `libs/core`, `libs/webhooks`, `libs/worker`, `libs/workflows`, and the plugins under `plugins/`.
 - `compile-supervisor-multi-agent.md` now documents the implemented sequential supervisor workflow in `libs/workflows`. Read it together with `ingestion-and-workflows.md` for the current compile contract.
 - Older documents that described operator UIs, MCP services, retrieval SDK packages, or static-site pipelines are treated here as deferred roadmap material unless the implementation exists in this repo.
 - The original compile workflow proposal is archived at `docs/plans/compile-workflow-original-plan.md`. Use it as historical background only; the current implementation contract is documented in `docs/design/ingestion-and-workflows.md`.

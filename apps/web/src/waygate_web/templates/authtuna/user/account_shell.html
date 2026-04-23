@@ -1,0 +1,67 @@
+{% extends "base.html" %} {% block content %}
+<section class="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+  <aside
+    class="card border border-base-300 bg-base-100 shadow-sm lg:sticky lg:top-6 lg:self-start"
+  >
+    <div class="card-body p-4">
+      <p
+        class="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50"
+      >
+        Operator surface
+      </p>
+      <ul class="menu gap-1 p-0">
+        <li>
+          <a
+            class="{{ 'menu-active' if active_page == 'dashboard' else '' }}"
+            href="/ui/dashboard"
+            >Dashboard</a
+          >
+        </li>
+        <li>
+          <a
+            class="{{ 'menu-active' if active_page == 'profile' else '' }}"
+            href="/ui/profile"
+            >Profile</a
+          >
+        </li>
+        <li>
+          <a
+            class="{{ 'menu-active' if active_page == 'settings' else '' }}"
+            href="/ui/settings"
+            >Settings</a
+          >
+        </li>
+        <li>
+          <a
+            class="{{ 'menu-active' if active_page == 'organizations' else '' }}"
+            href="/ui/organizations"
+            >Organizations</a
+          >
+        </li>
+        <li>
+          <a
+            class="{{ 'menu-active' if active_page == 'teams' else '' }}"
+            href="/ui/teams"
+            >Teams</a
+          >
+        </li>
+        <li><a href="/auth/logout">Sign out</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <div class="flex flex-col gap-6">
+    <header class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-2 p-6">
+        <span class="badge badge-primary badge-outline w-fit">Account</span>
+        <h1 class="text-3xl font-black tracking-tight">{{ page_title }}</h1>
+        {% if page_intro %}
+        <p class="text-sm text-base-content/70">{{ page_intro }}</p>
+        {% endif %}
+      </div>
+    </header>
+
+    {% block account_content %}{% endblock %}
+  </div>
+</section>
+{% endblock %}

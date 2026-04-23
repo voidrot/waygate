@@ -6,6 +6,7 @@ from waygate_core.plugin import DispatchErrorKind, WorkflowTriggerMessage
 from waygate_plugin_communication_http.plugin import (
     CommunicationHttpConfig,
     CommunicationHttpPlugin,
+    CommunicationHttpWorkerTransport,
 )
 
 
@@ -142,3 +143,9 @@ def test_submit_workflow_trigger_retries_transient_http_status(monkeypatch) -> N
 
     assert result.accepted is True
     assert result.transport_message_id == "retry-success"
+
+
+def test_http_plugin_registers_worker_transport_companion() -> None:
+    worker_transport = CommunicationHttpPlugin.waygate_worker_transport_plugin()
+
+    assert worker_transport is CommunicationHttpWorkerTransport

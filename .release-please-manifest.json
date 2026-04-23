@@ -1,9 +1,9 @@
 {
-  "apps/api": "0.1.0",
+  "apps/web": "0.1.0",
   "apps/scheduler": "0.1.0",
-  "apps/draft-worker": "0.1.0",
-  "apps/nats-worker": "0.1.0",
+  "apps/worker-app": "0.1.0",
   "libs/core": "0.1.0",
+  "libs/webhooks": "0.1.0",
   "libs/worker": "0.1.0",
   "libs/workflows": "0.1.0",
   "plugins/local-storage": "0.1.0",

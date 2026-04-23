@@ -1,10 +1,21 @@
 services:
-  api:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: migrations
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+  web:
     build:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        - APP=api
+        - APP=web
     ports:
       - "${API_PORT:-8080}:8080"
     env_file:
@@ -12,15 +23,21 @@ services:
     environment:
       PORT: 8080
     depends_on:
-      - db
-      - nats
-      - valkey
-      - chromadb
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
     volumes:
       - wiki_data:/data/wiki
     develop:
       watch:
-        - path: apps/api
+        - path: apps/web
           action: rebuild
         - path: libs
           action: rebuild
@@ -36,10 +53,16 @@ services:
       - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     environment: {}
     depends_on:
-      - db
-      - nats
-      - valkey
-      - chromadb
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
     volumes:
       - wiki_data:/data/wiki
     develop:
@@ -50,17 +73,23 @@ services:
           action: rebuild
         - path: plugins
           action: rebuild
-  draft-worker:
+  worker:
     build:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        - APP=draft-worker
+        - APP=worker-app
     env_file:
       - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
     environment: {}
+    ports:
+      - "${WORKER_PORT:-8090}:8090"
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
+        condition: service_healthy
+      nats:
         condition: service_healthy
       valkey:
         condition: service_healthy
@@ -70,33 +99,7 @@ services:
       - wiki_data:/data/wiki
     develop:
       watch:
-        - path: apps/draft-worker
-          action: rebuild
-        - path: libs
-          action: rebuild
-        - path: plugins
-          action: rebuild
-  nats-worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        - APP=nats-worker
-    env_file:
-      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
-    environment: {}
-    depends_on:
-      db:
-        condition: service_healthy
-      nats:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    volumes:
-      - wiki_data:/data/wiki
-    develop:
-      watch:
-        - path: apps/nats-worker
+        - path: apps/worker-app
           action: rebuild
         - path: libs
           action: rebuild

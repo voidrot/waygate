@@ -1,0 +1,55 @@
+{% extends "account_shell.html" %} {% set active_page = "teams" %} {% set
+page_title = "Teams" %} {% set page_intro = "View the teams you belong to across
+your organizations and jump straight into each team workspace." %} {% block
+account_content %} {% if team_groups %}
+<section class="grid gap-6">
+  {% for group in team_groups %}
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="card-title">{{ group.org.name }}</h2>
+          <p class="text-sm text-base-content/60">
+            Organization {{ group.org.id }}
+          </p>
+        </div>
+        <a
+          class="btn btn-ghost btn-sm"
+          href="/ui/organizations/{{ group.org.id }}"
+          >Open organization</a
+        >
+      </div>
+
+      <div class="flex flex-col gap-3">
+        {% for team in group.teams %}
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold">{{ team.name }}</p>
+              <p class="text-xs text-base-content/60">{{ team.id }}</p>
+            </div>
+            <a class="btn btn-primary btn-sm" href="/ui/teams/{{ team.id }}"
+              >Open team</a
+            >
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<article class="card max-w-2xl border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <h2 class="card-title">No team memberships yet</h2>
+    <p class="text-sm text-base-content/70">
+      You are not a member of any teams. Open an organization to review its
+      teams or accept a new invitation.
+    </p>
+    <a class="btn btn-soft justify-self-start" href="/ui/organizations"
+      >Browse organizations</a
+    >
+  </div>
+</article>
+{% endif %} {% endblock %}

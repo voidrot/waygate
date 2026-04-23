@@ -1,0 +1,132 @@
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: migrations
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=web
+    ports:
+      - "${API_PORT:-8080}:8080"
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    environment:
+      PORT: 8080
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - wiki_data:/data/wiki
+    restart: unless-stopped
+
+  scheduler:
+    profiles: [ "scheduler" ]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=scheduler
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    environment: {}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - wiki_data:/data/wiki
+    restart: unless-stopped
+
+  worker:
+    profiles: [ "rq", "nats", "http" ]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        - APP=worker-app
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    environment: {}
+    ports:
+      - "${WORKER_PORT:-8090}:8090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - wiki_data:/data/wiki
+    restart: unless-stopped
+
+  db:
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    extends:
+      file: .compose/postgresql.yml
+      service: db
+
+  valkey:
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    extends:
+      file: .compose/valkey.yml
+      service: valkey
+
+  chromadb:
+    profiles: [ "chroma" ]
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    extends:
+      file: .compose/chromadb.yml
+      service: chromadb
+
+  ollama:
+    profiles: [ "ollama" ]
+    extends:
+      file: .compose/ollama.yml
+      service: ollama
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    restart: unless-stopped
+
+  nats:
+    profiles: [ "nats" ]
+    extends:
+      file: .compose/nats.yml
+      service: nats
+    env_file:
+      - ${WAYGATE_COMPOSE_ENV_FILE:-.env.compose}
+    restart: unless-stopped
+
+volumes:
+  valkey_data:
+  postgres_data:
+  chroma_data:
+  wiki_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${WIKI_DATA_DIR:-./wiki}
+  ollama_data:
+    name: ${OLLAMA_VOLUME_NAME:-waygate_ollama_data}

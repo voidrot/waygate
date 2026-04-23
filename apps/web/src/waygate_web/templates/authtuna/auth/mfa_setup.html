@@ -1,0 +1,118 @@
+{% extends "auth_shell.html" %} {% set page_title = "Set up multi-factor auth"
+%} {% set auth_title = "Set up an authenticator app" %} {% set auth_subtitle =
+"Scan the QR code with your authenticator app, then enter the generated code to
+finish setup." %} {% set auth_icon = "#" %} {% block auth_content %}
+<div id="mfa-setup-message" class="alert hidden text-sm" role="status"></div>
+
+<div class="flex flex-col items-center gap-4">
+  <figure class="rounded-box border border-base-300 bg-white p-4 shadow-sm">
+    <img
+      alt="QR code for MFA setup"
+      class="h-52 w-52"
+      src="/mfa/qr-code?uri={{ qr_code_uri | urlencode }}"
+    />
+  </figure>
+  <p class="text-center text-sm text-base-content/70">
+    If scanning is not possible, keep this page open and copy the secret into
+    your authenticator app manually.
+  </p>
+</div>
+
+<form id="mfa-setup-form" class="space-y-4">
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Authenticator code</legend>
+    <input
+      id="mfa-setup-code"
+      class="input input-bordered w-full text-center tracking-[0.4em]"
+      type="text"
+      minlength="6"
+      maxlength="6"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      required
+    />
+  </fieldset>
+
+  <button class="btn btn-primary btn-block" type="submit">
+    Verify and enable MFA
+  </button>
+</form>
+
+<section id="recovery-codes" class="hidden space-y-4">
+  <div class="alert alert-success text-sm">
+    MFA is enabled. Save these recovery codes now; they are shown only once.
+  </div>
+  <div id="recovery-code-list" class="grid gap-2 sm:grid-cols-2"></div>
+  <button
+    id="copy-recovery-codes"
+    class="btn btn-outline btn-block"
+    type="button"
+  >
+    Copy recovery codes
+  </button>
+</section>
+{% endblock %} {% block body_end %}
+<script>
+  const mfaSetupForm = document.getElementById("mfa-setup-form");
+  const mfaSetupMessage = document.getElementById("mfa-setup-message");
+  const recoveryCodesSection = document.getElementById("recovery-codes");
+  const recoveryCodeList = document.getElementById("recovery-code-list");
+  const copyRecoveryCodesButton = document.getElementById(
+    "copy-recovery-codes",
+  );
+
+  function showMfaSetupMessage(kind, text) {
+    mfaSetupMessage.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    mfaSetupMessage.textContent = text;
+    mfaSetupMessage.classList.remove("hidden");
+  }
+
+  mfaSetupForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = mfaSetupForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    try {
+      const response = await fetch("/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: document.getElementById("mfa-setup-code").value,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to verify MFA setup.");
+      }
+      recoveryCodeList.innerHTML = "";
+      for (const code of data.recovery_codes || []) {
+        const item = document.createElement("div");
+        item.className =
+          "rounded-box border border-base-300 bg-base-200 px-4 py-3 font-mono text-sm";
+        item.textContent = code;
+        recoveryCodeList.appendChild(item);
+      }
+      recoveryCodesSection.classList.remove("hidden");
+      mfaSetupForm.classList.add("hidden");
+      showMfaSetupMessage("success", "Multi-factor authentication is enabled.");
+    } catch (error) {
+      showMfaSetupMessage(
+        "error",
+        error.message || "Unable to verify MFA setup.",
+      );
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  copyRecoveryCodesButton.addEventListener("click", async () => {
+    const text = Array.from(recoveryCodeList.children)
+      .map((item) => item.textContent)
+      .join("\n");
+    await navigator.clipboard.writeText(text);
+    copyRecoveryCodesButton.textContent = "Copied";
+    window.setTimeout(() => {
+      copyRecoveryCodesButton.textContent = "Copy recovery codes";
+    }, 1200);
+  });
+</script>
+{% endblock %}

@@ -62,7 +62,7 @@ def test_submit_workflow_trigger_enqueues_rq_job(monkeypatch) -> None:
     assert result.accepted is True
     assert result.transport_message_id == "draft.ready-draft-1"
     assert fake_queue.enqueue_calls[0]["job_function"] == (
-        "waygate_workflows.draft.jobs.process_workflow_trigger"
+        "waygate_worker.rq.process_rq_workflow_trigger"
     )
 
 

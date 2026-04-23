@@ -23,6 +23,15 @@ run = "docker compose up -d"
 [tasks."docker:down"]
 run = "docker compose down"
 
+[tasks."docker:up:prod:nats"]
+run = "docker compose -f compose.prod.yml --profile nats --profile chroma --profile ollama up -d"
+
+[tasks."docker:up:prod:rq"]
+run = "docker compose -f compose.prod.yml --profile rq --profile chroma --profile ollama up -d"
+
+[tasks."docker:down:prod"]
+run = "docker compose -f compose.prod.yml down"
+
 [tasks."test:compose:nats-smoke"]
 run = "uv run python scripts/compose_smoke_nats.py"
 

@@ -1,0 +1,124 @@
+{% extends "account_shell.html" %} {% set active_page = "organizations" %} {%
+set page_title = "Organizations" %} {% set page_intro = "View the organizations
+you own or belong to, and create a new one when your roles allow it." %} {%
+block account_content %}
+<section class="grid gap-6 lg:grid-cols-2">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Owned organizations</h2>
+      {% if owned_orgs %}
+      <div class="flex flex-col gap-3">
+        {% for org in owned_orgs %}
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold">{{ org.name }}</p>
+              <p class="text-xs text-base-content/60">{{ org.id }}</p>
+            </div>
+            <a
+              class="btn btn-primary btn-sm"
+              href="/ui/organizations/{{ org.id }}"
+              >Open</a
+            >
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-base-content/60">
+        You do not own any organizations yet.
+      </p>
+      {% endif %}
+    </div>
+  </article>
+
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Member of</h2>
+      {% if orgs %}
+      <div class="flex flex-col gap-3">
+        {% for org in orgs %}
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold">{{ org.name }}</p>
+              <p class="text-xs text-base-content/60">{{ org.id }}</p>
+            </div>
+            <a class="btn btn-soft btn-sm" href="/ui/organizations/{{ org.id }}"
+              >Open</a
+            >
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-base-content/60">
+        You are not a member of any organizations.
+      </p>
+      {% endif %}
+    </div>
+  </article>
+</section>
+
+{% if can_create_org %}
+<article class="card max-w-2xl border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <h2 class="card-title">Create organization</h2>
+    <div
+      id="org-create-message"
+      class="alert hidden text-sm"
+      role="status"
+    ></div>
+    <form id="org-create-form" class="grid gap-4">
+      <input
+        class="input input-bordered w-full"
+        id="org-create-name"
+        placeholder="Organization name"
+        required
+        type="text"
+      />
+      <button class="btn btn-primary justify-self-start" type="submit">
+        Create organization
+      </button>
+    </form>
+  </div>
+</article>
+{% endif %} {% endblock %} {% block body_end %} {% if can_create_org %}
+<script>
+  const orgCreateForm = document.getElementById("org-create-form");
+  const orgCreateMessage = document.getElementById("org-create-message");
+
+  function showOrgCreateMessage(kind, text) {
+    orgCreateMessage.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    orgCreateMessage.textContent = text;
+    orgCreateMessage.classList.remove("hidden");
+  }
+
+  orgCreateForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const payload = new URLSearchParams({
+        name: document.getElementById("org-create-name").value,
+      });
+      const response = await fetch("/ui/organizations/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: payload.toString(),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to create organization.");
+      }
+      showOrgCreateMessage("success", "Organization created.");
+      window.setTimeout(() => {
+        window.location.href = `/ui/organizations/${data.id}`;
+      }, 500);
+    } catch (error) {
+      showOrgCreateMessage(
+        "error",
+        error.message || "Unable to create organization.",
+      );
+    }
+  });
+</script>
+{% endif %} {% endblock %}

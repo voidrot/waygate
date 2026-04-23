@@ -3,10 +3,14 @@
 from .communication import (
     CommunicationClientPlugin,
     CommunicationClientResolutionError,
+    CommunicationWorkerTransportPlugin,
+    CommunicationWorkerTransportResolutionError,
     DispatchErrorKind,
+    WorkflowTriggerRunner,
     WorkflowDispatchResult,
     WorkflowTriggerMessage,
     resolve_communication_client,
+    resolve_communication_worker_transport,
 )
 from .cron import CronPlugin
 from .hooks import PluginConfigRegistration, WayGatePluginSpec
@@ -33,6 +37,8 @@ __all__ = [
     "CronPlugin",
     "CommunicationClientPlugin",
     "CommunicationClientResolutionError",
+    "CommunicationWorkerTransportPlugin",
+    "CommunicationWorkerTransportResolutionError",
     "DispatchErrorKind",
     "LLMCommonOptions",
     "LLMConfigurationError",
@@ -45,9 +51,11 @@ __all__ = [
     "LLMReadinessProbe",
     "LLMResolvedOptions",
     "StoragePlugin",
+    "WorkflowTriggerRunner",
     "WorkflowDispatchResult",
     "WorkflowTriggerMessage",
     "resolve_communication_client",
+    "resolve_communication_worker_transport",
     "WebhookPlugin",
     "PluginConfigRegistration",
     "WayGatePluginSpec",

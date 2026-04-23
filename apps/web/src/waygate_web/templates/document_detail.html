@@ -1,0 +1,45 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="card-title">{{ document_stub.title }}</h2>
+        <span class="badge badge-outline">{{ document_stub.visibility }}</span>
+      </div>
+      <dl class="grid gap-3 md:grid-cols-2">
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Document id</dt>
+          <dd class="font-mono text-sm">{{ document_stub.id }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Artifact kind</dt>
+          <dd>{{ document_stub.artifact_kind }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Storage uri</dt>
+          <dd class="font-mono text-sm">{{ document_stub.storage_uri }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Source set key</dt>
+          <dd class="font-mono text-sm">{{ document_stub.source_set_key }}</dd>
+        </div>
+      </dl>
+    </div>
+  </article>
+
+  <aside class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3">
+      <h2 class="card-title">Reserved detail sections</h2>
+      <ul class="list gap-2">
+        {% for section in detail_sections %}
+        <li class="list-row rounded-box bg-base-200 px-4 py-3">
+          <div class="list-col-grow">
+            <p class="font-semibold">{{ section }}</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+</section>
+{% endblock %}

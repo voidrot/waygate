@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 
 from langchain.agents import create_agent
+from waygate_core.logging import get_logger
 
 from waygate_workflows.runtime.llm import resolve_chat_model
-from waygate_workflows.runtime.text import extract_final_text
+from waygate_workflows.runtime.text import extract_final_text, preview_text
 from waygate_workflows.schema import DraftGraphState
+
+logger = get_logger(__name__)
 
 
 def _build_synthesis_prompt(state: DraftGraphState) -> str:
@@ -40,6 +43,18 @@ def synthesize_draft_with_specialist(
     Returns:
         Markdown draft text produced by the synthesis specialist.
     """
+    prompt = _build_synthesis_prompt(state)
+    logger.info(
+        "Invoking synthesis specialist",
+        source_set_key=state.get("source_set_key"),
+        draft_model_name=draft_model_name,
+        prompt_length=len(prompt),
+    )
+    logger.debug(
+        "Synthesis specialist prompt preview",
+        source_set_key=state.get("source_set_key"),
+        prompt_preview=preview_text(prompt),
+    )
     synthesis_agent = create_agent(
         model=resolve_chat_model(
             "compile",
@@ -53,10 +68,14 @@ def synthesize_draft_with_specialist(
             "Eliminate redundancy, preserve grounded claims, and keep terminology consistent with the durable compile context."
         ),
     )
-    result = synthesis_agent.invoke(
-        {"messages": [{"role": "user", "content": _build_synthesis_prompt(state)}]}
+    result = synthesis_agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    draft = extract_final_text(result)
+    logger.info(
+        "Synthesis specialist completed",
+        source_set_key=state.get("source_set_key"),
+        draft_length=len(draft),
     )
-    return extract_final_text(result)
+    return draft
 
 
 __all__ = ["synthesize_draft_with_specialist"]

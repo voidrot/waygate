@@ -4,9 +4,12 @@ import json
 
 from langchain.agents import create_agent
 from langchain.agents.structured_output import ToolStrategy
+from waygate_core.logging import get_logger
 
 from waygate_workflows.runtime.llm import invoke_structured_stage
+from waygate_workflows.runtime.llm import recover_structured_result
 from waygate_workflows.runtime.llm import resolve_chat_model
+from waygate_workflows.runtime.text import preview_text
 from waygate_workflows.schema import ContinuityExtractionModel
 from waygate_workflows.schema import DocumentAnalysisPromptContext
 from waygate_workflows.schema import DocumentAnalysisResultModel
@@ -15,6 +18,8 @@ from waygate_workflows.schema import MetadataExtractionModel
 from waygate_workflows.schema import SourceDocumentState
 from waygate_workflows.schema import SummaryExtractionModel
 from waygate_workflows.tools import build_source_analysis_tools
+
+logger = get_logger(__name__)
 
 
 class _StructuredSpecialistAdapter:
@@ -50,6 +55,12 @@ class _StructuredSpecialistAdapter:
             raise ValueError("structured specialist messages must be dict objects")
 
         user_prompt = str(first_message.get("content", ""))
+        logger.debug(
+            "Invoking structured analysis specialist",
+            target_name=self._target_name,
+            prompt_length=len(user_prompt),
+            prompt_preview=preview_text(user_prompt),
+        )
         result = invoke_structured_stage(
             schema=self._schema,
             workflow_name="compile",
@@ -57,6 +68,11 @@ class _StructuredSpecialistAdapter:
             target_name=self._target_name,
             system_prompt=self._system_prompt,
             user_prompt=user_prompt,
+        )
+        logger.debug(
+            "Structured analysis specialist completed",
+            target_name=self._target_name,
+            response_type=type(result).__name__,
         )
         return {"structured_response": result}
 
@@ -81,28 +97,6 @@ def _build_document_prompt(
     )
 
 
-def _coerce_model(
-    schema: type[MetadataExtractionModel]
-    | type[SummaryExtractionModel]
-    | type[FindingsExtractionModel]
-    | type[ContinuityExtractionModel]
-    | type[DocumentAnalysisResultModel],
-    value: object,
-):
-    """Coerce provider output into the expected structured response model.
-
-    Args:
-        schema: Expected Pydantic model type.
-        value: Raw provider output.
-
-    Returns:
-        Parsed model instance.
-    """
-    if isinstance(value, schema):
-        return value
-    return schema.model_validate(value)
-
-
 def _extract_structured_response(
     result: dict[str, object],
     schema: type[MetadataExtractionModel]
@@ -113,10 +107,7 @@ def _extract_structured_response(
 ):
     """Return a validated structured response when the agent produced one."""
 
-    structured = result.get("structured_response")
-    if structured is None:
-        return None
-    return _coerce_model(schema, structured)
+    return recover_structured_result(schema, result)
 
 
 def _invoke_specialist_agent(
@@ -130,9 +121,18 @@ def _invoke_specialist_agent(
 ):
     """Invoke one specialist directly and require a structured response."""
 
+    logger.debug(
+        "Invoking fallback specialist directly",
+        target_schema=schema.__name__,
+        prompt_length=len(document_prompt),
+    )
     result = agent.invoke({"messages": [{"role": "user", "content": document_prompt}]})
     structured = _extract_structured_response(result, schema)
     if structured is None:
+        logger.error(
+            "Fallback specialist returned no structured response",
+            target_schema=schema.__name__,
+        )
         raise KeyError("structured_response")
     return structured
 
@@ -191,7 +191,20 @@ def analyze_document_with_supervisor(
     Returns:
         Combined structured analysis result for the active document.
     """
+    logger.info(
+        "Starting document analysis supervisor run",
+        document_uri=document["uri"],
+        metadata_model_name=metadata_model_name,
+        draft_model_name=draft_model_name,
+        guidance_count=len(prompt_context["prompt_instructions"]),
+    )
     document_prompt = _build_document_prompt(document, prompt_context)
+    logger.debug(
+        "Built document analysis supervisor prompt",
+        document_uri=document["uri"],
+        prompt_length=len(document_prompt),
+        prompt_preview=preview_text(document_prompt),
+    )
 
     metadata_system_prompt = (
         "You are the metadata extraction specialist for the compile workflow. "
@@ -280,6 +293,10 @@ def analyze_document_with_supervisor(
         DocumentAnalysisResultModel,
     )
     if structured is None:
+        logger.warning(
+            "Document analysis supervisor returned no structured response; falling back to direct specialists",
+            document_uri=document["uri"],
+        )
         structured = _fallback_document_analysis_result(
             document,
             document_prompt=document_prompt,
@@ -289,5 +306,17 @@ def analyze_document_with_supervisor(
             continuity_agent=continuity_agent,
         )
     if structured.uri != document["uri"]:
+        logger.warning(
+            "Document analysis supervisor returned mismatched URI; normalizing to active document",
+            expected_uri=document["uri"],
+            actual_uri=structured.uri,
+        )
         structured.uri = document["uri"]
+    logger.info(
+        "Completed document analysis supervisor run",
+        document_uri=document["uri"],
+        topic_count=len(structured.metadata.topics),
+        key_claim_count=len(structured.findings.key_claims),
+        unresolved_mention_count=len(structured.continuity.unresolved_mentions),
+    )
     return structured

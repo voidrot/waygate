@@ -45,7 +45,7 @@ The current direction is to keep one explicit model per document artifact type i
 
 ## Raw Storage Artifact
 
-The API does not store a `RawDocument` as JSON. It renders the model into a text artifact with frontmatter and writes that artifact to storage.
+The webhook ingress app does not store a `RawDocument` as JSON. It renders the model into a text artifact with frontmatter and writes that artifact to storage.
 
 The compile workflow currently depends on these parsed fields when it reloads a raw artifact:
 
@@ -103,6 +103,32 @@ The later integration workflow will consume compiled artifacts and write
 
 That future artifact should use the `PublishedDocument` contract and published-document renderer rather than reusing the compiled-document schema unchanged.
 
+## Relational Secondary Indexes
+
+`waygate-core` now defines a first-party relational schema for secondary indexing and workflow observability.
+
+That schema now targets PostgreSQL 18+ and uses native `uuid` columns with the built-in `uuidv7()` function for primary key defaults.
+
+The main tables are:
+
+- `document_types`
+- `documents`
+- `raw_documents`
+- `compiled_documents`
+- `published_pages`
+- `workflow_jobs`
+- `workflow_job_transitions`
+- `document_job_links`
+- `document_vector_refs`
+
+That schema is intentionally downstream of the stored file artifacts:
+
+- `documents` indexes shared identity and metadata such as `storage_uri`, `content_hash`, `source_hash`, `source_uri`, `source_set_key`, `topics`, `tags`, `people`, `organizations`, and `projects`
+- `document_job_links` records every workflow job that edited a document instead of collapsing lineage to one current job pointer
+- `document_vector_refs` stores vector or index references as reconstructable links, not as a replacement for the compiled or published artifact
+
+These relational tables are an operational index and audit surface. They do not change the source-of-truth rule described below.
+
 ## Storage Namespaces
 
 The storage contract is namespace-based.
@@ -154,7 +180,7 @@ Base-relative URIs give storage plugins a stable handoff format that does not le
 
 That keeps three boundaries cleaner:
 
-- API and scheduler can hand work to workers without assuming a host path layout
+- web app and scheduler can hand work to workers without assuming a host path layout
 - tests can assert storage behavior without depending on absolute directories
 - future storage implementations can preserve the same high-level document reference shape even if the backing store changes
 

@@ -1,0 +1,53 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Job summary</h2>
+      <dl class="grid gap-3 md:grid-cols-2">
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Job id</dt>
+          <dd class="font-mono text-sm">{{ job_stub.id }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Workflow type</dt>
+          <dd>{{ job_stub.workflow_type }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Event type</dt>
+          <dd>{{ job_stub.event_type }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Status</dt>
+          <dd>
+            <span class="badge badge-outline">{{ job_stub.status }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase text-base-content/50">Source set key</dt>
+          <dd class="font-mono text-sm">{{ job_stub.source_set_key }}</dd>
+        </div>
+      </dl>
+      <div class="rounded-box bg-base-200 p-4 text-sm text-base-content/70">
+        {{ job_stub.last_feedback_summary }}
+      </div>
+    </div>
+  </article>
+
+  <aside class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3">
+      <h2 class="card-title">Transition history stub</h2>
+      <ul class="timeline timeline-vertical timeline-compact">
+        {% for label in transition_labels %}
+        <li>
+          <div class="timeline-middle status status-primary"></div>
+          <div class="timeline-end timeline-box">{{ label }}</div>
+          {% if not loop.last %}
+          <hr />
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+</section>
+{% endblock %}

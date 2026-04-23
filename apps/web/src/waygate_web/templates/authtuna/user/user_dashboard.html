@@ -1,0 +1,62 @@
+{% extends "account_shell.html" %} {% set active_page = "dashboard" %} {% set
+page_title = "Your dashboard" %} {% set page_intro = "A compact summary of your
+account state and the auth tooling attached to it." %} {% block account_content
+%}
+<section class="grid gap-4 md:grid-cols-3">
+  <article
+    class="stat rounded-box border border-base-300 bg-base-100 shadow-sm"
+  >
+    <div class="stat-title">Username</div>
+    <div class="stat-value text-primary text-2xl">{{ user.username }}</div>
+  </article>
+  <article
+    class="stat rounded-box border border-base-300 bg-base-100 shadow-sm"
+  >
+    <div class="stat-title">Email status</div>
+    <div
+      class="stat-value text-2xl {{ 'text-success' if user.email_verified else 'text-warning' }}"
+    >
+      {{ 'Verified' if user.email_verified else 'Pending' }}
+    </div>
+  </article>
+  <article
+    class="stat rounded-box border border-base-300 bg-base-100 shadow-sm"
+  >
+    <div class="stat-title">MFA</div>
+    <div
+      class="stat-value text-2xl {{ 'text-success' if user.mfa_enabled else 'text-warning' }}"
+    >
+      {{ 'Enabled' if user.mfa_enabled else 'Disabled' }}
+    </div>
+  </article>
+</section>
+
+<section class="grid gap-4 lg:grid-cols-2">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">Account details</h2>
+      <dl class="grid gap-3 text-sm">
+        <div>
+          <dt class="font-semibold text-base-content/60">Email</dt>
+          <dd>{{ user.get_email() }}</dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-base-content/60">Account status</dt>
+          <dd>{{ 'Active' if user.is_active else 'Inactive' }}</dd>
+        </div>
+      </dl>
+    </div>
+  </article>
+
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h2 class="card-title">Quick actions</h2>
+      <div class="flex flex-wrap gap-3">
+        <a class="btn btn-primary" href="/ui/settings">Security settings</a>
+        <a class="btn btn-soft" href="/ui/profile">Edit profile</a>
+        <a class="btn btn-ghost" href="/ui/organizations">Organizations</a>
+      </div>
+    </div>
+  </article>
+</section>
+{% endblock %}

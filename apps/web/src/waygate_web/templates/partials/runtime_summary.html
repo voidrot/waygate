@@ -1,0 +1,18 @@
+<div class="overflow-x-auto">
+  <table class="table table-zebra">
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Selection</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for label, value in runtime_rows %}
+      <tr>
+        <th>{{ label }}</th>
+        <td>{{ value }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

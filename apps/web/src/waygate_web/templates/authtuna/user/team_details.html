@@ -1,0 +1,180 @@
+{% extends "account_shell.html" %} {% set active_page = "teams" %} {% set
+page_title = team.name %} {% set page_intro = "Manage team membership and
+team-scoped access inside " ~ org.name ~ "." %} {% block account_content %}
+<section class="grid gap-6">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="card-title">Team details</h2>
+          <p class="text-sm text-base-content/60">
+            Organization {{ org.name }} · ID {{ team.id }}
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          {% if is_lead %}
+          <button
+            class="btn btn-error btn-sm"
+            id="delete-team-button"
+            type="button"
+          >
+            Delete team
+          </button>
+          {% else %}
+          <button
+            class="btn btn-warning btn-sm"
+            id="leave-team-button"
+            type="button"
+          >
+            Leave team
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="card-title">Members</h2>
+        {% if is_lead %}
+        <form id="team-invite-form" class="flex flex-wrap gap-3">
+          <input
+            class="input input-bordered w-full max-w-xs"
+            id="team-invite-email"
+            placeholder="Invitee email"
+            required
+            type="email"
+          />
+          <select class="select select-bordered" id="team-invite-role">
+            <option value="TeamMember">Team member</option>
+            <option value="TeamLead">Team lead</option>
+          </select>
+          <button class="btn btn-primary" type="submit">Invite</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if is_lead %}
+      <div
+        id="team-invite-message"
+        class="alert hidden text-sm"
+        role="status"
+      ></div>
+      {% endif %}
+      <div class="flex flex-col gap-3">
+        {% for member in members %}
+        <div class="rounded-box border border-base-300 bg-base-200 px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold">{{ member.username }}</p>
+              <p class="text-xs text-base-content/60">
+                {{ member.email }} · joined {{ member.joined_at }}
+              </p>
+            </div>
+            {% if is_lead %}
+            <button
+              class="btn btn-ghost btn-sm"
+              data-team-member-id="{{ member.user_id }}"
+              data-team-member-email="{{ member.email }}"
+              type="button"
+            >
+              Remove
+            </button>
+            {% else %}
+            <span class="badge badge-ghost">Member</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </article>
+</section>
+{% endblock %} {% block body_end %}
+<script>
+  const teamId = {{ team.id|tojson }};
+  const teamInviteForm = document.getElementById("team-invite-form");
+  const teamInviteMessage = document.getElementById("team-invite-message");
+
+  function showTeamMessage(kind, text) {
+    if (!teamInviteMessage) {
+      return;
+    }
+    teamInviteMessage.className = `alert ${kind === "error" ? "alert-error" : "alert-success"} text-sm`;
+    teamInviteMessage.textContent = text;
+    teamInviteMessage.classList.remove("hidden");
+  }
+
+  if (teamInviteForm) {
+    teamInviteForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const response = await fetch(`/ui/teams/${teamId}/invite`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("team-invite-email").value,
+            role_name: document.getElementById("team-invite-role").value,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to send team invite.");
+        }
+        showTeamMessage("success", data.message || "Invitation sent.");
+        teamInviteForm.reset();
+      } catch (error) {
+        showTeamMessage("error", error.message || "Unable to send team invite.");
+      }
+    });
+  }
+
+  document.querySelectorAll("[data-team-member-id]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/ui/teams/${teamId}/members/${button.dataset.teamMemberId}`, { method: "DELETE" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || `Unable to remove ${button.dataset.teamMemberEmail}.`);
+        }
+        window.location.reload();
+      } catch (error) {
+        window.alert(error.message || `Unable to remove ${button.dataset.teamMemberEmail}.`);
+      }
+    });
+  });
+
+  const deleteTeamButton = document.getElementById("delete-team-button");
+  if (deleteTeamButton) {
+    deleteTeamButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/ui/teams/${teamId}`, { method: "DELETE" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to delete team.");
+        }
+        window.location.href = `/ui/organizations/{{ org.id }}`;
+      } catch (error) {
+        window.alert(error.message || "Unable to delete team.");
+      }
+    });
+  }
+
+  const leaveTeamButton = document.getElementById("leave-team-button");
+  if (leaveTeamButton) {
+    leaveTeamButton.addEventListener("click", async () => {
+      try {
+        const response = await fetch(`/ui/teams/${teamId}/leave`, { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to leave team.");
+        }
+        window.location.href = `/ui/organizations/{{ org.id }}`;
+      } catch (error) {
+        window.alert(error.message || "Unable to leave team.");
+      }
+    });
+  }
+</script>
+{% endblock %}

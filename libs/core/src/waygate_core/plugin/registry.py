@@ -70,27 +70,26 @@ class WayGatePluginManager:
                 configs[registration.name] = registration.config
         return configs
 
-    def get_plugins(self, group: str, settings: object) -> dict[str, object]:
-        """Instantiate plugins for a group and inject resolved config objects.
+    def _instantiate_plugins(
+        self, hook_attr: str, settings: object
+    ) -> dict[str, object]:
+        """Instantiate plugins for a hook and inject resolved config objects.
 
         Args:
-            group: The plugin group to load.
+            hook_attr: The Pluggy hook attribute to resolve.
             settings: The merged WayGate settings object.
 
         Returns:
             A mapping of plugin instance name to instantiated plugin.
         """
 
-        hook_attr = _GROUP_HOOK_ATTR[group]
         hook = getattr(self._pm.hook, hook_attr)
 
-        # Build normalized-name -> config-instance lookup from current settings
         config_map: dict[str, object] = {}
         for name in self.get_plugin_configs():
             normalized = normalize_plugin_name(name)
             config_instance = getattr(settings, normalized, None)
             if config_instance is not None:
-                # Match the normalized config field name rather than the raw hook name.
                 config_map[normalized] = config_instance
 
         plugins: dict[str, object] = {}
@@ -109,6 +108,26 @@ class WayGatePluginManager:
             plugins[key] = instance
 
         return plugins
+
+    def get_plugins(self, group: str, settings: object) -> dict[str, object]:
+        """Instantiate plugins for a group and inject resolved config objects.
+
+        Args:
+            group: The plugin group to load.
+            settings: The merged WayGate settings object.
+
+        Returns:
+            A mapping of plugin instance name to instantiated plugin.
+        """
+
+        return self._instantiate_plugins(_GROUP_HOOK_ATTR[group], settings)
+
+    def get_plugins_for_hook(
+        self, hook_attr: str, settings: object
+    ) -> dict[str, object]:
+        """Instantiate plugins exposed through an explicit Pluggy hook."""
+
+        return self._instantiate_plugins(hook_attr, settings)
 
 
 shared_plugin_manager = WayGatePluginManager()

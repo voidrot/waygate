@@ -1,0 +1,13 @@
+{% extends "auth_shell.html" %} {% set page_title = "Request error" %} {% set
+auth_title = "This request could not be completed" %} {% set auth_subtitle =
+message or "Something went wrong while processing the auth flow." %} {% set
+auth_icon = "!" %} {% set auth_badge = "WayGate Error" %} {% block auth_content
+%}
+<div class="alert alert-error text-sm">
+  {{ message or "Something went wrong while processing the auth flow." }}
+</div>
+<div class="flex flex-wrap gap-3">
+  <a class="btn btn-primary flex-1" href="/auth/login">Return to sign in</a>
+  <a class="btn btn-ghost flex-1" href="/">Back to home</a>
+</div>
+{% endblock %}

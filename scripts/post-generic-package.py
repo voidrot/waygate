@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
@@ -18,8 +19,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PACKAGE_ROOT = REPO_ROOT / "libs" / "core"
-DEFAULT_ENDPOINT = "http://127.0.0.1:8080/webhooks/generic-webhook"
 SKIPPED_PARTS = {"__pycache__", ".git", ".pytest_cache", ".mypy_cache"}
+
+
+def default_endpoint() -> str:
+    """Resolve the default generic webhook endpoint for local runs."""
+
+    explicit_endpoint = os.getenv("WAYGATE_GENERIC_WEBHOOK_ENDPOINT")
+    if explicit_endpoint:
+        return explicit_endpoint
+
+    port = os.getenv("API_PORT", "8080")
+    return f"http://127.0.0.1:{port}/webhooks/generic-webhook"
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--endpoint",
-        default=DEFAULT_ENDPOINT,
+        default=default_endpoint(),
         help="Generic webhook endpoint URL",
     )
     parser.add_argument(

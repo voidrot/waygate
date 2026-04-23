@@ -118,6 +118,13 @@ def _dispatch_integration_trigger(
         metadata=metadata,
     )
 
+    logger.info(
+        "Dispatching ready.integrate workflow trigger",
+        source=parent_message.source,
+        compiled_document_uri=compiled_document_uri,
+        compiled_document_id=compiled_document_id,
+        source_set_key=source_set_key,
+    )
     try:
         app_context = get_app_context()
         client = resolve_communication_client(
@@ -125,8 +132,34 @@ def _dispatch_integration_trigger(
             app_context.config.core.communication_plugin_name,
             allow_fallback=False,
         )
-        return asyncio.run(client.submit_workflow_trigger(trigger))
+        dispatch_result = asyncio.run(client.submit_workflow_trigger(trigger))
+        if dispatch_result.accepted:
+            logger.info(
+                "ready.integrate workflow trigger accepted",
+                source=parent_message.source,
+                compiled_document_id=compiled_document_id,
+                transport_message_id=dispatch_result.transport_message_id,
+            )
+        else:
+            logger.error(
+                "ready.integrate workflow trigger rejected",
+                source=parent_message.source,
+                compiled_document_id=compiled_document_id,
+                error_kind=(
+                    dispatch_result.error_kind.value
+                    if dispatch_result.error_kind is not None
+                    else None
+                ),
+                detail=dispatch_result.detail,
+            )
+        return dispatch_result
     except Exception as exc:
+        logger.error(
+            "ready.integrate workflow trigger dispatch failed",
+            source=parent_message.source,
+            compiled_document_id=compiled_document_id,
+            detail=str(exc),
+        )
         return WorkflowDispatchResult(
             accepted=False,
             detail=f"Failed to dispatch ready.integrate trigger: {exc}",
@@ -147,10 +180,26 @@ def _invoke_compile_workflow(
     """
     thread_id = _build_thread_id(message)
     config = {"configurable": {"thread_id": thread_id}}
+    logger.info(
+        "Starting compile workflow invocation",
+        request_key=thread_id,
+        source=message.source,
+        document_count=len(message.document_paths),
+        metadata_keys=sorted(message.metadata.keys()),
+    )
     with PostgresSaver.from_conn_string(build_postgres_connection_string()) as saver:
         saver.setup()
         workflow = compile_workflow(checkpointer=saver)
         result = workflow.invoke(_build_initial_state(message), config=config)
+    logger.info(
+        "Compile workflow invocation completed",
+        request_key=thread_id,
+        source=message.source,
+        source_set_key=result.get("source_set_key"),
+        compiled_document_uri=result.get("compiled_document_uri"),
+        human_review_record_uri=result.get("human_review_record_uri"),
+        interrupted="__interrupt__" in result,
+    )
     return thread_id, result
 
 
@@ -169,6 +218,14 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
     raw_payload = json.loads(payload) if isinstance(payload, str) else payload
     message = WorkflowTriggerMessage.model_validate(raw_payload)
     event_type = message.event_type
+    logger.debug(
+        "Validated workflow trigger payload",
+        event_type=event_type,
+        source=message.source,
+        document_count=len(message.document_paths),
+        metadata_keys=sorted(message.metadata.keys()),
+        idempotency_key=message.idempotency_key,
+    )
 
     match event_type:
         case WorkflowEvent.DRAFT_READY.value:
@@ -214,6 +271,13 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
                     "metadata": message.metadata,
                 }
             if "__interrupt__" in result:
+                logger.info(
+                    "Compile workflow paused for human review",
+                    source=message.source,
+                    request_key=thread_id,
+                    source_set_key=result.get("source_set_key"),
+                    human_review_record_uri=result.get("human_review_record_uri"),
+                )
                 return {
                     "status": "human_review",
                     "request_key": thread_id,
@@ -226,6 +290,14 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
 
             dispatch_result = _dispatch_integration_trigger(message, result)
             if dispatch_result is not None and not dispatch_result.accepted:
+                logger.error(
+                    "Compile workflow completed but integration dispatch failed",
+                    source=message.source,
+                    request_key=thread_id,
+                    source_set_key=result.get("source_set_key"),
+                    compiled_document_id=result.get("compiled_document_id"),
+                    detail=dispatch_result.detail,
+                )
                 return {
                     "status": "failed",
                     "error_kind": (
@@ -244,6 +316,14 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
                     "compiled_document_hash": result.get("compiled_document_hash"),
                 }
 
+            logger.info(
+                "Compile workflow completed successfully",
+                source=message.source,
+                request_key=thread_id,
+                source_set_key=result.get("source_set_key"),
+                compiled_document_id=result.get("compiled_document_id"),
+                compiled_document_uri=result.get("compiled_document_uri"),
+            )
             return {
                 "status": "completed",
                 "request_key": thread_id,
@@ -267,7 +347,7 @@ def process_workflow_trigger(payload: dict | str) -> dict[str, object]:
                 "metadata": message.metadata,
             }
         case _:
-            logger.error(
+            logger.warning(
                 "Ignoring unsupported workflow trigger event",
                 event_type=event_type,
                 source=message.source,

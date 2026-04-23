@@ -28,5 +28,5 @@ Environment variables use the `WAYGATE_COMMUNICATION_NATS__*` namespace.
 
 - The plugin expects a JetStream stream to exist and treats missing stream
   configuration as a configuration error.
-- The `waygate-nats-worker` app can create the stream automatically during
+- The `waygate-worker-app` process can create the stream automatically during
   worker startup for local development and simple deployments.

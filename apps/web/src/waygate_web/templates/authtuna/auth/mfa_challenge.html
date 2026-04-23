@@ -1,0 +1,128 @@
+{% extends "auth_shell.html" %} {% set page_title = "Multi-factor check" %} {%
+set auth_title = "Verify your sign-in" %} {% set auth_subtitle = "Enter your
+authenticator code or confirm the sign-in with a passkey." %} {% set auth_icon =
+"2" %} {% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+{% endblock %} {% block auth_content %}
+<div id="mfa-message" class="alert hidden text-sm" role="status"></div>
+
+<form id="mfa-form" class="space-y-4">
+  <fieldset class="fieldset">
+    <legend class="fieldset-legend">Verification code</legend>
+    <input
+      id="mfa-code"
+      class="input input-bordered w-full text-center tracking-[0.4em]"
+      type="text"
+      minlength="6"
+      maxlength="11"
+      autocomplete="one-time-code"
+      required
+    />
+  </fieldset>
+
+  <button class="btn btn-primary btn-block" type="submit">
+    Complete sign-in
+  </button>
+</form>
+
+<div class="divider">Other option</div>
+
+<button
+  id="mfa-passkey-button"
+  class="btn btn-outline btn-block hidden"
+  type="button"
+>
+  Use a passkey instead
+</button>
+{% endblock %} {% block body_end %}
+<script>
+  const mfaMessage = document.getElementById("mfa-message");
+  const mfaForm = document.getElementById("mfa-form");
+  const mfaPasskeyButton = document.getElementById("mfa-passkey-button");
+  const mfaToken = new URLSearchParams(window.location.search).get("mfa_token");
+
+  function showMfaMessage(kind, text) {
+    mfaMessage.className = `alert ${kind === "error" ? "alert-error" : kind === "success" ? "alert-success" : "alert-info"} text-sm`;
+    mfaMessage.textContent = text;
+    mfaMessage.classList.remove("hidden");
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (!mfaToken) {
+      showMfaMessage("error", "Missing MFA token. Start the login flow again.");
+      mfaForm.querySelector("button[type='submit']").disabled = true;
+      return;
+    }
+    if (
+      window.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable
+    ) {
+      const available =
+        await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (available) {
+        mfaPasskeyButton.classList.remove("hidden");
+      }
+    }
+  });
+
+  mfaForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = mfaForm.querySelector("button[type='submit']");
+    button.disabled = true;
+    try {
+      const response = await fetch("/mfa/validate-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mfa_token: mfaToken,
+          code: document.getElementById("mfa-code").value,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Verification failed.");
+      }
+      showMfaMessage("success", data.message || "Verified.");
+      window.setTimeout(() => {
+        window.location.href = "/ui/dashboard";
+      }, 600);
+    } catch (error) {
+      showMfaMessage("error", error.message || "Verification failed.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  mfaPasskeyButton.addEventListener("click", async () => {
+    mfaPasskeyButton.disabled = true;
+    showMfaMessage("info", "Waiting for your passkey...");
+    try {
+      const optionsResponse = await fetch("/passkeys/login-options", {
+        method: "POST",
+      });
+      const options = await optionsResponse.json();
+      if (!optionsResponse.ok) {
+        throw new Error(options.detail || "Unable to start passkey flow.");
+      }
+      const assertion =
+        await SimpleWebAuthnBrowser.startAuthentication(options);
+      const verifyResponse = await fetch("/passkeys/mfa-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mfa_token: mfaToken, response: assertion }),
+      });
+      const data = await verifyResponse.json();
+      if (!verifyResponse.ok) {
+        throw new Error(data.detail || "Passkey verification failed.");
+      }
+      showMfaMessage("success", data.message || "Verified.");
+      window.setTimeout(() => {
+        window.location.href = "/ui/dashboard";
+      }, 600);
+    } catch (error) {
+      showMfaMessage("error", error.message || "Passkey verification failed.");
+    } finally {
+      mfaPasskeyButton.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

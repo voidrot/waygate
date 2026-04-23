@@ -6,14 +6,15 @@ Shared worker runtime helpers for WayGate transports.
 
 - boots the shared WayGate app context for worker processes
 - preflights compile LLM readiness before accepting work
-- manages JetStream stream and consumer configuration for NATS-based workers
+- resolves the worker-side transport companion for the selected communication plugin
 - runs the existing `waygate_workflows.router.process_workflow_trigger` entrypoint
+- ships transport helpers for JetStream and RQ runtimes that communication plugins can call
 - keeps long-running JetStream jobs alive with periodic `in_progress()` heartbeats
 
-## Running Through The NATS Worker App
+## Running
 
 ```bash
-uv run waygate-nats-worker
+uv run waygate-worker-app
 ```
 
-The `waygate-nats-worker` app is the thin CLI wrapper around this library.
+`waygate-worker-app` is the app entrypoint for worker execution.

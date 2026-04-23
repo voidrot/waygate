@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 from waygate_workflows.agents.document_analysis import analyze_document_with_supervisor
 from waygate_workflows.schema import ContinuityExtractionModel
@@ -11,9 +12,35 @@ from waygate_workflows.schema import MetadataExtractionModel
 from waygate_workflows.schema import SummaryExtractionModel
 
 
+class _RecordingLogger:
+    def __init__(self) -> None:
+        self.records: list[dict[str, object]] = []
+
+    def debug(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "debug", "event": event, **kwargs})
+
+    def info(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "info", "event": event, **kwargs})
+
+    def warning(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "warning", "event": event, **kwargs})
+
+    def error(self, event: str, **kwargs: object) -> None:
+        self.records.append({"level": "error", "event": event, **kwargs})
+
+    def has_event(self, level: str, event: str) -> bool:
+        return any(
+            record["level"] == level and record["event"] == event
+            for record in self.records
+        )
+
+
 def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
     monkeypatch,
 ) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
     create_agent_calls: list[dict[str, object]] = []
     invoked_payloads: list[tuple[str, str]] = []
     resolved_models: list[tuple[str, str, str | None]] = []
@@ -200,12 +227,17 @@ def test_analyze_document_with_supervisor_uses_multiple_specialist_subagents(
         ("compile", "draft-model", "compile.source-analysis.findings"),
         ("compile", "draft-model", "compile.source-analysis.continuity"),
     ]
+    assert logger.has_event("info", "Starting document analysis supervisor run")
+    assert logger.has_event("info", "Completed document analysis supervisor run")
 
 
 def test_analyze_document_with_supervisor_falls_back_when_supervisor_lacks_structured_response(
     monkeypatch,
 ) -> None:
     invoked_kinds: list[str] = []
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
     document = {
         "uri": "file://raw/fallback.md",
         "content": "Document fallback content referencing Beta",
@@ -288,3 +320,461 @@ def test_analyze_document_with_supervisor_falls_back_when_supervisor_lacks_struc
         "compile.source-analysis.findings",
         "compile.source-analysis.continuity",
     ]
+    assert logger.has_event(
+        "warning",
+        "Document analysis supervisor returned no structured response; falling back to direct specialists",
+    )
+
+
+def test_analyze_document_with_supervisor_recovers_from_raw_agent_message(
+    monkeypatch,
+) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
+    monkeypatch.setattr("waygate_workflows.runtime.llm.logger", logger)
+    document = {
+        "uri": "file://raw/recovered.md",
+        "content": "Document content referencing Gamma",
+        "source_hash": "hash-recovered",
+        "source_uri": "https://example.test/recovered",
+        "source_type": "generic",
+        "timestamp": None,
+    }
+    prompt_context = {
+        "active_document": document,
+        "active_document_position": 1,
+        "canonical_topics_subset": [],
+        "canonical_tags_subset": [],
+        "glossary_subset": [],
+        "entity_subset": [],
+        "claim_subset": [],
+        "reference_subset": [],
+        "prior_briefs_subset": [],
+        "unresolved_mentions_subset": [],
+        "prompt_instructions": [],
+    }
+
+    class FakeSupervisor:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    SimpleNamespace(
+                        tool_calls=None,
+                        additional_kwargs=None,
+                        content=json.dumps(
+                            {
+                                "uri": document["uri"],
+                                "metadata": {
+                                    "tags": ["tag-recovered"],
+                                    "topics": ["topic-recovered"],
+                                    "people": [],
+                                    "organizations": [],
+                                    "projects": [],
+                                },
+                                "summary": {
+                                    "summary": "Recovered summary",
+                                },
+                                "findings": {
+                                    "key_claims": ["Recovered claim"],
+                                    "defined_terms": ["Gamma"],
+                                },
+                                "continuity": {
+                                    "referenced_entities": ["Gamma"],
+                                    "unresolved_mentions": [],
+                                },
+                            }
+                        ),
+                    )
+                ]
+            }
+
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.create_agent",
+        lambda **kwargs: FakeSupervisor(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.resolve_chat_model",
+        lambda *args, **kwargs: object(),
+    )
+
+    result = analyze_document_with_supervisor(
+        document,
+        prompt_context,
+        metadata_model_name="metadata-model",
+        draft_model_name="draft-model",
+    )
+
+    assert result.uri == document["uri"]
+    assert result.summary.summary == "Recovered summary"
+    assert result.findings.defined_terms == ["Gamma"]
+    assert not logger.has_event(
+        "warning",
+        "Document analysis supervisor returned no structured response; falling back to direct specialists",
+    )
+    assert logger.has_event(
+        "warning",
+        "Recovered structured output from raw agent message",
+    )
+
+
+def test_analyze_document_with_supervisor_falls_back_when_raw_agent_json_is_prompt_context(
+    monkeypatch,
+) -> None:
+    invoked_kinds: list[str] = []
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
+    monkeypatch.setattr("waygate_workflows.runtime.llm.logger", logger)
+    document = {
+        "uri": "file://raw/fallback-prompt-context.md",
+        "content": "Document fallback content referencing Eta",
+        "source_hash": "hash-fallback-prompt-context",
+        "source_uri": "https://example.test/fallback-prompt-context",
+        "source_type": "generic",
+        "timestamp": None,
+    }
+    prompt_context = {
+        "active_document": document,
+        "active_document_position": 1,
+        "canonical_topics_subset": [],
+        "canonical_tags_subset": [],
+        "glossary_subset": [],
+        "entity_subset": [],
+        "claim_subset": [],
+        "reference_subset": [],
+        "prior_briefs_subset": [],
+        "unresolved_mentions_subset": [],
+        "prompt_instructions": [],
+    }
+
+    class FakeSupervisor:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            invoked_kinds.append("supervisor")
+            return {
+                "messages": [
+                    SimpleNamespace(
+                        tool_calls=None,
+                        additional_kwargs=None,
+                        content=json.dumps(
+                            {
+                                "claims": [{"claim_ids": []}],
+                                "unresolved_mentions_subset": [],
+                            }
+                        ),
+                    )
+                ]
+            }
+
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.create_agent",
+        lambda **kwargs: FakeSupervisor(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.resolve_chat_model",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.invoke_structured_stage",
+        lambda *, schema, workflow_name, fallback_model_name, target_name=None, system_prompt, user_prompt: (
+            invoked_kinds.append(str(target_name))
+            or (
+                MetadataExtractionModel(
+                    tags=["tag-fallback"],
+                    topics=["topic-fallback"],
+                    people=[],
+                    organizations=[],
+                    projects=[],
+                )
+                if schema is MetadataExtractionModel
+                else SummaryExtractionModel(summary="Fallback summary")
+                if schema is SummaryExtractionModel
+                else FindingsExtractionModel(
+                    key_claims=["Claim fallback"],
+                    defined_terms=["Eta"],
+                )
+                if schema is FindingsExtractionModel
+                else ContinuityExtractionModel(
+                    referenced_entities=["Eta"],
+                    unresolved_mentions=[],
+                )
+            )
+        ),
+    )
+
+    result = analyze_document_with_supervisor(
+        document,
+        prompt_context,
+        metadata_model_name="metadata-model",
+        draft_model_name="draft-model",
+    )
+
+    assert result.summary.summary == "Fallback summary"
+    assert invoked_kinds == [
+        "supervisor",
+        "compile.source-analysis.metadata",
+        "compile.source-analysis.summary",
+        "compile.source-analysis.findings",
+        "compile.source-analysis.continuity",
+    ]
+    assert logger.has_event(
+        "warning",
+        "Document analysis supervisor returned no structured response; falling back to direct specialists",
+    )
+
+
+def test_analyze_document_with_supervisor_normalizes_legacy_summary_narrative(
+    monkeypatch,
+) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
+    monkeypatch.setattr("waygate_workflows.runtime.llm.logger", logger)
+    document = {
+        "uri": "file://raw/recovered-legacy.md",
+        "content": "Document content referencing Delta",
+        "source_hash": "hash-recovered-legacy",
+        "source_uri": "https://example.test/recovered-legacy",
+        "source_type": "generic",
+        "timestamp": None,
+    }
+    prompt_context = {
+        "active_document": document,
+        "active_document_position": 1,
+        "canonical_topics_subset": [],
+        "canonical_tags_subset": [],
+        "glossary_subset": [],
+        "entity_subset": [],
+        "claim_subset": [],
+        "reference_subset": [],
+        "prior_briefs_subset": [],
+        "unresolved_mentions_subset": [],
+        "prompt_instructions": [],
+    }
+
+    class FakeSupervisor:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    SimpleNamespace(
+                        tool_calls=None,
+                        additional_kwargs=None,
+                        content=json.dumps(
+                            {
+                                "uri": document["uri"],
+                                "metadata": {
+                                    "tags": ["tag-recovered"],
+                                    "topics": ["topic-recovered"],
+                                    "people": [],
+                                    "organizations": [],
+                                    "projects": [],
+                                },
+                                "summary": {
+                                    "narrative": "Recovered legacy summary",
+                                    "key_claims": ["Recovered claim"],
+                                    "defined_terms": ["Delta"],
+                                },
+                                "findings": {
+                                    "key_claims": ["Recovered claim"],
+                                    "defined_terms": ["Delta"],
+                                },
+                                "continuity": {
+                                    "referenced_entities": ["Delta"],
+                                    "unresolved_mentions": [],
+                                },
+                            }
+                        ),
+                    )
+                ]
+            }
+
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.create_agent",
+        lambda **kwargs: FakeSupervisor(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.resolve_chat_model",
+        lambda *args, **kwargs: object(),
+    )
+
+    result = analyze_document_with_supervisor(
+        document,
+        prompt_context,
+        metadata_model_name="metadata-model",
+        draft_model_name="draft-model",
+    )
+
+    assert result.uri == document["uri"]
+    assert result.summary.summary == "Recovered legacy summary"
+    assert result.summary.defined_terms == ["Delta"]
+    assert logger.has_event(
+        "warning",
+        "Normalized legacy structured summary payload",
+    )
+
+
+def test_analyze_document_with_supervisor_normalizes_legacy_summary_text(
+    monkeypatch,
+) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
+    monkeypatch.setattr("waygate_workflows.runtime.llm.logger", logger)
+    document = {
+        "uri": "file://raw/recovered-legacy-text.md",
+        "content": "Document content referencing Epsilon",
+        "source_hash": "hash-recovered-legacy-text",
+        "source_uri": "https://example.test/recovered-legacy-text",
+        "source_type": "generic",
+        "timestamp": None,
+    }
+    prompt_context = {
+        "active_document": document,
+        "active_document_position": 1,
+        "canonical_topics_subset": [],
+        "canonical_tags_subset": [],
+        "glossary_subset": [],
+        "entity_subset": [],
+        "claim_subset": [],
+        "reference_subset": [],
+        "prior_briefs_subset": [],
+        "unresolved_mentions_subset": [],
+        "prompt_instructions": [],
+    }
+
+    class FakeSupervisor:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    SimpleNamespace(
+                        tool_calls=None,
+                        additional_kwargs=None,
+                        content=json.dumps(
+                            {
+                                "uri": document["uri"],
+                                "metadata": {
+                                    "tags": ["tag-recovered"],
+                                    "topics": ["topic-recovered"],
+                                    "people": [],
+                                    "organizations": [],
+                                    "projects": [],
+                                },
+                                "summary": {
+                                    "text": "Recovered legacy text summary",
+                                    "key_claims": ["Recovered claim"],
+                                    "defined_terms": ["Epsilon"],
+                                },
+                                "findings": {
+                                    "key_claims": ["Recovered claim"],
+                                    "defined_terms": ["Epsilon"],
+                                },
+                                "continuity": {
+                                    "referenced_entities": ["Epsilon"],
+                                    "unresolved_mentions": [],
+                                },
+                            }
+                        ),
+                    )
+                ]
+            }
+
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.create_agent",
+        lambda **kwargs: FakeSupervisor(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.resolve_chat_model",
+        lambda *args, **kwargs: object(),
+    )
+
+    result = analyze_document_with_supervisor(
+        document,
+        prompt_context,
+        metadata_model_name="metadata-model",
+        draft_model_name="draft-model",
+    )
+
+    assert result.summary.summary == "Recovered legacy text summary"
+    assert logger.has_event("warning", "Normalized legacy structured summary payload")
+
+
+def test_analyze_document_with_supervisor_normalizes_legacy_summary_string(
+    monkeypatch,
+) -> None:
+    logger = _RecordingLogger()
+
+    monkeypatch.setattr("waygate_workflows.agents.document_analysis.logger", logger)
+    monkeypatch.setattr("waygate_workflows.runtime.llm.logger", logger)
+    document = {
+        "uri": "file://raw/recovered-legacy-string.md",
+        "content": "Document content referencing Zeta",
+        "source_hash": "hash-recovered-legacy-string",
+        "source_uri": "https://example.test/recovered-legacy-string",
+        "source_type": "generic",
+        "timestamp": None,
+    }
+    prompt_context = {
+        "active_document": document,
+        "active_document_position": 1,
+        "canonical_topics_subset": [],
+        "canonical_tags_subset": [],
+        "glossary_subset": [],
+        "entity_subset": [],
+        "claim_subset": [],
+        "reference_subset": [],
+        "prior_briefs_subset": [],
+        "unresolved_mentions_subset": [],
+        "prompt_instructions": [],
+    }
+
+    class FakeSupervisor:
+        def invoke(self, payload: dict[str, object]) -> dict[str, object]:
+            return {
+                "messages": [
+                    SimpleNamespace(
+                        tool_calls=None,
+                        additional_kwargs=None,
+                        content=json.dumps(
+                            {
+                                "uri": document["uri"],
+                                "metadata": {
+                                    "tags": ["tag-recovered"],
+                                    "topics": ["topic-recovered"],
+                                    "people": [],
+                                    "organizations": [],
+                                    "projects": [],
+                                },
+                                "summary": "Recovered legacy bare summary",
+                                "findings": {
+                                    "key_claims": ["Recovered claim"],
+                                    "defined_terms": ["Zeta"],
+                                },
+                                "continuity": {
+                                    "referenced_entities": ["Zeta"],
+                                    "unresolved_mentions": [],
+                                },
+                            }
+                        ),
+                    )
+                ]
+            }
+
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.create_agent",
+        lambda **kwargs: FakeSupervisor(),
+    )
+    monkeypatch.setattr(
+        "waygate_workflows.agents.document_analysis.resolve_chat_model",
+        lambda *args, **kwargs: object(),
+    )
+
+    result = analyze_document_with_supervisor(
+        document,
+        prompt_context,
+        metadata_model_name="metadata-model",
+        draft_model_name="draft-model",
+    )
+
+    assert result.summary.summary == "Recovered legacy bare summary"
+    assert result.summary.key_claims == []
+    assert logger.has_event("warning", "Normalized legacy structured summary payload")

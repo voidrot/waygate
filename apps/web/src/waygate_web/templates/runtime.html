@@ -1,0 +1,28 @@
+{% extends "operator_shell.html" %} {% block operator_content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <div
+      class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+    >
+      <div>
+        <h2 class="card-title">Live runtime data</h2>
+        <p class="text-sm text-base-content/60">
+          HTMX fragment rendered from the server using the existing runtime
+          summary partial.
+        </p>
+      </div>
+      <button
+        class="btn btn-outline btn-sm"
+        hx-get="/partials/runtime"
+        hx-target="#runtime-summary"
+        hx-swap="innerHTML"
+      >
+        Refresh
+      </button>
+    </div>
+    <div id="runtime-summary" hx-get="/partials/runtime" hx-trigger="load">
+      <div class="skeleton h-28 w-full"></div>
+    </div>
+  </div>
+</section>
+{% endblock %}
