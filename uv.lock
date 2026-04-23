@@ -2257,6 +2257,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "alembic", extra = ["tz"] },
+    { name = "psycopg", extra = ["binary"] },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -2271,6 +2272,7 @@ requires-dist = [{ name = "rich", specifier = ">=14.3.3" }]
 [package.metadata.requires-dev]
 dev = [
     { name = "alembic", extras = ["tz"], specifier = ">=1.18.4" },
+    { name = "psycopg", extras = ["binary"] },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },

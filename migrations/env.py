@@ -7,6 +7,7 @@ import tomllib
 from alembic import context
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy.engine import URL
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -69,12 +70,79 @@ def _discover_target_metadata(repo_root: Path):
 # Tell Alembic which SQLAlchemy metadata collections to diff against.
 target_metadata = _discover_target_metadata(repo_root)
 
+IGNORED_TABLE_NAMES = {
+    "api_key_scopes",
+    "api_keys",
+    "audit_events",
+    "checkpoint_blobs",
+    "checkpoint_migrations",
+    "checkpoint_writes",
+    "checkpoints",
+    "deleted_users",
+    "encryption_keys",
+    "mfa_methods",
+    "mfa_recovery_codes",
+    "organization",
+    "organization_members",
+    "passkey_credentials",
+    "permissions",
+    "role_assign_permissions",
+    "role_grant_permissions",
+    "role_permissions",
+    "roles",
+    "sessions",
+    "social_accounts",
+    "team",
+    "team_members",
+    "tokens",
+    "user_roles",
+    "users",
+}
+
+
+def _parent_table_name(object_, type_: str) -> str | None:
+    if type_ == "table":
+        return getattr(object_, "name", None)
+
+    parent_table = getattr(object_, "table", None)
+    if parent_table is not None:
+        return getattr(parent_table, "name", None)
+
+    return None
+
+
+def include_object(object_, name, type_, reflected, compare_to) -> bool:
+    del name, reflected, compare_to
+
+    return _parent_table_name(object_, type_) not in IGNORED_TABLE_NAMES
+
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-url = f"postgresql://{getenv('PG_USER', 'postgres')}:{getenv('PG_PASSWORD', 'postgres')}@{getenv('PG_HOST', 'localhost')}:{getenv('PG_PORT', '5432')}/{getenv('PG_DB', 'postgres')}"
+
+def _build_database_url() -> str:
+    """Build the SQLAlchemy URL used by Alembic.
+
+    The workspace installs `psycopg` v3, so Alembic must request the matching
+    SQLAlchemy dialect explicitly instead of relying on the default psycopg2
+    driver name.
+    """
+
+    driver = getenv("PG_DRIVER", "psycopg").strip() or "psycopg"
+    return URL.create(
+        drivername=f"postgresql+{driver}",
+        username=getenv("PG_USER", "postgres"),
+        password=getenv("PG_PASSWORD", "postgres"),
+        host=getenv("PG_HOST", "localhost"),
+        port=int(getenv("PG_PORT", "5432")),
+        database=getenv("PG_DB", "postgres"),
+    ).render_as_string(hide_password=False)
+
+
+url = _build_database_url()
 
 
 def run_migrations_offline() -> None:
@@ -92,6 +160,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_object=include_object,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -116,7 +185,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

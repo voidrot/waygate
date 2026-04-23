@@ -170,6 +170,8 @@ This contract is explicit on purpose:
 
 Workspace contributors win over installed contributors with the same entry-point name so local monorepo development can override already-installed package metadata.
 
+Tables owned by other systems should stay out of `target_metadata`. When WayGate depends on libraries or runtimes that manage their own schema, Alembic should ignore those tables explicitly during autogenerate instead of trying to adopt them into the first-party migration history.
+
 ## Why This Model Exists
 
 The plugin system is not only an extensibility mechanism. It is also the main architectural boundary between product-specific workflow logic and environment-specific integrations.

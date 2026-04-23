@@ -162,6 +162,10 @@ def waygate_migration_metadata():
     )
 
     monkeypatch.syspath_prepend(str(package_src))
+    monkeypatch.setattr(
+        "waygate_core.database.discovery._discover_installed_contributors",
+        lambda: (),
+    )
     sys.modules.pop("sample_models", None)
 
     metadata = discover_migration_metadata(repo_root=repo_root)

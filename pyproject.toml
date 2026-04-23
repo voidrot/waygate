@@ -8,13 +8,14 @@ dependencies    = ["rich>=14.3.3"]
 
 [dependency-groups]
 dev = [
-    "pytest",
-    "pytest-cov",
-    "ruff",
-    "pyright",
-    "tiktoken",
-    "ty",
-    "alembic[tz]>=1.18.4",
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "pyright",
+  "tiktoken",
+  "ty",
+  "alembic[tz]>=1.18.4",
+  "psycopg[binary]",
 ]
 
 [tool.uv]
@@ -22,13 +23,13 @@ package = false
 
 [tool.uv.workspace]
 members = [
-    "packages/*",
-    "apps/*",
-    "plugins/*",
-    "libs/core",
-    "libs/webhooks",
-    "libs/worker",
-    "libs/workflows",
+  "packages/*",
+  "apps/*",
+  "plugins/*",
+  "libs/core",
+  "libs/webhooks",
+  "libs/worker",
+  "libs/workflows",
 ]
 
 [tool.pytest.ini_options]
@@ -36,19 +37,19 @@ minversion = "8.0"
 testpaths = ["apps/*", "packages/*", "plugins/*"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = [
-    "-ra",
-    "--strict-config",
-    "--strict-markers",
-    "--cov=waygate_core",
-    "--cov=waygate_web",
-    "--cov=waygate_webhooks",
-    "--cov-report=term-missing",
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=waygate_core",
+  "--cov=waygate_web",
+  "--cov=waygate_webhooks",
+  "--cov-report=term-missing",
 ]
 filterwarnings = [
-    # # python-frontmatter v1.1.0 uses codecs.open() which is deprecated in Python 3.14+
-    # "ignore::DeprecationWarning:frontmatter",
-    # # langchain_core ships pydantic v1 compatibility shims that don't work on Python 3.14+
-    "ignore::UserWarning:langchain_core",
+  # # python-frontmatter v1.1.0 uses codecs.open() which is deprecated in Python 3.14+
+  # "ignore::DeprecationWarning:frontmatter",
+  # # langchain_core ships pydantic v1 compatibility shims that don't work on Python 3.14+
+  "ignore::UserWarning:langchain_core",
 ]
 
 [tool.coverage.run]
