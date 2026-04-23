@@ -1,6 +1,6 @@
 [project]
 name = "waygate-plugin-provider-ollama"
-version = "0.1.0"
+version = "0.1.1"
 description = "Ollama-backed LLM provider plugin for WayGate"
 readme = "README.md"
 authors = [
