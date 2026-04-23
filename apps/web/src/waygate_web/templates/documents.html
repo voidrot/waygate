@@ -43,7 +43,16 @@
         <legend class="fieldset-legend">Sort</legend>
         <select class="select select-bordered" name="sort">
           {% for value, label in sort_options %}
-          <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>
+          <option
+            value="{{ value }}"
+            {%
+            if
+            filters.sort=""
+            ="value"
+            %}selected{%
+            endif
+            %}
+          >
             {{ label }}
           </option>
           {% endfor %}
