@@ -1,6 +1,6 @@
 [project]
 name = "waygate-plugin-communication-rq"
-version = "0.1.0"
+version = "0.1.1"
 description = "RQ communication client plugin for worker dispatch"
 readme = "README.md"
 authors = [
