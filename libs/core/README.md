@@ -9,6 +9,22 @@ Core framework library for WayGate. Provides the plugin system, configuration re
 - **Bootstrap** — `bootstrap_app()` is the single entry point for application startup. It runs logging setup, plugin loading, config building, and plugin instantiation in order, returning a frozen `WaygateAppContext`.
 - **Hook specs** — defines the pluggy hookspec class (`WayGatePluginSpec`) and exports `hookimpl` for use by plugin packages.
 - **Plugin base classes** — abstract base classes for `StoragePlugin`, `WebhookPlugin`, `LLMProviderPlugin`, `CronPlugin`, and `CommunicationClientPlugin`.
+- **Database metadata** — first-party SQLAlchemy ORM models for tracked documents, workflow jobs, job transitions, document-job edit history, vector references, and Alembic metadata discovery.
+
+## Database Models
+
+`waygate-core` now exposes the first-party relational metadata used for secondary indexing and workflow observability.
+
+- `DocumentType` defines semantic document taxonomy.
+- `Document` is the shared registry for raw, compiled, and published artifacts with searchable metadata facets and audit timestamps.
+- `RawDocumentRecord`, `CompiledDocumentRecord`, and `PublishedPageRecord` hold artifact-specific fields that should not leak across boundaries.
+- `WorkflowJob` and `WorkflowJobTransition` track job details and state transitions.
+- `DocumentJobLink` records every job that edited a document with `edit_type`, `edit_count`, `first_edit_at`, and `last_edit_at`.
+- `DocumentVectorRef` stores downstream vector-store references as reconstructable secondary indexes.
+
+These tables are designed to complement storage-backed artifacts rather than replace them. Raw, compiled, and published files remain the source of truth.
+
+The schema is intentionally PostgreSQL-specific and now assumes PostgreSQL 18+ so it can use native `uuid` columns with the built-in `uuidv7()` function for primary key defaults.
 
 ## Usage
 

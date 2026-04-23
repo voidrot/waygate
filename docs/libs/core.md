@@ -8,6 +8,7 @@
 - Core settings under `WAYGATE_CORE__*`.
 - Plugin settings discovered through `waygate_plugin_config()` and exposed as normalized root fields such as `WAYGATE_LOCAL_STORAGE__*`.
 - Base classes and DTOs for storage, webhook, cron, LLM provider, and communication plugins.
+- First-party SQLAlchemy metadata and ORM models for relational indexing, workflow job tracking, and Alembic discovery.
 - Shared document models and template helpers for raw, compiled, and published document rendering.
 - Structured logging setup through `configure_logging()` and `get_logger()`.
 
@@ -66,6 +67,17 @@ Environment variables follow two conventions:
 - `build_raw_document_frontmatter()`, `build_compiled_document_frontmatter()`, and `build_published_document_frontmatter()` build artifact-specific frontmatter models.
 - `render_raw_document()`, `render_compiled_document()`, and `render_published_document()` provide the shared rendering path.
 
+### Database models
+
+- `Base` is the shared declarative root used by Alembic metadata discovery.
+- `DocumentType`, `Document`, `RawDocumentRecord`, `CompiledDocumentRecord`, and `PublishedPageRecord` define the first-party relational index over storage-backed artifacts.
+- `WorkflowJob` and `WorkflowJobTransition` persist job state and transition history for workflow observability.
+- `DocumentJobLink` records every job run that edited a tracked document, keyed by document, job, and `edit_type` with `first_edit_at`, `last_edit_at`, and `edit_count`.
+- `DocumentVectorRef` stores reconstructable downstream vector/index references without making the vector store a source of truth.
+- `discover_migration_metadata()` and `waygate_migration_metadata()` expose the metadata collection used by Alembic.
+
+The first-party relational schema now targets PostgreSQL 18+ and uses native `uuid` columns with the built-in `uuidv7()` function for primary key defaults.
+
 ### Logging
 
 - `configure_logging()` installs the structlog pipeline.
@@ -97,6 +109,8 @@ Common plugin groups are:
 - [libs/core/src/waygate_core/plugin/registry.py](../../libs/core/src/waygate_core/plugin/registry.py)
 - [libs/core/src/waygate_core/plugin/hooks.py](../../libs/core/src/waygate_core/plugin/hooks.py)
 - [libs/core/src/waygate_core/files/template.py](../../libs/core/src/waygate_core/files/template.py)
+- [libs/core/src/waygate_core/database/models.py](../../libs/core/src/waygate_core/database/models.py)
+- [libs/core/src/waygate_core/database/discovery.py](../../libs/core/src/waygate_core/database/discovery.py)
 - [libs/core/src/waygate_core/logging/config.py](../../libs/core/src/waygate_core/logging/config.py)
 - [libs/core/src/waygate_core/logging/helpers.py](../../libs/core/src/waygate_core/logging/helpers.py)
 - [libs/core/src/waygate_core/schema/document.py](../../libs/core/src/waygate_core/schema/document.py)

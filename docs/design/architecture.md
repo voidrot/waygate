@@ -99,6 +99,8 @@ The durable artifacts in the current repository are storage-backed files:
 - published compiled markdown
 - metadata/templates/agents content for storage plugins that provide those namespaces
 
+The repository may also persist relational secondary indexes in Postgres for document metadata, workflow jobs, job transitions, document/job edit history, and vector references. Those tables are reconstructable operational indexes and do not replace the storage-backed artifacts as the source of truth.
+
 The current implementation does not treat a search index, vector store, static site, or UI layer as a source of truth.
 
 ### Transport-agnostic workflow dispatch
