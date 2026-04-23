@@ -7,6 +7,7 @@ def test_bootstrap_app_populates_process_cache(monkeypatch) -> None:
     fake_manager = SimpleNamespace(
         load_all=lambda: None,
         get_plugins=lambda group, settings: {},
+        get_plugins_for_hook=lambda hook_name, settings: {},
     )
 
     class FakeConfigRegistry:
